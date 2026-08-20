@@ -1,0 +1,10 @@
+[package]
+name = "biparse"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hashbrown = "0.17.1"
+im = "15.1.0"
+rowan = "0.17.0"
+rustc-hash = "2.1.3"
