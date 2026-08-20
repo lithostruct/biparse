@@ -1,13 +1,13 @@
+use derive_more::Into;
+
 
 /// The trait describing all input types accepted by the [`Parser`](crate::parser::Parser) trait.
 pub trait Input {
-    /// The type of a singular token from this input.
-    type Token;
     /// The type of the cursor, that allows for external users to refer into this input.
     type Cursor: Clone + Eq;
 
-    /// Produces the next token in the input from the cursor.
-    fn next(&self, cursor: Self::Cursor) -> Option<(Self::Cursor, Self::Token)>;
+    /// Produces a cursor that points to the start of the input.
+    fn start(&self) -> Self::Cursor;
     /// Produces the string slice over the range specified by the two cursors.
     /// 
     /// Range is `start`-inclusive, `end`-exclusive.
@@ -16,31 +16,32 @@ pub trait Input {
 
 /// The trait describing all pattern types that match onto a specific input type.
 pub trait Pattern<I : Input + ?Sized> {
-    /// The result of matching.
-    type Matched<'src> where I : 'src;
-    fn matches_at<'src>(&self, input: &'src I, cursor: I::Cursor) -> Option<(I::Cursor, Self::Matched<'src>)>;
+    /// Returns the end position of the cursor, if `self` matches onto the input at the specified cursor.
+    fn matches_at(&self, input: &mut I, cursor: I::Cursor) -> Option<I::Cursor>;
 }
 
+/// The cursor type for `str`-based input.
+/// The contained value is asserted to be at a UTF-8 boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Into)]
+pub struct StrIndex(usize);
+
 impl Input for str {
-    type Token = char;
-    type Cursor = usize;
+    type Cursor = StrIndex;
     
-    fn next(&self, cursor: Self::Cursor) -> Option<(Self::Cursor, Self::Token)> {
-        self[cursor..].char_indices().next()
+    fn start(&self) -> Self::Cursor {
+        StrIndex(0)
     }
     fn slice(&self, start: Self::Cursor, end: Self::Cursor) -> &str {
-        &self[start..end]
+        &self[start.0 .. end.0]
     }
 }
 impl Pattern<str> for char {
-    type Matched<'src> = char;
-    fn matches_at<'src>(&self, input: &'src str, cursor: <str as Input>::Cursor) -> Option<(<str as Input>::Cursor, Self::Matched<'src>)> {
-        input.next(cursor).filter(|(_, inner)| inner == self)
+    fn matches_at(&self, input: &mut str, cursor: <str as Input>::Cursor) -> Option<<str as Input>::Cursor> {
+        input[cursor.0 ..].starts_with(*self).then_some(StrIndex(cursor.0 + self.len_utf8()))
     }
 }
 impl Pattern<str> for str {
-    type Matched<'src> = &'src str;
-    fn matches_at<'src>(&self, input: &'src str, cursor: <str as Input>::Cursor) -> Option<(<str as Input>::Cursor, Self::Matched<'src>)> {
-        input[cursor..].starts_with(self).then_some((cursor + self.len(), &input[cursor..(cursor+self.len())]))
+    fn matches_at(&self, input: &mut str, cursor: <str as Input>::Cursor) -> Option<<str as Input>::Cursor> {
+        input[cursor.0 ..].starts_with(self).then_some(StrIndex(cursor.0 + self.len()))
     }
 }
