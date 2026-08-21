@@ -33,13 +33,15 @@ fn by_address_raw(item: GreenElementRef<'_>) -> *const () {
     }
 }
 
-fn hash_node<'a>(kind: SyntaxKind, children: impl Iterator<Item = GreenElementRef<'a>>) -> u64 {
+fn hash_node<'a>(kind: SyntaxKind, children: impl Iterator<Item = GreenElement>) -> (u64, Vec<GreenElement>) {
     let mut hasher = FxHasher::default();
+    let mut resultant = Vec::new();
     kind.hash(&mut hasher);
     for child in children {
-        by_address_raw(child).hash(&mut hasher);
+        by_address_raw(borrow_element(&child)).hash(&mut hasher);
+        resultant.push(child);
     }
-    hasher.finish()
+    (hasher.finish(), resultant)
 }
 fn hash_token(kind: SyntaxKind, text: &str) -> u64 {
     let mut hasher = FxHasher::default();
@@ -49,7 +51,12 @@ fn hash_token(kind: SyntaxKind, text: &str) -> u64 {
 }
 #[inline]
 fn hash_existing_node(node: &GreenNode) -> u64 {
-    hash_node(node.kind(), node.children())
+    let mut hasher = FxHasher::default();
+    node.kind().hash(&mut hasher);
+    for child in node.children() {
+        by_address_raw(child).hash(&mut hasher);
+    }
+    hasher.finish()
 }
 #[inline]
 fn hash_existing_token(token: &GreenToken) -> u64 {
@@ -74,10 +81,11 @@ impl GreenInterner {
     ///
     /// This function relies on all children being interned and deduplicated for it to also deduplicate the parent.
     /// Therefore, it is not sound to have any externally-constructed children to in the children list.
-    pub(crate) fn node(&mut self, kind: SyntaxKind, children: Vec<GreenElement>) -> GreenNode {
+    pub(crate) fn node(&mut self, kind: SyntaxKind, collection: impl IntoIterator<Item = GreenElement>) -> GreenNode {
+        let (hash, children) = hash_node(kind, collection.into_iter());
         self.nodes
             .entry(
-                hash_node(kind, children.iter().map(borrow_element)),
+                hash,
                 |existing| {
                     existing.kind() == kind
                         && existing

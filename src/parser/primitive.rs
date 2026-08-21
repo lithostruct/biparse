@@ -1,41 +1,128 @@
-// use crate::{
-//     green::green_interner::GreenElement,
-//     parser::{
-//         common::{Parser, ParserOutput, ParserResult, ParserState},
-//         cst::Zero,
-//     },
-// };
+use rowan::SyntaxKind;
 
-// /// Consumes no input and succeeds immediately.
-// ///
-// /// The zero identity for sequential operations.
-// pub struct Empty;
-// impl<F, Id> Parser<(), F, Id, Zero<GreenElement>> for Empty {
-//     fn parse<I: crate::input::Input>(
-//         &self,
-//         input: &I,
-//         state: ParserState<I>,
-//     ) -> (ParserState<I>, ParserOutput<(), F, Id, Zero<GreenElement>>) {
-//         (state, ParserOutput {
-//             ast: ParserResult::Success(()),
-//             cst: Zero::new(),
-//             origin: im::HashMap::new(),
-//             errors: im::HashMap::new(),
-//         })
-//     }
+use crate::{
+    input::{Input, Pattern}, parser::{
+        common::{CstOutput, IdSupply, ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser}, error::{ErrorContext, ParserFailure},
+    },
+};
+use std::{fmt::Debug};
 
-//     fn check<I: crate::input::Input>(
-//         &self,
-//         input: &I,
-//         state: ParserState<I>,
-//     ) -> (ParserState<I>, ParserOutput<(), F, Id, ()>) {
-//         // Identical to parse, other than the CST payload.
-//         let (state, output) = self.parse(input, state);
-//         (state, ParserOutput {
-//             ast: output.ast,
-//             cst: (),
-//             origin: im::HashMap::new(),
-//             errors: output.errors,
-//         })
-//     }
-// }
+/// Consumes no input and succeeds.
+///
+/// The zero identity for sequential operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Empty;
+impl<'src, I: Input, E : ParseEnvironment> Parser<'src, I, (), E> for Empty {
+    fn parse<S : IdSupply<Id = <E as ParseEnvironment>::Id>>(
+        &self,
+        _input: &'src I,
+        state: ParseState<I, S>,
+    ) -> (ParseState<I, S>, ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>)
+    {
+        (state, ParseOutput {
+            ast: ParseResult::Success(()),
+            cst: CstOutput::new()
+        })
+    }
+    fn check<S : IdSupply<Id = <E as ParseEnvironment>::Id>>(
+        &self,
+        input: &'src I,
+        state: ParseState<I, S>,
+    ) -> (ParseState<I, S>, ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>)
+    {
+        Parser::<'src, I, (), E>::parse(self, input, state)
+    }
+}
+
+/// Consumes no input and produces a speculative failure.
+/// 
+/// The zero identity for choices.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Fail;
+impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Fail {
+    fn parse<S : IdSupply<Id = <E as ParseEnvironment>::Id>>(
+        &self,
+        input: &'src I,
+        state: ParseState<I, S>,
+    ) -> (ParseState<I, S>, ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>) {
+        let cursor = state.cursor.clone();
+        (state, ParseOutput {
+            ast: ParseResult::Speculative(E::Failure::from_provenance(input, cursor, ErrorContext::FailPrimitive)),
+            cst: CstOutput::new(),
+        })
+    }
+
+    fn check<S : IdSupply<Id = <E as ParseEnvironment>::Id>>(
+        &self,
+        input: &'src I,
+        state: ParseState<I, S>,
+    ) -> (ParseState<I, S>, ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>) {
+        Parser::<'src, I, (), E>::parse(self, input, state)
+    }
+}
+
+/// Matches on a pattern compatible with the input type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Just<P>{
+    kind: SyntaxKind,
+    pattern: P,
+}
+impl<'src, I : Input, P, E : ParseEnvironment> Parser<'src, I, &'src str, E> for Just<P> where P: Pattern<I> + Debug {
+    fn parse<S : IdSupply<Id = <E as ParseEnvironment>::Id>>(
+        &self,
+        input: &'src I,
+        mut state: ParseState<I, S>,
+    ) -> (ParseState<I, S>, ParseOutput<&'src str, <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>) {
+        match self.pattern.matches_at(input, state.cursor.clone()) {
+            Some(end_position) => {
+                let old_position = state.cursor;
+                let substring = input.slice(old_position, end_position.clone());
+                let element = state.interner.token(self.kind, substring).into();
+                
+                let new_state = ParseState {
+                    cursor: end_position,
+                    ..state
+                };
+                (new_state, ParseOutput {
+                    ast: ParseResult::Success(substring),
+                    cst: CstOutput::unit(element),
+                })
+            },
+            None => {
+                let failure = E::Failure::from_provenance(input, state.cursor.clone(), 
+                    ErrorContext::MatchFailure(format!("{:?}", self.pattern)));
+                (state, ParseOutput {
+                    ast: ParseResult::Speculative(failure),
+                    cst: CstOutput::new(),
+                })
+            },
+        }
+    }
+
+    fn check<S : IdSupply<Id = <E as ParseEnvironment>::Id>>(
+        &self,
+        input: &'src I,
+        state: ParseState<I, S>,
+    ) -> (ParseState<I, S>, ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>) {
+        match self.pattern.matches_at(input, state.cursor.clone()) {
+            Some(end_position) => {
+                let new_state = ParseState {
+                    cursor: end_position,
+                    ..state
+                };
+                (new_state, ParseOutput {
+                    ast: ParseResult::Success(()),
+                    cst: CstOutput::new(),
+                })
+            },
+            None => {
+                let failure = E::Failure::from_provenance(input, state.cursor.clone(), 
+                    ErrorContext::MatchFailure(format!("{:?}", self.pattern)));
+                (state, ParseOutput {
+                    ast: ParseResult::Speculative(failure),
+                    cst: CstOutput::new(),
+                })
+            },
+        }
+    }
+}

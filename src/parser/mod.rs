@@ -1,5 +1,5 @@
 mod common;
 
-pub mod cst_cardinality;
+pub mod error;
 
-mod primitive;
+pub mod primitive;

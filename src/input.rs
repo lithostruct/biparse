@@ -16,7 +16,7 @@ pub trait Input {
 /// The trait describing all pattern types that match onto a specific input type.
 pub trait Pattern<I: Input + ?Sized> {
     /// Returns the end position of the cursor, if `self` matches onto the input at the specified cursor.
-    fn matches_at(&self, input: &mut I, cursor: I::Cursor) -> Option<I::Cursor>;
+    fn matches_at(&self, input: &I, cursor: I::Cursor) -> Option<I::Cursor>;
 }
 
 /// The cursor type for `str`-based input.
@@ -37,7 +37,7 @@ impl Input for str {
 impl Pattern<str> for char {
     fn matches_at(
         &self,
-        input: &mut str,
+        input: &str,
         cursor: <str as Input>::Cursor,
     ) -> Option<<str as Input>::Cursor> {
         input[cursor.0..]
@@ -48,7 +48,7 @@ impl Pattern<str> for char {
 impl Pattern<str> for str {
     fn matches_at(
         &self,
-        input: &mut str,
+        input: &str,
         cursor: <str as Input>::Cursor,
     ) -> Option<<str as Input>::Cursor> {
         input[cursor.0..]
