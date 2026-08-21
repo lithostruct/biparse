@@ -1,4 +1,9 @@
 pub(crate) mod green;
 
+pub mod cst;
+pub mod failure;
 pub mod input;
-pub mod parser;
+
+pub mod parse;
+
+pub mod combinator;

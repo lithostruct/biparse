@@ -1,0 +1,76 @@
+use std::{fmt::Debug, hash::Hash};
+
+use rowan::SyntaxKind;
+
+use crate::{
+    cst::{Association, Cst, CstPath},
+    green::{GreenElement, GreenInterner},
+};
+
+/// The output of CST construction.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CstOutput<Id>
+where
+    Id: Eq + Hash,
+{
+    /// The forest of CST nodes.
+    pub cst: Cst<GreenElement>,
+    /// The association table between `Id` and paths into `self.cst` to get those nodes.
+    pub origin: Association<Id>,
+}
+impl<Id: Debug + Clone + Eq + Hash> Default for CstOutput<Id> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl<Id: Debug + Clone + Eq + Hash> CstOutput<Id> {
+    pub fn new() -> Self {
+        CstOutput {
+            cst: Cst::new(),
+            origin: Association::new(),
+        }
+    }
+    pub fn unit(value: GreenElement) -> Self {
+        CstOutput {
+            cst: Cst::unit(value),
+            origin: Association::new(),
+        }
+    }
+
+    pub fn merge_with(self, rhs: Self) -> Self {
+        let merged_origin = self.origin.merge_with(rhs.origin, self.cst.len());
+        let merged_forest = self.cst + rhs.cst;
+        CstOutput {
+            cst: merged_forest,
+            origin: merged_origin,
+        }
+    }
+    pub fn attach_parent(self, kind: SyntaxKind, interner: &mut GreenInterner) -> Self {
+        let new_origin = self.origin.with_new_parent(0);
+        let new_node = interner.node(kind, self.cst);
+        CstOutput {
+            cst: Cst::unit(new_node.into()),
+            origin: new_origin,
+        }
+    }
+
+    pub fn associate_root_at(mut self, index: usize, with_id: Id) -> Self {
+        if index >= self.cst.len() {
+            panic!(
+                "Cannot find node {index}; forest is of length {}!",
+                self.cst.len()
+            )
+        }
+        match self
+            .origin
+            .inner
+            .insert(with_id.clone(), CstPath::here_at(index))
+        {
+            None => (),
+            Some(existing) => panic!(
+                "IdSupply invariant invalidated: {with_id:?} has existing mapping to {existing:?}!"
+            ),
+        }
+        self
+    }
+}

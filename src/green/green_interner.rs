@@ -33,7 +33,10 @@ fn by_address_raw(item: GreenElementRef<'_>) -> *const () {
     }
 }
 
-fn hash_node<'a>(kind: SyntaxKind, children: impl Iterator<Item = GreenElement>) -> (u64, Vec<GreenElement>) {
+fn hash_node(
+    kind: SyntaxKind,
+    children: impl Iterator<Item = GreenElement>,
+) -> (u64, Vec<GreenElement>) {
     let mut hasher = FxHasher::default();
     let mut resultant = Vec::new();
     kind.hash(&mut hasher);
@@ -63,15 +66,15 @@ fn hash_existing_token(token: &GreenToken) -> u64 {
     hash_token(token.kind(), token.text())
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct GreenInterner {
+#[derive(Debug, Clone, Default)]
+pub struct GreenInterner {
     // These are qualified as pub(super) so that the testing module can use the internals for a has collision test.
     pub(super) nodes: HashTable<GreenNode>,
     pub(super) tokens: HashTable<GreenToken>,
 }
 impl GreenInterner {
     /// Creates a new interner.
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         GreenInterner {
             nodes: HashTable::new(),
             tokens: HashTable::new(),
@@ -81,7 +84,11 @@ impl GreenInterner {
     ///
     /// This function relies on all children being interned and deduplicated for it to also deduplicate the parent.
     /// Therefore, it is not sound to have any externally-constructed children to in the children list.
-    pub(crate) fn node(&mut self, kind: SyntaxKind, collection: impl IntoIterator<Item = GreenElement>) -> GreenNode {
+    pub fn node(
+        &mut self,
+        kind: SyntaxKind,
+        collection: impl IntoIterator<Item = GreenElement>,
+    ) -> GreenNode {
         let (hash, children) = hash_node(kind, collection.into_iter());
         self.nodes
             .entry(
@@ -100,7 +107,7 @@ impl GreenInterner {
             .clone()
     }
     /// Interns a token.
-    pub(crate) fn token(&mut self, kind: SyntaxKind, text: &str) -> GreenToken {
+    pub fn token(&mut self, kind: SyntaxKind, text: &str) -> GreenToken {
         self.tokens
             .entry(
                 hash_token(kind, text),
