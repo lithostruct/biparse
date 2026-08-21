@@ -1,5 +1,4 @@
-
-mod green_interner;
+pub(crate) mod green;
 
 pub mod input;
 pub mod parser;
