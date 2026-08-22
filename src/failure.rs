@@ -4,6 +4,7 @@ use thiserror::Error;
 use crate::input::{Input, LineCol};
 use std::fmt::Debug;
 
+/// The trait required by parser failure types to implement.
 pub trait ParseFailure {
     fn failure_at<I: Input, E: std::error::Error>(
         input: &I,
@@ -13,6 +14,8 @@ pub trait ParseFailure {
     fn merge(self, other: Self) -> Self;
 }
 
+/// The struct that carries information on what kind of failure is encountered by the parser,
+/// which is given to [`ParseFailure`] implementors for construction.
 pub enum FailureKind<I: Input, E: std::error::Error> {
     ExpectedFound {
         expected: String,
@@ -24,6 +27,22 @@ pub enum FailureKind<I: Input, E: std::error::Error> {
     Custom {
         error: E,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
+#[error("Parser error encountered.")]
+pub struct ZeroSized;
+impl ParseFailure for ZeroSized {
+    fn failure_at<I: Input, E: std::error::Error>(
+        _: &I,
+        _: I::Cursor,
+        _: FailureKind<I, E>,
+    ) -> Self {
+        ZeroSized
+    }
+    fn merge(self, _: Self) -> Self {
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, From, Error)]

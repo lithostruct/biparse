@@ -5,4 +5,4 @@ mod parser;
 mod environment;
 mod io;
 
-pub use self::{environment::*, io::*, parser::Parser};
+pub use self::{environment::*, io::*, parser::*};

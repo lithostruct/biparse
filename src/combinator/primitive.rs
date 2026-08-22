@@ -11,17 +11,14 @@ use std::fmt::Debug;
 /// Consumes no input and succeeds.
 ///
 /// The zero identity for sequential operations.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Empty;
 impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Empty {
-    fn parse<S: IdSupply<Id = <E as ParseEnvironment>::Id>>(
+    fn parse(
         &self,
         _input: &'src I,
-        state: ParseState<I, S>,
-    ) -> (
-        ParseState<I, S>,
-        ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>,
-    ) {
+        state: ParseState<I, E::Supply>,
+    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
         (
             state,
             ParseOutput {
@@ -30,14 +27,11 @@ impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Empty {
             },
         )
     }
-    fn check<S: IdSupply<Id = <E as ParseEnvironment>::Id>>(
+    fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, S>,
-    ) -> (
-        ParseState<I, S>,
-        ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>,
-    ) {
+        state: ParseState<I, E::Supply>,
+    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
         Parser::<'src, I, (), E>::parse(self, input, state)
     }
 }
@@ -45,17 +39,14 @@ impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Empty {
 /// Consumes no input and produces a speculative failure.
 ///
 /// The zero identity for choices.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Fail;
 impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Fail {
-    fn parse<S: IdSupply<Id = <E as ParseEnvironment>::Id>>(
+    fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, S>,
-    ) -> (
-        ParseState<I, S>,
-        ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>,
-    ) {
+        state: ParseState<I, E::Supply>,
+    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
         let failure = E::Failure::failure_at(
             input,
             state.cursor,
@@ -70,20 +61,18 @@ impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Fail {
         )
     }
 
-    fn check<S: IdSupply<Id = <E as ParseEnvironment>::Id>>(
+    fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, S>,
-    ) -> (
-        ParseState<I, S>,
-        ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>,
-    ) {
+        state: ParseState<I, E::Supply>,
+    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
         Parser::<'src, I, (), E>::parse(self, input, state)
     }
 }
 
 /// Matches on a pattern compatible with the input type.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// `P` should implement `Pattern<I>` for some `I : Input` for this combinator to be meaningful.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Just<P> {
     kind: SyntaxKind,
     pattern: P,
@@ -92,19 +81,16 @@ impl<'src, I: Input, P, E: ParseEnvironment> Parser<'src, I, &'src str, E> for J
 where
     P: Pattern<I> + Debug,
 {
-    fn parse<S: IdSupply<Id = <E as ParseEnvironment>::Id>>(
+    fn parse(
         &self,
         input: &'src I,
-        mut state: ParseState<I, S>,
-    ) -> (
-        ParseState<I, S>,
-        ParseOutput<&'src str, <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>,
-    ) {
+        state: ParseState<I, E::Supply>,
+    ) -> (ParseState<I, E::Supply>, ParseOutput<&'src str, E>) {
         match self.pattern.matches_at(input, state.cursor) {
             Ok(end_position) => {
                 let old_position = state.cursor;
                 let substring = input.slice(old_position, end_position);
-                let element = state.interner.token(self.kind, substring).into();
+                let element = state.intern_token(self.kind, substring).into();
 
                 let new_state = ParseState {
                     cursor: end_position,
@@ -140,15 +126,12 @@ where
         }
     }
 
-    fn check<S: IdSupply<Id = <E as ParseEnvironment>::Id>>(
+    fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, S>,
-    ) -> (
-        ParseState<I, S>,
-        ParseOutput<(), <E as ParseEnvironment>::Failure, <E as ParseEnvironment>::Id>,
-    ) {
-        match self.pattern.matches_at(input, state.cursor.clone()) {
+        state: ParseState<I, E::Supply>,
+    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        match self.pattern.matches_at(input, state.cursor) {
             Ok(end_position) => {
                 let new_state = ParseState {
                     cursor: end_position,

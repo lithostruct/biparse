@@ -1,13 +1,15 @@
-use std::{fmt::Debug, hash::Hash};
+use crate::{
+    cst::IdSupply,
+    failure::{self, ParseFailure},
+};
 
-use crate::failure::{self, ParseFailure};
-
+/// The trait describing additional information required by certain parsing constructs.
 pub trait ParseEnvironment {
     type Failure: ParseFailure + std::error::Error;
-    type Id: Debug + Clone + Eq + Hash;
+    type Supply: IdSupply;
 }
 pub struct DefaultParseEnvironment;
 impl ParseEnvironment for DefaultParseEnvironment {
     type Failure = failure::Simple;
-    type Id = u64;
+    type Supply = usize;
 }
