@@ -12,7 +12,19 @@ pub struct Then<First, Second> {
     first: First,
     second: Second,
 }
-impl<'src, I: Input, First, Second, A, B, E: ParseEnvironment> Parser<'src, I, (A, B), E>
+impl<First, Second> Then<First, Second> {
+    pub fn new<'src, I: Input + ?Sized, A, B, E: ParseEnvironment>(
+        first: First,
+        second: Second,
+    ) -> Self
+    where
+        First: Parser<'src, I, A, E>,
+        Second: Parser<'src, I, B, E>,
+    {
+        Then { first, second }
+    }
+}
+impl<'src, I: Input + ?Sized, First, Second, A, B, E: ParseEnvironment> Parser<'src, I, (A, B), E>
     for Then<First, Second>
 where
     First: Parser<'src, I, A, E>,
@@ -149,8 +161,20 @@ pub struct Or<First, Second> {
     first: First,
     second: Second,
 }
-impl<'src, I: Input, First, Second, A, B, E: ParseEnvironment> Parser<'src, I, Either<A, B>, E>
-    for Or<First, Second>
+impl<First, Second> Or<First, Second> {
+    pub fn new<'src, I: Input + ?Sized, A, B, E: ParseEnvironment>(
+        first: First,
+        second: Second,
+    ) -> Self
+    where
+        First: Parser<'src, I, A, E>,
+        Second: Parser<'src, I, B, E>,
+    {
+        Or { first, second }
+    }
+}
+impl<'src, I: Input + ?Sized, First, Second, A, B, E: ParseEnvironment>
+    Parser<'src, I, Either<A, B>, E> for Or<First, Second>
 where
     First: Parser<'src, I, A, E>,
     Second: Parser<'src, I, B, E>,

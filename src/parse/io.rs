@@ -10,7 +10,7 @@ use crate::{
 use std::{cell::RefCell, fmt::Debug, hash::Hash, rc::Rc};
 
 /// The parse state to be passed and returned by all parser combinators.
-pub struct ParseState<'src, I: Input, S: IdSupply> {
+pub struct ParseState<'src, I: Input + ?Sized, S: IdSupply> {
     /// The current cursor position.
     pub cursor: I::Cursor,
     /// A supply of type `S`.
@@ -31,7 +31,7 @@ pub struct ParseState<'src, I: Input, S: IdSupply> {
     /// Do not discard the recursive stack during parsing. This may lead to undefined behaviour.
     pub recursive_stack: RecursiveStack<'src, I, S>,
 }
-impl<'src, I: Input, S: IdSupply> Debug for ParseState<'src, I, S>
+impl<'src, I: Input + ?Sized, S: IdSupply> Debug for ParseState<'src, I, S>
 where
     I::Cursor: Debug,
     S: Debug,
@@ -55,7 +55,7 @@ where
         debug.field("supply", &self.supply).finish()
     }
 }
-impl<'src, I: Input, S: IdSupply> Clone for ParseState<'src, I, S> {
+impl<'src, I: Input + ?Sized, S: IdSupply> Clone for ParseState<'src, I, S> {
     fn clone(&self) -> Self {
         ParseState {
             cursor: self.cursor,
@@ -65,7 +65,7 @@ impl<'src, I: Input, S: IdSupply> Clone for ParseState<'src, I, S> {
         }
     }
 }
-impl<'src, I: Input, S: IdSupply + Default> ParseState<'src, I, S> {
+impl<'src, I: Input + ?Sized, S: IdSupply + Default> ParseState<'src, I, S> {
     /// Creates a new parse state from this input.
     pub fn new(input: &I) -> Self {
         ParseState {
@@ -116,6 +116,21 @@ where
         }
     }
 }
+impl<A, E: ParseEnvironment> PartialEq for ParseOutput<A, E>
+where
+    A: PartialEq,
+    E::Failure: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.ast == other.ast
+            && self.cst == other.cst
+    }
+}
+impl<A, E: ParseEnvironment> Eq for ParseOutput<A, E>
+where
+    A: Eq,
+    E::Failure: Eq,
+{}
 
 /// Status of parse result of the AST payload.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

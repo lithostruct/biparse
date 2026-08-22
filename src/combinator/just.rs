@@ -6,69 +6,6 @@ use crate::{
     input::{Input, Pattern},
     parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
 };
-use std::fmt::Debug;
-
-/// Consumes no input and succeeds.
-///
-/// The zero identity for sequential operations.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Empty;
-impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Empty {
-    fn parse(
-        &self,
-        _input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
-        (
-            state,
-            ParseOutput {
-                ast: ParseResult::Success(()),
-                cst: CstOutput::new(),
-            },
-        )
-    }
-    fn check(
-        &self,
-        input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
-        Parser::<'src, I, (), E>::parse(self, input, state)
-    }
-}
-
-/// Consumes no input and produces a speculative failure.
-///
-/// The zero identity for choices.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Fail;
-impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Fail {
-    fn parse(
-        &self,
-        input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
-        let failure = E::Failure::failure_at(
-            input,
-            state.cursor,
-            FailureKind::FailPrimitive::<I, E::Failure>,
-        );
-        (
-            state,
-            ParseOutput {
-                ast: ParseResult::Speculative(failure),
-                cst: CstOutput::new(),
-            },
-        )
-    }
-
-    fn check(
-        &self,
-        input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
-        Parser::<'src, I, (), E>::parse(self, input, state)
-    }
-}
 
 /// Matches on a pattern compatible with the input type.
 /// `P` should implement `Pattern<I>` for some `I : Input` for this combinator to be meaningful.
@@ -77,7 +14,16 @@ pub struct Just<P> {
     kind: SyntaxKind,
     pattern: P,
 }
-impl<'src, I: Input, P, E: ParseEnvironment> Parser<'src, I, &'src str, E> for Just<P>
+impl<P> Just<P> {
+    pub fn new<I>(kind: SyntaxKind, pattern: P) -> Self
+    where
+        P: Pattern<I>,
+        I: Input + ?Sized,
+    {
+        Just { kind, pattern }
+    }
+}
+impl<'src, I: Input + ?Sized, P, E: ParseEnvironment> Parser<'src, I, &'src str, E> for Just<P>
 where
     P: Pattern<I>,
 {

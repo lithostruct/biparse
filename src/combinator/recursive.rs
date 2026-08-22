@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Debug, rc::Rc};
+use std::{any::TypeId, borrow::Cow, fmt::Debug, rc::Rc};
 
 use crate::{
     cst::{CstOutput, IdSupply},
@@ -10,24 +10,24 @@ use crate::{
 /// The recursive stack stored in `ParseState`, which can be cheaply cloned.
 ///
 /// Internals hidden due to being specific to `Recursive` and no other combinator.
-pub struct RecursiveStack<'src, I: Input, S: IdSupply> {
+pub struct RecursiveStack<'src, I: Input + ?Sized, S: IdSupply> {
     inner: im::Vector<RecursiveFrame<'src, I, S>>,
 }
-impl<'src, I: Input, S: IdSupply> Default for RecursiveStack<'src, I, S> {
+impl<'src, I: Input + ?Sized, S: IdSupply> Default for RecursiveStack<'src, I, S> {
     fn default() -> Self {
         RecursiveStack {
             inner: im::Vector::new(),
         }
     }
 }
-impl<'src, I: Input, S: IdSupply> Clone for RecursiveStack<'src, I, S> {
+impl<'src, I: Input + ?Sized, S: IdSupply> Clone for RecursiveStack<'src, I, S> {
     fn clone(&self) -> Self {
         RecursiveStack {
             inner: self.inner.clone(),
         }
     }
 }
-impl<'src, I: Input, S: IdSupply> RecursiveStack<'src, I, S> {
+impl<'src, I: Input + ?Sized, S: IdSupply> RecursiveStack<'src, I, S> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -48,19 +48,20 @@ impl<'src, I: Input, S: IdSupply> RecursiveStack<'src, I, S> {
     }
 }
 
-struct RecursiveFrame<'src, I: Input, S: IdSupply> {
+struct RecursiveFrame<'src, I: Input + ?Sized, S: IdSupply> {
     // Identifying information
     id: RecursiveId,
     start_cursor: I::Cursor,
 
     // Diagnostic information.
-    description: Cow<'static, str>,
+    description: Option<Cow<'static, str>>,
+    closure_typename: Cow<'static, str>,
 
     // Payload.
     /// This cannot be in `erased` becaue `I` does not live for `'static`.
     seed_result: Option<(ParseState<'src, I, S>, Rc<dyn ErasedOutput<'src> + 'src>)>,
 }
-impl<'src, I: Input, S: IdSupply> Debug for RecursiveFrame<'src, I, S> {
+impl<'src, I: Input + ?Sized, S: IdSupply> Debug for RecursiveFrame<'src, I, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecursiveFrame")
             .field("description", &self.description)
@@ -68,20 +69,18 @@ impl<'src, I: Input, S: IdSupply> Debug for RecursiveFrame<'src, I, S> {
             .finish()
     }
 }
-impl<'src, I: Input, S: IdSupply> Clone for RecursiveFrame<'src, I, S> {
+impl<'src, I: Input + ?Sized, S: IdSupply> Clone for RecursiveFrame<'src, I, S> {
     fn clone(&self) -> Self {
         RecursiveFrame {
             id: self.id,
             start_cursor: self.start_cursor,
             description: self.description.clone(),
+            closure_typename: self.closure_typename.clone(),
             seed_result: self.seed_result.clone(),
         }
     }
 }
-impl<I: Input, S: IdSupply> RecursiveFrame<'_, I, S> {
-    pub fn description(&self) -> &str {
-        &self.description
-    }
+impl<I: Input + ?Sized, S: IdSupply> RecursiveFrame<'_, I, S> {
     pub fn matches(&self, id: RecursiveId, start_cursor: I::Cursor) -> bool {
         self.id == id && self.start_cursor == start_cursor
     }
@@ -107,9 +106,10 @@ where
     }
 }
 
+/// Parser combinator for expressiong fixpoint recursion.
 #[derive(Debug, Clone)]
 pub struct Recursive<F> {
-    description: Cow<'static, str>,
+    description: Option<Cow<'static, str>>,
     closure: F,
 }
 impl<F> Recursive<F> {
@@ -117,6 +117,15 @@ impl<F> Recursive<F> {
     #[inline]
     fn id(&self) -> RecursiveId {
         RecursiveId(self as *const Self as *const ())
+    }
+    pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(closure: F) -> Self
+    where
+        Self: Parser<'src, I, A, E>,
+    {
+        Recursive {
+            description: None,
+            closure,
+        }
     }
 }
 impl<'src, I: Input, A, E: ParseEnvironment, F, P> Parser<'src, I, A, E> for Recursive<F>
@@ -167,7 +176,8 @@ where
                             input,
                             state.cursor,
                             FailureKind::LeftRecursion {
-                                description: self.description.clone().into_owned(),
+                                description: self.description.as_deref().map(ToOwned::to_owned),
+                                closure_typename: std::any::type_name::<F>().to_owned(),
                             },
                         );
                         (
@@ -186,6 +196,7 @@ where
                     id: self.id(),
                     start_cursor: state.cursor,
                     description: self.description.clone(),
+                    closure_typename: std::any::type_name::<F>().into(),
                     seed_result: None,
                 });
                 let seed_state = ParseState {
@@ -221,6 +232,7 @@ where
                         id: self.id(),
                         start_cursor: state.cursor,
                         description: self.description.clone(),
+                        closure_typename: std::any::type_name::<F>().into(),
                         seed_result: Some((rec_seed_state.clone(), rec_seed_result.clone_erased())),
                     });
                     let next_seed_state = ParseState {

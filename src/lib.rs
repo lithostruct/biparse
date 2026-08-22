@@ -1,11 +1,14 @@
+#![doc = include_str!("README.rustdoc.md")]
+
 pub mod green;
 
 pub mod cst;
 pub mod failure;
 pub mod input;
 
+pub mod combinator;
 pub mod parse;
 
-pub mod combinator;
+pub mod prelude;
 
 pub use rowan;

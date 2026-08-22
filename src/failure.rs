@@ -6,7 +6,7 @@ use std::{cmp::Ordering, fmt::Debug};
 
 /// The trait required by parser failure types to implement.
 pub trait ParseFailure: Clone {
-    fn failure_at<I: Input, E: std::error::Error>(
+    fn failure_at<I: Input + ?Sized, E: std::error::Error>(
         input: &I,
         cursor: I::Cursor,
         kind: FailureKind<I, E>,
@@ -16,14 +16,18 @@ pub trait ParseFailure: Clone {
 
 /// The struct that carries information on what kind of failure is encountered by the parser,
 /// which is given to [`ParseFailure`] implementors for construction.
-pub enum FailureKind<I: Input, E: std::error::Error> {
+pub enum FailureKind<I: Input + ?Sized, E: std::error::Error> {
     ExpectedFound {
         expected: String,
         found: Option<I::Token>,
         difference_at: I::Cursor,
     },
+    ExpectedEnd {
+        found: I::Token,
+    },
     LeftRecursion {
-        description: String,
+        description: Option<String>,
+        closure_typename: String,
     },
     FailPrimitive,
     Custom {
@@ -35,7 +39,7 @@ pub enum FailureKind<I: Input, E: std::error::Error> {
 #[error("Parser error encountered.")]
 pub struct ZeroSized;
 impl ParseFailure for ZeroSized {
-    fn failure_at<I: Input, E: std::error::Error>(
+    fn failure_at<I: Input + ?Sized, E: std::error::Error>(
         _: &I,
         _: I::Cursor,
         _: FailureKind<I, E>,
@@ -55,11 +59,11 @@ impl ParseFailure for ZeroSized {
         "\n\t".to_string() + &messages.join("\n\t")
     })]
 pub struct Simple {
-    position: LineCol,
-    messages: Vec<String>,
+    pub position: LineCol,
+    pub messages: Vec<String>,
 }
 impl ParseFailure for Simple {
-    fn failure_at<I: Input, E: std::error::Error>(
+    fn failure_at<I: Input + ?Sized, E: std::error::Error>(
         input: &I,
         cursor: I::Cursor,
         kind: FailureKind<I, E>,
@@ -77,8 +81,17 @@ impl ParseFailure for Simple {
                     location.line, location.column
                 )
             }
-            FailureKind::LeftRecursion { description } => {
-                format!("Zero-progress left recursion detected at '{description}'")
+            FailureKind::ExpectedEnd { found } => {
+                format!("expected end-of-input, found {found:?}",)
+            }
+            FailureKind::LeftRecursion {
+                description,
+                closure_typename,
+            } => {
+                format!(
+                    "Zero-progress left recursion detected at '{}'",
+                    description.unwrap_or(closure_typename)
+                )
             }
             FailureKind::FailPrimitive => "'Fail' primitive combinator encountered".to_string(),
             FailureKind::Custom { error } => error.to_string(),

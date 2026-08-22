@@ -52,8 +52,18 @@ pub struct LineCol {
 
 /// The cursor type for `str`-based input.
 /// The contained value is asserted to be at a UTF-8 boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Into)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StrIndex(usize);
+impl From<StrIndex> for usize {
+    fn from(val: StrIndex) -> Self {
+        val.0
+    }
+}
+impl StrIndex {
+    pub fn into_usize(self) -> usize {
+        self.into()
+    }
+}
 
 impl Input for str {
     type Cursor = StrIndex;
@@ -93,6 +103,7 @@ impl Input for str {
         LineCol { line, column }
     }
 }
+
 impl Pattern<str> for char {
     fn matches_at(
         &self,
@@ -131,6 +142,18 @@ impl Pattern<str> for str {
                 }
                 unreachable!("The whole pattern cannot match!")
             })
+    }
+    fn describe(&self) -> String {
+        format!("string \"{self:?}\"")
+    }
+}
+impl Pattern<str> for String {
+    fn matches_at(
+        &self,
+        input: &str,
+        cursor: <str as Input>::Cursor,
+    ) -> Result<<str as Input>::Cursor, <str as Input>::Cursor> {
+        self.as_str().matches_at(input, cursor)
     }
     fn describe(&self) -> String {
         format!("string \"{self:?}\"")
