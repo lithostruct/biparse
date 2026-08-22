@@ -12,15 +12,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<A, E>) {
         (**self).parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         (**self).check(input, state)
     }
 }
@@ -32,15 +32,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<A, E>) {
         (**self).parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         (**self).check(input, state)
     }
 }
@@ -52,15 +52,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<A, E>) {
         (**self).parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         (**self).check(input, state)
     }
 }
@@ -72,15 +72,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<A, E>) {
         (**self).parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         (**self).check(input, state)
     }
 }

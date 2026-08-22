@@ -4,10 +4,13 @@ use crate::{
 };
 
 /// The trait describing additional information required by certain parsing constructs.
-pub trait ParseEnvironment {
+///
+/// This trait should be implemented by zero-sized types.
+pub trait ParseEnvironment: 'static {
     type Failure: ParseFailure + std::error::Error;
     type Supply: IdSupply;
 }
+#[derive(Debug, Clone, Copy)]
 pub struct DefaultParseEnvironment;
 impl ParseEnvironment for DefaultParseEnvironment {
     type Failure = failure::Simple;

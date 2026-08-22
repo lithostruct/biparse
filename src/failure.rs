@@ -2,10 +2,10 @@ use derive_more::From;
 use thiserror::Error;
 
 use crate::input::{Input, LineCol};
-use std::fmt::Debug;
+use std::{cmp::Ordering, fmt::Debug};
 
 /// The trait required by parser failure types to implement.
-pub trait ParseFailure {
+pub trait ParseFailure: Clone {
     fn failure_at<I: Input, E: std::error::Error>(
         input: &I,
         cursor: I::Cursor,
@@ -22,7 +22,9 @@ pub enum FailureKind<I: Input, E: std::error::Error> {
         found: Option<I::Token>,
         difference_at: I::Cursor,
     },
-    LeftRecursion,
+    LeftRecursion {
+        description: String,
+    },
     FailPrimitive,
     Custom {
         error: E,
@@ -46,10 +48,15 @@ impl ParseFailure for ZeroSized {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, From, Error)]
-#[error("({}, {}): {message}", position.line, position.column)]
+#[error("({}, {}): {}", position.line, position.column,
+    if messages.len() == 1 {
+        messages[0].clone()
+    } else {
+        "\n\t".to_string() + &messages.join("\n\t")
+    })]
 pub struct Simple {
     position: LineCol,
-    message: String,
+    messages: Vec<String>,
 }
 impl ParseFailure for Simple {
     fn failure_at<I: Input, E: std::error::Error>(
@@ -70,15 +77,23 @@ impl ParseFailure for Simple {
                     location.line, location.column
                 )
             }
-            FailureKind::LeftRecursion => "Zero-progress left recursion detected".to_string(),
+            FailureKind::LeftRecursion { description } => {
+                format!("Zero-progress left recursion detected at '{description}'")
+            }
             FailureKind::FailPrimitive => "'Fail' primitive combinator encountered".to_string(),
             FailureKind::Custom { error } => error.to_string(),
         };
-        (line_col, message).into()
+        (line_col, vec![message]).into()
     }
-    fn merge(self, other: Self) -> Self {
-        // for now, discard self.
-        // this type does not retain enough type information to determine whether an error is important.
-        other
+    fn merge(mut self, mut other: Self) -> Self {
+        // Retain the most advanced error position, for now.
+        match self.position.cmp(&other.position) {
+            Ordering::Less => other,
+            Ordering::Equal => {
+                self.messages.append(&mut other.messages);
+                self
+            }
+            Ordering::Greater => self,
+        }
     }
 }

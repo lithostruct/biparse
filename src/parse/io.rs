@@ -1,6 +1,7 @@
 use rowan::{GreenNode, GreenToken, SyntaxKind};
 
 use crate::{
+    combinator::RecursiveStack,
     cst::{CstOutput, IdSupply},
     green::{GreenElement, GreenInterner},
     input::Input,
@@ -9,14 +10,14 @@ use crate::{
 use std::{cell::RefCell, fmt::Debug, hash::Hash, rc::Rc};
 
 /// The parse state to be passed and returned by all parser combinators.
-pub struct ParseState<I: Input, S: IdSupply> {
+pub struct ParseState<'src, I: Input, S: IdSupply> {
     /// The current cursor position.
     pub cursor: I::Cursor,
     /// A supply of type `S`.
     pub supply: S,
     /// A reference-counted shared interner, allowing for clones to access the same structure.
     ///
-    /// # Safety
+    /// # Panics
     ///
     /// This field comes with the usual pitfalls of [`Rc<RefCell<...>>`];
     /// if you hold a mutable borrow and attempt subsequent borrowing, Rust *will* panic.
@@ -25,8 +26,12 @@ pub struct ParseState<I: Input, S: IdSupply> {
     /// are re-exposed here as [`ParseState::intern_node`] and [`ParseState::intern_token`],
     /// which holds the mutable borrow for as short as possible.
     pub interner: Rc<RefCell<GreenInterner>>,
+    /// The current recursive stack.
+    ///
+    /// Do not discard the recursive stack during parsing. This may lead to undefined behaviour.
+    pub recursive_stack: RecursiveStack<'src, I, S>,
 }
-impl<I: Input, S: IdSupply> Debug for ParseState<I, S>
+impl<'src, I: Input, S: IdSupply> Debug for ParseState<'src, I, S>
 where
     I::Cursor: Debug,
     S: Debug,
@@ -50,22 +55,24 @@ where
         debug.field("supply", &self.supply).finish()
     }
 }
-impl<I: Input, S: IdSupply> Clone for ParseState<I, S> {
+impl<'src, I: Input, S: IdSupply> Clone for ParseState<'src, I, S> {
     fn clone(&self) -> Self {
         ParseState {
             cursor: self.cursor,
             interner: self.interner.clone(),
             supply: self.supply.clone(),
+            recursive_stack: self.recursive_stack.clone(),
         }
     }
 }
-impl<I: Input, S: IdSupply + Default> ParseState<I, S> {
+impl<'src, I: Input, S: IdSupply + Default> ParseState<'src, I, S> {
     /// Creates a new parse state from this input.
     pub fn new(input: &I) -> Self {
         ParseState {
             cursor: input.start(),
             interner: Rc::new(RefCell::new(GreenInterner::new())),
             supply: S::default(),
+            recursive_stack: RecursiveStack::new(),
         }
     }
     pub fn intern_token(&self, kind: SyntaxKind, text: &str) -> GreenToken {
@@ -83,10 +90,31 @@ impl<I: Input, S: IdSupply + Default> ParseState<I, S> {
 }
 
 /// Parse output produced by [`Parser`](crate::parse::Parser) implementors.
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseOutput<A, E: ParseEnvironment> {
     pub ast: ParseResult<A, E::Failure>,
     pub cst: CstOutput<<E::Supply as IdSupply>::Id>,
+}
+impl<A, E: ParseEnvironment> Debug for ParseOutput<A, E>
+where
+    A: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ParseOutput")
+            .field("ast", &self.ast)
+            .field("cst", &self.cst)
+            .finish()
+    }
+}
+impl<A, E: ParseEnvironment> Clone for ParseOutput<A, E>
+where
+    A: Clone,
+{
+    fn clone(&self) -> Self {
+        ParseOutput {
+            ast: self.ast.clone(),
+            cst: self.cst.clone(),
+        }
+    }
 }
 
 /// Status of parse result of the AST payload.

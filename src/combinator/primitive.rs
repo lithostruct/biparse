@@ -1,7 +1,7 @@
 use rowan::SyntaxKind;
 
 use crate::{
-    cst::{CstOutput, IdSupply},
+    cst::CstOutput,
     failure::{FailureKind, ParseFailure},
     input::{Input, Pattern},
     parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
@@ -17,8 +17,8 @@ impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Empty {
     fn parse(
         &self,
         _input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         (
             state,
             ParseOutput {
@@ -30,8 +30,8 @@ impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Empty {
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         Parser::<'src, I, (), E>::parse(self, input, state)
     }
 }
@@ -45,8 +45,8 @@ impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Fail {
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         let failure = E::Failure::failure_at(
             input,
             state.cursor,
@@ -64,8 +64,8 @@ impl<'src, I: Input, E: ParseEnvironment> Parser<'src, I, (), E> for Fail {
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         Parser::<'src, I, (), E>::parse(self, input, state)
     }
 }
@@ -79,13 +79,13 @@ pub struct Just<P> {
 }
 impl<'src, I: Input, P, E: ParseEnvironment> Parser<'src, I, &'src str, E> for Just<P>
 where
-    P: Pattern<I> + Debug,
+    P: Pattern<I>,
 {
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<&'src str, E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<&'src str, E>) {
         match self.pattern.matches_at(input, state.cursor) {
             Ok(end_position) => {
                 let old_position = state.cursor;
@@ -129,8 +129,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         match self.pattern.matches_at(input, state.cursor) {
             Ok(end_position) => {
                 let new_state = ParseState {

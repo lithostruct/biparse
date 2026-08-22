@@ -12,7 +12,7 @@ pub trait IdSupply: Clone + Default {
     fn next_id(&mut self) -> Self::Id;
 }
 
-/// A [`Supply`] implementor that wraps a newtype around a monotonically-increasing [`usize`].
+/// A [`IdSupply`] implementor that wraps a newtype around a monotonically-increasing [`usize`].
 ///
 /// This supply assumes that `T::from(value : usize)` is injective, which is the case for transparent newtypes.
 /// Violating this invariant may lead to undefined behaviour.

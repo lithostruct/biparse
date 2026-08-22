@@ -1,10 +1,10 @@
 use derive_more::Into;
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 
-/// The trait describing all input types accepted by the [`Parser`](crate::parser::Parser) trait.
+/// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
-    type Cursor: Copy + Eq;
+    type Cursor: Copy + Eq + Hash;
     /// The type of a single input in this input.
     type Token: Debug + Clone + Eq;
 
@@ -31,7 +31,7 @@ pub trait Pattern<I: Input + ?Sized> {
     /// Writes a description of what is expected by `self` as a string.
     ///
     /// This is used for error reporting:
-    /// Assume a typical format of "expected [DESCRIPTION], got token [INPUT TOKEN]".
+    /// Assume a typical format of "expected \<description\>, got \<token\>".
     fn describe(&self) -> String;
 }
 

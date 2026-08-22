@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 use crate::{
-    cst::IdSupply,
     failure::ParseFailure,
     input::Input,
     parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
@@ -22,8 +21,8 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(A, B), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(A, B), E>) {
         let (state, first_result) = self.first.parse(input, state);
         let payload_a = match first_result.ast {
             ast @ ParseResult::Speculative(_) | ast @ ParseResult::Committed(_) => {
@@ -69,8 +68,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         let (state, first_result) = self.first.check(input, state);
         match &first_result.ast {
             ParseResult::Speculative(_) | ParseResult::Committed(_) => {
@@ -118,7 +117,7 @@ impl<A, B> Either<A, B> {
     ///
     /// # Panics
     ///
-    /// Panics if [`self`] is [`Either::Right`].
+    /// Panics if `self` is [`Either::Right`].
     pub fn unwrap_left(self) -> A
     where
         B: Debug,
@@ -132,7 +131,7 @@ impl<A, B> Either<A, B> {
     ///
     /// # Panics
     ///
-    /// Panics if [`self`] is [`Either::Left`].
+    /// Panics if `self` is [`Either::Left`].
     pub fn unwrap_right(self) -> B
     where
         A: Debug,
@@ -159,8 +158,8 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<Either<A, B>, E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<Either<A, B>, E>) {
         let (first_state, first_result) = self.first.parse(input, state.clone());
         let first_speculative_error = match first_result.ast {
             ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {
@@ -205,8 +204,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         let (first_state, mut first_result) = self.first.check(input, state.clone());
         let first_speculative_error = match first_result.ast {
             ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {

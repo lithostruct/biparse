@@ -8,7 +8,7 @@ mod primitive;
 mod recursive;
 
 pub use self::{
-    binary::{Or, Then},
+    binary::{Either, Or, Then},
     primitive::{Empty, Fail, Just},
-    recursive::Recursive,
+    recursive::{Recursive, RecursiveStack},
 };

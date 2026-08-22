@@ -4,4 +4,4 @@
 mod green_interner;
 mod tests;
 
-pub(crate) use green_interner::*;
+pub use green_interner::*;

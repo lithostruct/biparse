@@ -4,14 +4,14 @@ use crate::{
     parse::{DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState},
 };
 
-/// The central parsing item.
+/// The central parsing trait, implemented by all combinators.
 pub trait Parser<'src, I: Input, A, E: ParseEnvironment = DefaultParseEnvironment> {
     /// Parse the input.
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<A, E>);
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<A, E>);
 
     /// Checks the input for any errors.
     ///
@@ -19,8 +19,8 @@ pub trait Parser<'src, I: Input, A, E: ParseEnvironment = DefaultParseEnvironmen
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<I, E::Supply>,
-    ) -> (ParseState<I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E::Supply>,
+    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
         let (new_state, output) = self.parse(input, state);
         let erased_output = ParseOutput {
             ast: output.ast.map(|_| ()),
