@@ -1,5 +1,4 @@
-//! The module containing items related to CST construction and origin tracking
-//! throughout the parsing process.
+//! Module for items relating to CST and origin tracking.
 
 mod association;
 mod output;

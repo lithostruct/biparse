@@ -41,7 +41,7 @@ proptest! {
     #[test]
     fn empty_or_just(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
         let (state1, result1): (_, ParseOutput<Either<(), &str>, DefaultParseEnvironment>)
-            = <Empty as Parser<'_, str, _, DefaultParseEnvironment>>::map(empty, Either::Left)
+            = <Empty as ParserExt<'_, str, _, DefaultParseEnvironment>>::map(empty, Either::Left)
                 .parse_from_start(s.as_str());
         let (state2, result2): (_, ParseOutput<Either<(), &str>, DefaultParseEnvironment>)
             = empty.or(just(SyntaxKind(kind), pattern))

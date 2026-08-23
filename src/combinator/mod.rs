@@ -16,10 +16,11 @@ use crate::{
 };
 
 pub use self::{
-    blanket::WithEnv,
     binary::{Either, Or, Then},
+    blanket::WithEnv,
     just::Just,
     map_to_owned::{Map, ToOwned},
+    node_association::{Node, Associate},
     recursive::{Recursive, RecursiveStack},
     sentinel::{Empty, End, Fail},
 };

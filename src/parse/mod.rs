@@ -1,4 +1,6 @@
-//! Crate containing traits and items relating to the central `Parser` trait.
+//! Module for parsing-related traits, implementations and items.
+//!
+//! Refer to [`Parser`] for the central trait exported.
 
 mod parser;
 

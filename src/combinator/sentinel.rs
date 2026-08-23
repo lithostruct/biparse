@@ -1,14 +1,12 @@
-use rowan::SyntaxKind;
-
 use crate::{
     cst::CstOutput,
     failure::{FailureKind, ParseFailure},
-    input::{Input, Pattern},
+    input::Input,
     parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
 };
 use std::fmt::Debug;
 
-/// Consumes no input and succeeds.
+/// Parser combinator that consumes no input and succeeds.
 ///
 /// The zero identity for sequential operations.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
@@ -22,8 +20,8 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Em
     fn parse(
         &self,
         _input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I::Cursor, E::Supply>,
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         (
             state,
             ParseOutput {
@@ -34,7 +32,7 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Em
     }
 }
 
-/// Consumes no input and produces a speculative failure.
+/// Parser combinator that onsumes no input and produces a speculative failure.
 ///
 /// The zero identity for choices.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
@@ -48,8 +46,8 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I::Cursor, E::Supply>,
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         let failure = E::Failure::failure_at(
             input,
             state.cursor,
@@ -65,7 +63,7 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
     }
 }
 
-/// Checks for the end-of-file.
+/// Parser combinator that checks for the end-of-file.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct End;
 impl End {
@@ -77,9 +75,9 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (
-        ParseState<'src, I, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, E::Supply>,
         ParseOutput<(), E>,
     ) {
         let cursor = state.cursor;

@@ -1,3 +1,7 @@
+//! Module for failure-related traits, implementations and items.
+//!
+//! Refer to [`ParseFailure`] for the central trait exported.
+
 use derive_more::From;
 use thiserror::Error;
 

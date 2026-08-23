@@ -7,7 +7,7 @@ use crate::{
     parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
 };
 
-/// Matches on a pattern compatible with the input type.
+/// Parser combinator that matches on a pattern compatible with the input type.
 /// `P` should implement `Pattern<I>` for some `I : Input` for this combinator to be meaningful.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Just<P> {
@@ -30,8 +30,8 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<&'src str, E>) {
+        state: ParseState<'src, I::Cursor, E::Supply>,
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<&'src str, E>) {
         match self.pattern.matches_at(input, state.cursor) {
             Ok(end_position) => {
                 let old_position = state.cursor;
@@ -75,8 +75,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I::Cursor, E::Supply>,
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         match self.pattern.matches_at(input, state.cursor) {
             Ok(end_position) => {
                 let new_state = ParseState {

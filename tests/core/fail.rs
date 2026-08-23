@@ -1,6 +1,6 @@
 //! Tests for the `Fail` combinator.
 
-use biparse::{prelude::*};
+use biparse::prelude::*;
 use proptest::{arbitrary::any, proptest};
 use rowan::SyntaxKind;
 

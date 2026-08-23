@@ -10,9 +10,9 @@ use crate::{
 use std::{cell::RefCell, fmt::Debug, hash::Hash, rc::Rc};
 
 /// The parse state to be passed and returned by all parser combinators.
-pub struct ParseState<'src, I: Input + ?Sized, S: IdSupply> {
+pub struct ParseState<'src, C, S: IdSupply> {
     /// The current cursor position.
-    pub cursor: I::Cursor,
+    pub cursor: C,
     /// A supply of type `S`.
     pub supply: S,
     /// A reference-counted shared interner, allowing for clones to access the same structure.
@@ -29,11 +29,11 @@ pub struct ParseState<'src, I: Input + ?Sized, S: IdSupply> {
     /// The current recursive stack.
     ///
     /// Do not discard the recursive stack during parsing. This may lead to undefined behaviour.
-    pub recursive_stack: RecursiveStack<'src, I, S>,
+    pub recursive_stack: RecursiveStack<'src, C, S>,
 }
-impl<'src, I: Input + ?Sized, S: IdSupply> Debug for ParseState<'src, I, S>
+impl<'src, C, S: IdSupply> Debug for ParseState<'src, C, S>
 where
-    I::Cursor: Debug,
+    C: Debug,
     S: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -55,19 +55,19 @@ where
         debug.field("supply", &self.supply).finish()
     }
 }
-impl<'src, I: Input + ?Sized, S: IdSupply> Clone for ParseState<'src, I, S> {
+impl<'src, C: Clone, S: IdSupply> Clone for ParseState<'src, C, S> {
     fn clone(&self) -> Self {
         ParseState {
-            cursor: self.cursor,
+            cursor: self.cursor.clone(),
             interner: self.interner.clone(),
             supply: self.supply.clone(),
             recursive_stack: self.recursive_stack.clone(),
         }
     }
 }
-impl<'src, I: Input + ?Sized, S: IdSupply + Default> ParseState<'src, I, S> {
+impl<'src, C, S: IdSupply + Default> ParseState<'src, C, S> {
     /// Creates a new parse state from this input.
-    pub fn new(input: &I) -> Self {
+    pub fn new<I : Input + ?Sized>(input: &I) -> ParseState<'_, I::Cursor, S> {
         ParseState {
             cursor: input.start(),
             interner: Rc::new(RefCell::new(GreenInterner::new())),
@@ -122,15 +122,15 @@ where
     E::Failure: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.ast == other.ast
-            && self.cst == other.cst
+        self.ast == other.ast && self.cst == other.cst
     }
 }
 impl<A, E: ParseEnvironment> Eq for ParseOutput<A, E>
 where
     A: Eq,
     E::Failure: Eq,
-{}
+{
+}
 
 /// Status of parse result of the AST payload.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

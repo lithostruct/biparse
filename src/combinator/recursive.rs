@@ -1,4 +1,4 @@
-use std::{any::TypeId, borrow::Cow, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, fmt::Debug, rc::Rc};
 
 use crate::{
     cst::{CstOutput, IdSupply},
@@ -10,48 +10,48 @@ use crate::{
 /// The recursive stack stored in `ParseState`, which can be cheaply cloned.
 ///
 /// Internals hidden due to being specific to `Recursive` and no other combinator.
-pub struct RecursiveStack<'src, I: Input + ?Sized, S: IdSupply> {
-    inner: im::Vector<RecursiveFrame<'src, I, S>>,
+pub struct RecursiveStack<'src, C, S: IdSupply> {
+    inner: im::Vector<RecursiveFrame<'src, C, S>>,
 }
-impl<'src, I: Input + ?Sized, S: IdSupply> Default for RecursiveStack<'src, I, S> {
+impl<'src, C: Clone, S: IdSupply> Default for RecursiveStack<'src, C, S> {
     fn default() -> Self {
         RecursiveStack {
             inner: im::Vector::new(),
         }
     }
 }
-impl<'src, I: Input + ?Sized, S: IdSupply> Clone for RecursiveStack<'src, I, S> {
+impl<'src, C: Clone, S: IdSupply> Clone for RecursiveStack<'src, C, S> {
     fn clone(&self) -> Self {
         RecursiveStack {
             inner: self.inner.clone(),
         }
     }
 }
-impl<'src, I: Input + ?Sized, S: IdSupply> RecursiveStack<'src, I, S> {
+impl<'src, C: Clone, S: IdSupply> RecursiveStack<'src, C, S> {
     pub fn new() -> Self {
         Self::default()
     }
     fn get_latest(
         &self,
         id: RecursiveId,
-        start_cursor: I::Cursor,
-    ) -> Option<&RecursiveFrame<'src, I, S>> {
+        start_cursor: C,
+    ) -> Option<&RecursiveFrame<'src, C, S>> where C : Eq {
         self.inner
             .iter()
             .rev()
-            .find(|inner| inner.matches(id, start_cursor))
+            .find(|inner| inner.matches(id, start_cursor.clone()))
     }
-    fn push_to_top(&self, frame: RecursiveFrame<'src, I, S>) -> Self {
+    fn push_to_top(&self, frame: RecursiveFrame<'src, C, S>) -> Self {
         RecursiveStack {
             inner: self.inner.clone() + im::Vector::unit(frame),
         }
     }
 }
 
-struct RecursiveFrame<'src, I: Input + ?Sized, S: IdSupply> {
+struct RecursiveFrame<'src, C, S: IdSupply> {
     // Identifying information
     id: RecursiveId,
-    start_cursor: I::Cursor,
+    start_cursor: C,
 
     // Diagnostic information.
     description: Option<Cow<'static, str>>,
@@ -59,9 +59,9 @@ struct RecursiveFrame<'src, I: Input + ?Sized, S: IdSupply> {
 
     // Payload.
     /// This cannot be in `erased` becaue `I` does not live for `'static`.
-    seed_result: Option<(ParseState<'src, I, S>, Rc<dyn ErasedOutput<'src> + 'src>)>,
+    seed_result: Option<(ParseState<'src, C, S>, Rc<dyn ErasedOutput<'src> + 'src>)>,
 }
-impl<'src, I: Input + ?Sized, S: IdSupply> Debug for RecursiveFrame<'src, I, S> {
+impl<'src, C: Debug, S: IdSupply> Debug for RecursiveFrame<'src, C, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecursiveFrame")
             .field("description", &self.description)
@@ -69,19 +69,20 @@ impl<'src, I: Input + ?Sized, S: IdSupply> Debug for RecursiveFrame<'src, I, S> 
             .finish()
     }
 }
-impl<'src, I: Input + ?Sized, S: IdSupply> Clone for RecursiveFrame<'src, I, S> {
+impl<'src, C: Clone, S: IdSupply> Clone for RecursiveFrame<'src, C, S> {
     fn clone(&self) -> Self {
         RecursiveFrame {
             id: self.id,
-            start_cursor: self.start_cursor,
+            start_cursor: self.start_cursor.clone(),
             description: self.description.clone(),
             closure_typename: self.closure_typename.clone(),
             seed_result: self.seed_result.clone(),
         }
     }
 }
-impl<I: Input + ?Sized, S: IdSupply> RecursiveFrame<'_, I, S> {
-    pub fn matches(&self, id: RecursiveId, start_cursor: I::Cursor) -> bool {
+impl<C, S: IdSupply> RecursiveFrame<'_, C, S> {
+    pub fn matches(&self, id: RecursiveId, start_cursor: C) -> bool
+    where C : Eq {
         self.id == id && self.start_cursor == start_cursor
     }
 }
@@ -106,7 +107,7 @@ where
     }
 }
 
-/// Parser combinator for expressiong fixpoint recursion.
+/// Parser combinator for expressing fixpoint recursion.
 #[derive(Debug, Clone)]
 pub struct Recursive<F> {
     description: Option<Cow<'static, str>>,
@@ -128,7 +129,7 @@ impl<F> Recursive<F> {
         }
     }
 }
-impl<'src, I: Input, A, E: ParseEnvironment, F, P> Parser<'src, I, A, E> for Recursive<F>
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, F, P> Parser<'src, I, A, E> for Recursive<F>
 where
     F: Fn(&Self) -> P,
     P: Parser<'src, I, A, E>,
@@ -137,8 +138,8 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I, E::Supply>,
-    ) -> (ParseState<'src, I, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I::Cursor, E::Supply>,
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
         match state.recursive_stack.get_latest(self.id(), state.cursor) {
             Some(frame) => {
                 // encountered. check for seed?

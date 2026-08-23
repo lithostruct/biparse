@@ -1,4 +1,7 @@
-use derive_more::Into;
+//! Module for input-related traits, implementations and items.
+//!
+//! Refer to [`Input`] and [`Pattern`] for the central traits exported.
+
 use std::{fmt::Debug, hash::Hash};
 
 /// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
@@ -156,6 +159,18 @@ impl Pattern<str> for String {
         self.as_str().matches_at(input, cursor)
     }
     fn describe(&self) -> String {
-        format!("string \"{self:?}\"")
+        self.as_str().describe()
+    }
+}
+impl Pattern<str> for &str {
+    fn matches_at(
+        &self,
+        input: &str,
+        cursor: <str as Input>::Cursor,
+    ) -> Result<<str as Input>::Cursor, <str as Input>::Cursor> {
+        (*self).matches_at(input, cursor)
+    }
+    fn describe(&self) -> String {
+        (*self).describe()
     }
 }
