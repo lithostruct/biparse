@@ -23,15 +23,15 @@ pub use self::{
     node_association::{Associate, Node},
     recursive::{
         combinator::{Direct, Indirect, Recursive},
-        frame::RecursiveStack,
+        frame::RecursiveState,
     },
-    sentinel::{Empty, End, Fail},
+    sentinel::{Success, End, Fail},
 };
 
 // Constants and functions.
 
-pub fn empty<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Empty> {
-    AsParser::from(Empty)
+pub fn success<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Success> {
+    AsParser::from(Success)
 }
 pub fn fail<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Fail> {
     AsParser::from(Fail)

@@ -1,4 +1,4 @@
-//! Tests for the `Fail` combinator.
+//! Tests for the `Fail` sentinel combinator.
 
 use biparse::prelude::*;
 use proptest::{arbitrary::any, proptest};

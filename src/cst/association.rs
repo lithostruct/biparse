@@ -4,28 +4,28 @@ use crate::cst::path::CstPath;
 
 /// Association table between an `Id` type and a CstOutput containing GreenNodes.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Association<Id>
+pub struct CstAssociation<Id>
 where
     Id: Eq + Hash,
 {
     pub(crate) inner: im::HashMap<Id, CstPath>,
 }
-impl<Id> Default for Association<Id>
+impl<Id> Default for CstAssociation<Id>
 where
     Id: Eq + Hash,
 {
     fn default() -> Self {
-        Association {
+        CstAssociation {
             inner: im::HashMap::new(),
         }
     }
 }
-impl<Id> Association<Id>
+impl<Id> CstAssociation<Id>
 where
     Id: Debug + Clone + Eq + Hash,
 {
     pub fn new() -> Self {
-        Association::default()
+        CstAssociation::default()
     }
     pub fn merge_with(self, mut rhs: Self, left_width: usize) -> Self {
         rhs.inner
@@ -39,7 +39,7 @@ where
         let merged = left_pair.union_with_key(right_pair, |key, _, _| {
             panic!("Non-unique key {key:?} found in merge operation!")
         });
-        Association { inner: merged }
+        CstAssociation { inner: merged }
     }
     pub fn with_new_parent(mut self, at_index: usize) -> Self {
         self.inner

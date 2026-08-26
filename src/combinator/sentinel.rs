@@ -10,13 +10,13 @@ use std::fmt::Debug;
 ///
 /// The zero identity for sequential operations.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Empty;
-impl Empty {
+pub struct Success;
+impl Success {
     pub fn new() -> Self {
         Self
     }
 }
-impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Empty {
+impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Success {
     fn parse(
         &self,
         _input: &'src I,

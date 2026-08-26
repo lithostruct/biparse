@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, rc::Rc, sync::Arc};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData, rc::Rc, sync::Arc};
 
 use derive_more::{From, Into};
 
@@ -88,13 +88,40 @@ where
 }
 
 /// Parser combinator wrapper that allows for a parser combinator to carry its associated [`ParseEnvironment`].
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, From, Into)]
+#[derive(From, Into)]
 #[repr(transparent)]
 pub struct WithEnv<E, P> {
     #[from]
     pub inner: P,
     _marker: PhantomData<fn(E)>,
 }
+impl<E, P: Debug> Debug for WithEnv<E, P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WithEnv")
+            .field("inner", &self.inner)
+            .field("_marker", &self._marker)
+            .finish()
+    }
+}
+impl<E, P: Clone> Clone for WithEnv<E, P> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone(), _marker: self._marker.clone() }
+    }
+}
+impl<E, P: Copy> Copy for WithEnv<E, P> {}
+impl<E, P: PartialEq> PartialEq for WithEnv<E, P> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner && self._marker == other._marker
+    }
+}
+impl<E, P: Eq> Eq for WithEnv<E, P> {}
+impl<E, P: Hash> Hash for WithEnv<E, P> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.inner.hash(state);
+        self._marker.hash(state);
+    }
+}
+
 impl<E: ParseEnvironment, P> WithEnv<E, P> {
     pub fn new<'src, I: Input + ?Sized, A>(inner: P) -> Self
     where
@@ -127,12 +154,38 @@ where
 }
 
 /// Parser combinator wrapper that restricts the inner parser to use the specified [`Parser<'src, I, A, E>`] instance.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct AsParser<'src, I: ?Sized, A, E, P> {
     pub inner: P,
     _marker: PhantomData<fn(&'src I, A, E)>,
 }
+impl<'src, I: ?Sized, A, E, P: Debug> Debug for AsParser<'src, I, A, E, P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AsParser")
+            .field("inner", &self.inner)
+            .field("_marker", &self._marker)
+            .finish()
+    }
+}
+impl<'src, I: ?Sized, A, E, P: Clone> Clone for AsParser<'src, I, A, E, P> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone(), _marker: self._marker.clone() }
+    }
+}
+impl<'src, I: ?Sized, A, E, P: Copy> Copy for AsParser<'src, I, A, E, P> {}
+impl<'src, I: ?Sized, A, E, P: PartialEq> PartialEq for AsParser<'src, I, A, E, P> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner && self._marker == other._marker
+    }
+}
+impl<'src, I: ?Sized, A, E, P: Eq> Eq for AsParser<'src, I, A, E, P> {}
+impl<'src, I: ?Sized, A, E, P: Hash> Hash for AsParser<'src, I, A, E, P> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.inner.hash(state);
+        self._marker.hash(state);
+    }
+}
+
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> From<P> for AsParser<'src, I, A, E, P>
 where
     P: Parser<'src, I, A, E>,

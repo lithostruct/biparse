@@ -1,4 +1,4 @@
-//! Tests for the `End` combinator.
+//! Tests for the `End` sentinel combinator.
 
 use biparse::{failure, prelude::*};
 use rowan::SyntaxKind;

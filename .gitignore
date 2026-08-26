@@ -1,2 +1,2 @@
 /target
-/tests/proptest_regressions
+/tests/proptest-regressions/*

@@ -3,7 +3,7 @@ use std::{fmt::Debug, hash::Hash};
 use rowan::SyntaxKind;
 
 use crate::{
-    cst::{Association, Cst, CstPath},
+    cst::{CstAssociation, Cst, CstPath},
     green::{GreenElement, GreenInterner},
 };
 
@@ -16,7 +16,7 @@ where
     /// The forest of CST nodes.
     pub cst: Cst<GreenElement>,
     /// The association table between `Id` and paths into `self.cst` to get those nodes.
-    pub origin: Association<Id>,
+    pub origin: CstAssociation<Id>,
 }
 impl<Id: Debug + Clone + Eq + Hash> Default for CstOutput<Id> {
     fn default() -> Self {
@@ -27,13 +27,13 @@ impl<Id: Debug + Clone + Eq + Hash> CstOutput<Id> {
     pub fn new() -> Self {
         CstOutput {
             cst: Cst::new(),
-            origin: Association::new(),
+            origin: CstAssociation::new(),
         }
     }
     pub fn unit(value: GreenElement) -> Self {
         CstOutput {
             cst: Cst::unit(value),
-            origin: Association::new(),
+            origin: CstAssociation::new(),
         }
     }
 

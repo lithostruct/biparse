@@ -1,7 +1,7 @@
 use rowan::{GreenNode, GreenToken, SyntaxKind};
 
 use crate::{
-    combinator::RecursiveStack,
+    combinator::RecursiveState,
     cst::{CstOutput, IdSupply},
     green::{GreenElement, GreenInterner},
     input::Input,
@@ -29,7 +29,7 @@ pub struct ParseState<'src, C, S: IdSupply> {
     /// The current recursive stack.
     ///
     /// Do not discard the recursive stack during parsing. This may lead to undefined behaviour.
-    pub recursive_stack: RecursiveStack<'src, C, S>,
+    pub recursive_state: RecursiveState<'src, C, S>,
 }
 impl<'src, C, S: IdSupply> Debug for ParseState<'src, C, S>
 where
@@ -61,7 +61,7 @@ impl<'src, C: Clone, S: IdSupply> Clone for ParseState<'src, C, S> {
             cursor: self.cursor.clone(),
             interner: self.interner.clone(),
             supply: self.supply.clone(),
-            recursive_stack: self.recursive_stack.clone(),
+            recursive_state: self.recursive_state.clone(),
         }
     }
 }
@@ -72,7 +72,7 @@ impl<'src, C, S: IdSupply + Default> ParseState<'src, C, S> {
             cursor: input.start(),
             interner: Rc::new(RefCell::new(GreenInterner::new())),
             supply: S::default(),
-            recursive_stack: RecursiveStack::new(),
+            recursive_state: RecursiveState::new(),
         }
     }
     pub fn intern_token(&self, kind: SyntaxKind, text: &str) -> GreenToken {

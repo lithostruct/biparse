@@ -1,62 +1,103 @@
-use std::{borrow::Cow, fmt::Debug, rc::Rc};
+use std::{borrow::Cow, fmt::Debug, hash::Hash, rc::Rc};
 
 use crate::{
     cst::IdSupply,
     parse::{ParseEnvironment, ParseOutput, ParseState},
 };
 
-/// The recursive stack stored in `ParseState`, which can be cheaply cloned.
+/// The recursive state stored in [`ParseState`], which can be cheaply cloned.
 ///
-/// Internals hidden due to being specific to `Recursive` and no other combinator.
-pub struct RecursiveStack<'src, C, S: IdSupply> {
-    inner: im::Vector<RecursiveFrame<'src, C, S>>,
+/// # Note / Warning to [`Parser`](crate::parse::Parser) Implementors
+/// 
+/// This data type encapsulates a lot of the invariants and information
+/// that makes [`Recursive`](crate::combinator::Recursive) work, including but not limited to:
+/// - Left-recursion and seed-growing,
+/// - Memoization and deduplication of work,
+/// - Dependency tracking between recursive combinator invocations.
+/// 
+/// Implementors *must* observe the following invariants when it comes to threading [`RecursiveState`]
+/// throughout the input and output [`ParseState`] of their combinators.
+/// 
+/// Failure to do so may cause correctness issues or exponential blowup of recursive parsing.
+/// 
+/// - **Leaf Combinators:** Return the `RecursiveState` as-is.
+///   Do *not* return a [`RecursiveState::new()`] or [`Default::default()`] instance.
+/// - **Sequential Combinators:** The `RecursiveState` must be threaded through each step.
+///   Do *not* use earlier clones of `RecursiveState` not threaded through each combinator.
+/// - **Speculative Combinators:** Clone the `RecursiveState` prior to speculative parsing.
+///   Use a fresh clone for each instance of speculative parsing.
+///   The `RecursiveState` of the successful branch should be returned.
+///   `RecursiveState` corresponding to discarded alternatives must *not* be returned, and should also be discarded.
+/// - **All of the Above:** *Must* hold for *both* parsing and checking modes.
+pub struct RecursiveState<'src, C, S: IdSupply> {
+    /// The recursion stack + memoization table.
+    pub(super) inner: im::HashMap<(RecursiveId, C), RecursiveFrame<'src, C, S>>,
+
+    /// The currently-active recursive combinator invocation.
+    pub(super) current_enclosing: Option<(RecursiveId, C)>,
+    /// Dependencies for the currently-enclosing recursive combinator.
+    pub(super) current_dependencies: im::Vector<(RecursiveId, C, usize)>,
 }
-impl<'src, C: Clone, S: IdSupply> Default for RecursiveStack<'src, C, S> {
+impl<'src, C: Clone, S: IdSupply> Default for RecursiveState<'src, C, S> {
     fn default() -> Self {
-        RecursiveStack {
-            inner: im::Vector::new(),
+        RecursiveState {
+            inner: im::HashMap::new(),
+            current_enclosing: None,
+            current_dependencies: im::Vector::new(),
         }
     }
 }
-impl<'src, C: Clone, S: IdSupply> Clone for RecursiveStack<'src, C, S> {
+impl<'src, C: Clone, S: IdSupply> Clone for RecursiveState<'src, C, S> {
     fn clone(&self) -> Self {
-        RecursiveStack {
+        RecursiveState {
             inner: self.inner.clone(),
+            current_enclosing: self.current_enclosing.clone(),
+            current_dependencies: self.current_dependencies.clone(),
         }
     }
 }
-impl<'src, C: Clone, S: IdSupply> RecursiveStack<'src, C, S> {
+impl<'src, C: Clone, S: IdSupply> RecursiveState<'src, C, S> {
     pub fn new() -> Self {
         Self::default()
     }
-    pub(in super) fn get_latest(&self, id: RecursiveId, start_cursor: C) -> Option<&RecursiveFrame<'src, C, S>>
+}
+impl<'src, C: Clone + Hash + Eq, S: IdSupply> RecursiveState<'src, C, S> {
+    pub(in super) fn get(&self, id: RecursiveId, start_cursor: C) -> Option<&RecursiveFrame<'src, C, S>>
     where
         C: Eq,
     {
         self.inner
-            .iter()
-            .rev()
-            .find(|inner| inner.matches(id, start_cursor.clone()))
+            .get(&(id, start_cursor))
     }
-    pub(in super) fn push_to_top(&self, frame: RecursiveFrame<'src, C, S>) -> Self {
-        RecursiveStack {
-            inner: self.inner.clone() + im::Vector::unit(frame),
+    pub(in super) fn get_mut(&mut self, id: RecursiveId, start_cursor: C) -> Option<&mut RecursiveFrame<'src, C, S>>
+    where
+        C: Eq,
+    {
+        self.inner
+            .get_mut(&(id, start_cursor))
+    }
+    pub(in super) fn push_to_top(&self, id: RecursiveId, start_cursor: C, frame: RecursiveFrame<'src, C, S>) -> Self {
+        RecursiveState {
+            current_enclosing: Some((id, start_cursor.clone())),
+            current_dependencies: frame.dependencies.clone(),
+            inner: self.inner.update((id, start_cursor), frame),
         }
     }
 }
 
 pub(super) struct RecursiveFrame<'src, C, S: IdSupply> {
-    // Identifying information
+    // Safety information
     pub(super) id: RecursiveId,
-    pub(super) start_cursor: C,
 
     // Diagnostic information.
     pub(super) description: Option<Cow<'static, str>>,
     pub(super) diagnostic_name: String,
 
-    // Payload.
-    /// This cannot be in `erased` becaue `I` does not live for `'static`.
+    // Payload information.
     pub(super) seed_result: Option<(ParseState<'src, C, S>, Rc<dyn ErasedOutput<'src> + 'src>)>,
+    pub(super) active_fixpoint: bool,
+    pub(super) generation: usize,
+    pub(super) dependencies: im::Vector<(RecursiveId, C, usize)>,
 }
 impl<'src, C: Debug, S: IdSupply> Debug for RecursiveFrame<'src, C, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -70,22 +111,17 @@ impl<'src, C: Clone, S: IdSupply> Clone for RecursiveFrame<'src, C, S> {
     fn clone(&self) -> Self {
         RecursiveFrame {
             id: self.id,
-            start_cursor: self.start_cursor.clone(),
             description: self.description.clone(),
             diagnostic_name: self.diagnostic_name.clone(),
             seed_result: self.seed_result.clone(),
+            active_fixpoint: self.active_fixpoint,
+            generation: self.generation,
+            dependencies: self.dependencies.clone(),
         }
     }
 }
-impl<C, S: IdSupply> RecursiveFrame<'_, C, S> {
-    pub fn matches(&self, id: RecursiveId, start_cursor: C) -> bool
-    where
-        C: Eq,
-    {
-        self.id == id && self.start_cursor == start_cursor
-    }
-}
 
+/// Newtype around the pointer address of a recursive combinator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) struct RecursiveId(pub(super) *const ());
 

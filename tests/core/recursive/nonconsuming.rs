@@ -10,7 +10,7 @@ proptest! {
     fn this_or_empty(s in any::<String>()) {
         let combinator: Recursive<dyn Parser<'_, str, (), DefaultParseEnvironment>> =
             Recursive::recursive(
-                |this| this.or(empty()).map(|_| ())
+                |this| this.or(success()).map(|_| ())
             );
         let (state, result) = combinator.parse_from_start(&s);
         assert!(matches!(result.ast, ParseResult::Success(_)));
@@ -21,7 +21,7 @@ proptest! {
     fn empty_or_this(s in any::<String>()) {
         let combinator: Recursive<dyn Parser<'_, str, (), DefaultParseEnvironment>> =
             Recursive::recursive(
-                |this| empty().or(this).map(|_| ())
+                |this| success().or(this).map(|_| ())
             );
         let (state, result) = combinator.parse_from_start(&s);
         assert!(matches!(result.ast, ParseResult::Success(_)));

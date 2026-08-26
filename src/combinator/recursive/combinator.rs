@@ -6,21 +6,25 @@ use std::{
 };
 
 use crate::{
-    combinator::recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId},
-    cst::CstOutput,
-    failure::{FailureKind, ParseFailure},
-    input::Input,
-    parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
+    combinator::{RecursiveState, recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId}}, cst::CstOutput, failure::{FailureKind, ParseFailure}, input::Input, parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
 };
 
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Recursive<P: ?Sized> {
     /// Inner payload.
     inner: RecursiveInner<P>,
     /// Description.
     description: Option<Cow<'static, str>>,
+}
+impl<P: ?Sized> Clone for Recursive<P> {
+    fn clone(&self) -> Self {
+        Recursive {
+            inner: self.inner.clone(),
+            description: self.description.clone(),
+        }
+    }
 }
 impl<P: ?Sized> Recursive<P> {
     fn recursive_id(&self) -> RecursiveId {
@@ -91,8 +95,7 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I
     }
     /// # Note on Strong Cycles
     ///
-    /// Mutually-recursive groups contain strong references into each other;
-    /// hence they will never deallocate even after becoming inaccessible.
+    /// Strong cycles formed by recursive groups never deallocate even after becoming inaccessible.
     ///
     /// This is currently considered acceptable because parsers typically are constructed no more than once,
     /// and stored and resused throughout the lifetime of the program.
@@ -119,12 +122,20 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum RecursiveInner<P: ?Sized> {
     // Owned. What users get during direct construction, declaration and definition.
     Owned(Rc<P>),
     // Unowned, supplied to the inner closure for the back-edge. A user should never be able to construct this.
     Unowned(Weak<P>),
+}
+impl<P: ?Sized> Clone for RecursiveInner<P> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Owned(owned) => Self::Owned(owned.clone()),
+            Self::Unowned(weak) => Self::Unowned(weak.clone()),
+        }
+    }
 }
 impl<P: ?Sized> RecursiveInner<P> {
     fn as_ptr(&self) -> *const P {
@@ -150,67 +161,85 @@ pub struct Indirect<'src, I: Input + ?Sized, A, E: ParseEnvironment> {
     inner: OnceCell<Box<dyn Parser<'src, I, A, E> + 'src>>,
 }
 
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I, A, E> for Recursive<P>
-where
-    P : Parser<'src, I, A, E>,
-    A : Clone + 'src,
-{
-    fn parse(
-        &self,
-        input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<A, E>) {
-        // # Internal Notes
-        //
-        // This function contains the workhouse of the recursive seed-growing algorithm,
-        // but it delegates to the inner `P` for parsing,
-        // hence `Parser` must be implemented for `RecursiveInner`, `Direct` and `Indirect`,
-        // though these are (mostly) straightforward wrapper types.
 
-        match state.recursive_stack.get_latest(self.recursive_id(), state.cursor) {
+/// # Internal Notes
+///
+/// - This function contains the workhouse of the recursive seed-growing algorithm,
+///   but it delegates to the inner `P` for parsing,
+///   hence `Parser` must be implemented for `RecursiveInner`, `Direct` and `Indirect`,
+///   though these are (mostly) straightforward wrapper types.
+/// - This has been separated into a macro because we need to dispatch on `parser.parse(...)` and `parser.check(...)`,
+///   which have differing signatures and different names, thus not abstractible as a method.
+///   You should conceptually think of this as a method of `Recursive` though.
+macro_rules! recursive_growth {
+    ($self:expr, $input:expr, $state:expr, $method:ident) => {{
+        // Convenience let-bindings.
+        // A shame we can't really do this for self.
+        let this = ($self);
+        let input = ($input);
+        let state = ($state);
+
+        // println!("{}@{:?}", &this.description.clone().unwrap_or(this.diagnostic_name().into()), state.cursor);
+
+        // Check the recursive state on whether or not this recursive function has been entered.
+        match state.recursive_state.get(this.recursive_id(), state.cursor) {
 
             Some(frame) => {
+                // check for stale-ness.
+                if this.entry_is_stale(state.cursor, &state.recursive_state) {
+                    recompute!(this, input, state, $method)
+                }
+
                 // encountered. check for seed?
                 match &frame.seed_result {
 
+                    // seed found.
                     // clone seed value, restore its type and return.
                     Some((seed_state, erased)) => {
                         assert_eq!(
                             frame.id,
-                            self.recursive_id(),
+                            this.recursive_id(),
                             "recursive output belongs to a different Recursive combinator!"
                         );
 
                         // # SAFETY:
-                        //
-                        // Every `RecursiveFrame` is associated with exactly one `RecursiveId`,
-                        // identifying the Recursive combinator whose invocation the frame represents.
-                        //
-                        // Assume the invariant that construction of `RecursiveFrame`
-                        // stores the payload and RecursiveId of the combinator that produced it,
-                        // which must not be decoupled after erasure within this parse invocation.
-                        //
-                        // The erased payload is asserted to be created by this Recursive combinator,
-                        // hence the output must be of type `ParseOutput<A, E>`.
-                        //
-                        // `ErasedOutput::as_ptr` points directly to its contained `ParseOutput<A, E>`.
-                        // We borrow that value and clone it; ownership of the erased output remains unchanged.
+                        // 1. Every `RecursiveFrame` is associated with exactly one `RecursiveId`,
+                        //    identifying the Recursive combinator whose invocation the frame represents.
+                        // 2. Assume the invariant that construction of `RecursiveFrame`
+                        //    stores the payload and RecursiveId of the combinator that produced it,
+                        //    which must not be decoupled after erasure within this parse invocation.
+                        // 3. Following 1 and 2: the erased payload is asserted to be created by this Recursive combinator,
+                        //    hence the output must be of type:
+                        //    - `ParseOutput<A, E>` for `parse`;
+                        //    - `ParseOutput<(), E>` for `check`.
+                        // 4. `ErasedOutput::as_ptr` points directly to its contained `ParseOutput<_, E>`.
+                        //    We borrow that value and clone it; ownership of the erased output remains unchanged.
                         let parse_output = unsafe {
-                            let output = &*(erased.as_ptr() as *const ParseOutput<A, E>);
+                            let output = &*(erased.as_ptr() as *const ParseOutput<_, E>);
                             output.clone()
                         };
-                        (seed_state.clone(), parse_output)
+
+                        // Overwrite seed state's recursive state with that discovered from the current state.
+                        // Hence, update dependency to the enclosure.
+                        let mut return_state = seed_state.clone();
+                        return_state.recursive_state = state.recursive_state.clone();
+                        return_state.recursive_state.current_dependencies
+                            .push_back((this.recursive_id(), state.cursor, frame.generation));
+                        (return_state, parse_output)
                     }
 
                     None => {
                         // speculative error for left-recursion.
+                        // no need to record failure dependency, because either:
+                        // - speculative failure: replaced by alternative, or propagated.
+                        // - committed failure: propagated, seed value not used.
                         let failure = E::Failure::failure_at::<_, E::Failure>(
                             input,
                             state.cursor,
                             FailureKind::LeftRecursion {
-                                description: self.description.as_ref()
+                                description: this.description.as_ref()
                                     .map(|s| s.clone().into_owned()),
-                                diagnostic_name: self.diagnostic_name(),
+                                diagnostic_name: this.diagnostic_name(),
                             },
                         );
                         (
@@ -223,85 +252,165 @@ where
                     }
                 }
             }
+
             None => {
-                // first entry; seed-growing.
-                let mut recursive_stack
-                    = state.recursive_stack.push_to_top(RecursiveFrame {
-                        id: self.recursive_id(),
-                        start_cursor: state.cursor,
-                        description: self.description.clone(),
-                        diagnostic_name: self.diagnostic_name(),
-                        seed_result: None,
-                    });
-                let seed_state = ParseState {
-                    recursive_stack: recursive_stack.clone(),
-                    ..state.clone()
-                };
+                recompute!(this, input, state, $method)
+            }
+        }
+    }};
+}
+macro_rules! recompute {
+    ($self:expr, $input:expr, $state:expr, $method:ident) => {{
+        // Convenience let-bindings.
+        // A shame we can't really do this for self.
+        let this = ($self);
+        let input = ($input);
+        let state = ($state);
 
-                let parser = &self.inner;
+        // first entry; seed-growing algorithm.
+        let outer_enclosure = state.recursive_state.current_enclosing.clone();
+        let outer_dependencies = state.recursive_state.current_dependencies.clone();
 
-                // Check if the initial sprout encountered failures.
-                // If yes, there is no point in seed growing, and the failure should be propagated.
-                let (sprout_state, sprout_result) = parser.parse(input, seed_state);
-                match &sprout_result.ast {
-                    ParseResult::Speculative(_) | ParseResult::Committed(_) => {
-                        // failure to sprout.
-                        return (sprout_state, sprout_result);
+        // # SAFETY
+        //
+        // Invariant regarding `RecursiveFrame` construction fulfilled;
+        // This is the only location where it is constructed, and subsequent modifications do not change `id`.
+        let recursive_state
+        = state.recursive_state.push_to_top(this.recursive_id(), state.cursor,
+            RecursiveFrame {
+                id: this.recursive_id(),
+                description: this.description.clone(),
+                diagnostic_name: this.diagnostic_name(),
+                seed_result: None,
+                active_fixpoint: true,
+                dependencies: im::Vector::new(),
+                generation: 0,
+            });
+        let seed_state = ParseState {
+            recursive_state: recursive_state.clone(),
+            ..state.clone()
+        };
+
+        let parser = &this.inner;
+
+        // Check if the initial sprout encountered failures.
+        // If yes, there is no point in seed growing, and the failure should be propagated.
+        let (mut sprout_state, sprout_result) = parser.$method(input, seed_state);
+        match &sprout_result.ast {
+            ParseResult::Speculative(_) | ParseResult::Committed(_) => {
+                // failure to sprout.
+                sprout_state.recursive_state.current_enclosing = outer_enclosure;
+                sprout_state.recursive_state.current_dependencies = outer_dependencies;
+                return (sprout_state, sprout_result);
+            }
+            // Succcessful seed.
+            // Any speculative errors now would be an indication to halt.
+            // Committed errors should still be propagated though.
+            ParseResult::Success(_) => (),
+        }
+
+        let (mut rec_seed_state, mut rec_seed_result) = (sprout_state, sprout_result);
+        loop {
+            let mut frame = rec_seed_state.recursive_state
+                .get_mut(this.recursive_id(), state.cursor).cloned()
+                .expect("Frame must have been allocated from above!");
+            frame.seed_result = Some((rec_seed_state.clone(), rec_seed_result.clone_erased()));
+            frame.dependencies = rec_seed_state.recursive_state.current_dependencies.clone();
+            frame.generation += 1;
+            rec_seed_state.recursive_state.push_to_top(this.recursive_id(), state.cursor, frame);
+
+            let current_best_cursor = rec_seed_state.cursor;
+            let (mut next_sprout_state, next_sprout_result) =
+                parser.$method(input, rec_seed_state.clone());
+
+            match &next_sprout_result.ast {
+                ParseResult::Success(_) => {
+                    // Grow the seed and continue, if not zero-progress.
+                    if current_best_cursor != next_sprout_state.cursor {
+                        rec_seed_state = next_sprout_state;
+                        rec_seed_result = next_sprout_result;
+                        continue;
+                    } else {
+                        // Zero progress encountered.
+                        // Treat stagnancy similarly to speculative error:
+                        // reached fixpoint and return.
+                        let frame = rec_seed_state.recursive_state
+                            .get_mut(this.recursive_id(), state.cursor)
+                            .expect("Frame must have been allocated from above!");
+                        frame.active_fixpoint = false;
+                        let generation = frame.generation;
+                        rec_seed_state.recursive_state.current_enclosing = outer_enclosure;
+                        rec_seed_state.recursive_state.current_dependencies
+                            .push_back((this.recursive_id(), state.cursor, generation));
+                        return (rec_seed_state, rec_seed_result);
                     }
-                    // Succcessful seed.
-                    // Any speculative errors now would be an indication to halt.
-                    // Committed errors should still be propagated though.
-                    ParseResult::Success(_) => (),
                 }
-
-                let (mut rec_seed_state, mut rec_seed_result) = (sprout_state, sprout_result);
-                loop {
-                    // Use the original `state` recursive stack to "replace" this combinator's frame every invocation.
-                    //
-                    // # SAFETY
-                    //
-                    // Invariant regarding `RecursiveFrame` construction fulfilled;
-                    // This is the only location where it is constructed.
-                    recursive_stack = state.recursive_stack.push_to_top(RecursiveFrame {
-                        id: self.recursive_id(),
-                        start_cursor: state.cursor,
-                        description: self.description.clone(),
-                        diagnostic_name: self.diagnostic_name(),
-                        seed_result: Some((rec_seed_state.clone(), rec_seed_result.clone_erased())),
-                    });
-                    let next_seed_state = ParseState {
-                        recursive_stack,
-                        ..state.clone()
-                    };
-                    let (next_sprout_state, next_sprout_result) =
-                        parser.parse(input, next_seed_state);
-                    match &next_sprout_result.ast {
-                        ParseResult::Success(_) => {
-                            // Grow the seed and continue, if not zero-progress.
-                            if rec_seed_state.cursor != next_sprout_state.cursor {
-                                rec_seed_state = next_sprout_state;
-                                rec_seed_result = next_sprout_result;
-                                continue;
-                            } else {
-                                // Zero progress encountered.
-                                // Treat stagnancy similarly to speculative error:
-                                // reached fixpoint and return.
-                                return (rec_seed_state, rec_seed_result);
-                            }
-                        }
-                        ParseResult::Speculative(_) => {
-                            // The previous iteration has consumed as much as we can without speculative failure.
-                            // It's time to stop.
-                            return (rec_seed_state, rec_seed_result);
-                        }
-                        ParseResult::Committed(_) => {
-                            // Propagate failure.
-                            return (next_sprout_state, next_sprout_result);
-                        }
-                    }
+                ParseResult::Speculative(_) => {
+                    // The previous iteration has consumed as much as we can without speculative failure.
+                    // It's time to stop.
+                    let frame = rec_seed_state.recursive_state
+                        .get_mut(this.recursive_id(), state.cursor)
+                        .expect("Frame must have been allocated from above!");
+                    frame.active_fixpoint = false;
+                    let generation = frame.generation;
+                    rec_seed_state.recursive_state.current_enclosing = outer_enclosure;
+                    rec_seed_state.recursive_state.current_dependencies
+                        .push_back((this.recursive_id(), state.cursor, generation));
+                    return (rec_seed_state, rec_seed_result);
+                }
+                ParseResult::Committed(_) => {
+                    // Propagate failure.
+                    let frame = next_sprout_state.recursive_state
+                        .get_mut(this.recursive_id(), state.cursor)
+                        .expect("Frame must have been allocated from above!");
+                    frame.active_fixpoint = false;
+                    let generation = frame.generation;
+                    next_sprout_state.recursive_state.current_enclosing = outer_enclosure;
+                    next_sprout_state.recursive_state.current_dependencies
+                        .push_back((this.recursive_id(), state.cursor, generation));
+                    return (next_sprout_state, next_sprout_result);
                 }
             }
         }
+    }};
+}
+impl<P: ?Sized> Recursive<P> {
+    fn entry_is_stale<'src, I: Input + ?Sized, A, E: ParseEnvironment>(&self, cursor: I::Cursor, state: &RecursiveState<'src, I::Cursor, E::Supply>) -> bool
+    where
+        P : Parser<'src, I, A, E>,
+        A : Clone + 'src,
+    {
+        let Some(dependencies) = state.get(self.recursive_id(), cursor)
+            .map(|frame| &frame.dependencies)
+        else {
+            return true;
+        };
+        dependencies.iter().any(|(dep_id, dep_cursor, dep_gen)| {
+            state.get(*dep_id, *dep_cursor)
+                .is_none_or(|current| current.generation != *dep_gen)
+        })
+    }
+}
+
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I, A, E> for Recursive<P>
+where
+    P : Parser<'src, I, A, E>,
+    A : Clone + 'src,
+{
+    fn parse(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<A, E>) {
+        recursive_growth!(self, input, state, parse)
+    }
+    fn check(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<(), E>)
+    {
+        recursive_growth!(self, input, state, check)
     }
 }
 

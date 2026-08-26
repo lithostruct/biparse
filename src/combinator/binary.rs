@@ -157,6 +157,15 @@ impl<A, B> Either<A, B> {
         }
     }
 }
+impl<A> Either<A, A> {
+    /// Removes the [`Either`] wrapper if both items are of the same type.
+    pub fn into_inner(self) -> A {
+        match self {
+            Either::Left(a) => a,
+            Either::Right(a) => a,
+        }
+    }
+}
 
 /// Parser combinator that returns the first viable alternative, preferring the first result wherever possible.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

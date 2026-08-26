@@ -38,11 +38,11 @@ where
         match self.pattern.matches_at(input, state.cursor) {
             Ok(matched) => {
                 let old_position = state.cursor;
-                let substring = input.slice(old_position, matched.advanced_cursor);
+                let substring = input.slice(old_position, matched.next_cursor);
                 let element = state.intern_token(self.kind, &substring).into();
 
                 let new_state = ParseState {
-                    cursor: matched.advanced_cursor,
+                    cursor: matched.next_cursor,
                     ..state
                 };
                 (
@@ -83,7 +83,7 @@ where
         match self.pattern.matches_at(input, state.cursor) {
             Ok(matched) => {
                 let new_state = ParseState {
-                    cursor: matched.advanced_cursor,
+                    cursor: matched.next_cursor,
                     ..state
                 };
                 (

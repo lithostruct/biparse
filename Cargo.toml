@@ -3,6 +3,10 @@ name = "biparse"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+regex = ["dep:regex", "dep:regex-lite"]
+
 [dependencies]
 derive_more = { version = "2.1.1", features = ["from", "into"] }
 expect-test = "1.5.1"
@@ -12,3 +16,13 @@ proptest = "1.11.0"
 rowan = "0.17.0"
 rustc-hash = "2.1.3"
 thiserror = "2.0.20"
+
+regex.version = "1.13.1"
+regex.optional = true
+regex-lite.version = "0.1.9"
+regex-lite.optional = true
+
+[dev-dependencies]
+indoc = "2.0.7"
+num-derive = "0.5.1"
+num-traits = "0.2.19"
