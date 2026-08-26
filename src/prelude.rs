@@ -6,8 +6,8 @@ pub use crate::{
     failure::{FailureKind, ParseFailure},
     input::{Input, InputItem, LineCol},
     parse::{
-        Parser, ParserExt,
-        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState,
+        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser,
+        ParserExt,
     },
     rowan,
 };

@@ -35,10 +35,7 @@ where
         &self,
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, E::Supply>,
-        ParseOutput<B, E>,
-    ) {
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<B, E>) {
         let (state, output) = self.inner.parse(input, state);
         (
             state,
@@ -52,10 +49,7 @@ where
         &self,
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, E::Supply>,
-        ParseOutput<(), E>,
-    ) {
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         self.inner.check(input, state)
     }
 }
@@ -107,10 +101,7 @@ where
         &self,
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, E::Supply>,
-        ParseOutput<(), E>,
-    ) {
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         self.inner.check(input, state)
     }
 }

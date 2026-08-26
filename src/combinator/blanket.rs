@@ -87,8 +87,8 @@ where
     }
 }
 
-/// Parser combinator wrapper that allows for a parser combinator to carry its associated `ParseEnvironment`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
+/// Parser combinator wrapper that allows for a parser combinator to carry its associated [`ParseEnvironment`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, From, Into)]
 #[repr(transparent)]
 pub struct WithEnv<E, P> {
     #[from]
@@ -114,8 +114,47 @@ where
         &self,
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
+        self.inner.parse(input, state)
+    }
+    fn check(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, I::Cursor, E::Supply>,
+    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        self.inner.check(input, state)
+    }
+}
+
+/// Parser combinator wrapper that restricts the inner parser to use the specified [`Parser<'src, I, A, E>`] instance.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct AsParser<'src, I: ?Sized, A, E, P> {
+    pub inner: P,
+    _marker: PhantomData<fn(&'src I, A, E)>,
+}
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> From<P> for AsParser<'src, I, A, E, P>
+where
+    P: Parser<'src, I, A, E>,
+{
+    fn from(value: P) -> Self {
+        AsParser {
+            inner: value,
+            _marker: PhantomData,
+        }
+    }
+}
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E>
+    for AsParser<'src, I, A, E, P>
+where
+    P: Parser<'src, I, A, E>,
+{
+    fn parse(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, I::Cursor, E::Supply>,
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<A, E>,
     ) {
         self.inner.parse(input, state)
@@ -123,9 +162,9 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, I::Cursor, E::Supply>,
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
         self.inner.check(input, state)

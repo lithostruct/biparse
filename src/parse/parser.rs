@@ -1,4 +1,3 @@
-
 use crate::{
     combinator::{Map, Or, Then, ToOwned, WithEnv},
     cst::CstOutput,
@@ -33,10 +32,11 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
 }
 
 /// Convenience methods available to all implementors of [`Parser<'src, I, A, E>`]. Enables combinator method chaining.
-/// 
+///
 /// This is separated from the main [`Parser`] to allow [`Parser`] to be dyn-compatible.
-pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment> : Parser<'src, I, A, E> {
-
+pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment>:
+    Parser<'src, I, A, E>
+{
     fn parse_from_start(
         &self,
         input: &'src I,
@@ -45,7 +45,9 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     fn boxed<'p>(self) -> WithEnv<E, Box<dyn Parser<'src, I, A, E> + 'p>>
-    where Self : Sized + 'p {
+    where
+        Self: Sized + 'p,
+    {
         let boxed: Box<dyn Parser<'src, I, A, E> + 'p> = Box::new(self);
         WithEnv::<E, Box<dyn Parser<'src, I, A, E> + 'p>>::new::<'src, I, A>(boxed)
     }
@@ -79,5 +81,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         WithEnv::new(ToOwned::new(self))
     }
 }
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E> for T
-where T : Parser<'src, I, A, E> {}
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E> for T where
+    T: Parser<'src, I, A, E>
+{
+}

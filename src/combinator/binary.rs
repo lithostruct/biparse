@@ -34,7 +34,10 @@ where
         &self,
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(A, B), E>) {
+    ) -> (
+        ParseState<'src, I::Cursor, E::Supply>,
+        ParseOutput<(A, B), E>,
+    ) {
         let (state, first_result) = self.first.parse(input, state);
         let payload_a = match first_result.ast {
             ast @ ParseResult::Speculative(_) | ast @ ParseResult::Committed(_) => {
@@ -183,7 +186,10 @@ where
         &self,
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<Either<A, B>, E>) {
+    ) -> (
+        ParseState<'src, I::Cursor, E::Supply>,
+        ParseOutput<Either<A, B>, E>,
+    ) {
         let (first_state, first_result) = self.first.parse(input, state.clone());
         let first_speculative_error = match first_result.ast {
             ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {

@@ -23,29 +23,32 @@ impl<P> Just<P> {
         Just { kind, pattern }
     }
 }
-impl<'src, I: Input + ?Sized, P, E: ParseEnvironment> Parser<'src, I, &'src str, E> for Just<P>
+impl<'src, I: Input + ?Sized, P, E: ParseEnvironment> Parser<'src, I, P::Payload<'src>, E> for Just<P>
 where
-    P: Pattern<I>,
+    P: Pattern<I> + 'src,
 {
     fn parse(
         &self,
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<&'src str, E>) {
+    ) -> (
+        ParseState<'src, I::Cursor, E::Supply>,
+        ParseOutput<P::Payload<'src>, E>,
+    ) {
         match self.pattern.matches_at(input, state.cursor) {
-            Ok(end_position) => {
+            Ok(matched) => {
                 let old_position = state.cursor;
-                let substring = input.slice(old_position, end_position);
-                let element = state.intern_token(self.kind, substring).into();
+                let substring = input.slice(old_position, matched.advanced_cursor);
+                let element = state.intern_token(self.kind, &substring).into();
 
                 let new_state = ParseState {
-                    cursor: end_position,
+                    cursor: matched.advanced_cursor,
                     ..state
                 };
                 (
                     new_state,
                     ParseOutput {
-                        ast: ParseResult::Success(substring),
+                        ast: ParseResult::Success(matched.payload),
                         cst: CstOutput::unit(element),
                     },
                 )
@@ -78,9 +81,9 @@ where
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         match self.pattern.matches_at(input, state.cursor) {
-            Ok(end_position) => {
+            Ok(matched) => {
                 let new_state = ParseState {
-                    cursor: end_position,
+                    cursor: matched.advanced_cursor,
                     ..state
                 };
                 (

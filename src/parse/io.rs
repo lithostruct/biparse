@@ -67,7 +67,7 @@ impl<'src, C: Clone, S: IdSupply> Clone for ParseState<'src, C, S> {
 }
 impl<'src, C, S: IdSupply + Default> ParseState<'src, C, S> {
     /// Creates a new parse state from this input.
-    pub fn new<I : Input + ?Sized>(input: &I) -> ParseState<'_, I::Cursor, S> {
+    pub fn new<I: Input + ?Sized>(input: &I) -> ParseState<'_, I::Cursor, S> {
         ParseState {
             cursor: input.start(),
             interner: Rc::new(RefCell::new(GreenInterner::new())),

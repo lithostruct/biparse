@@ -17,27 +17,42 @@ use crate::{
 
 pub use self::{
     binary::{Either, Or, Then},
-    blanket::WithEnv,
+    blanket::{AsParser, WithEnv},
     just::Just,
     map_to_owned::{Map, ToOwned},
-    node_association::{Node, Associate},
-    recursive::{Recursive, RecursiveStack},
+    node_association::{Associate, Node},
+    recursive::{
+        combinator::{Direct, Indirect, Recursive},
+        frame::RecursiveStack,
+    },
     sentinel::{Empty, End, Fail},
 };
 
 // Constants and functions.
 
-pub const empty: Empty = Empty;
-pub const fail: Fail = Fail;
-pub const end: End = End;
-
-pub fn just<I: Input + ?Sized, P: Pattern<I>>(kind: rowan::SyntaxKind, pattern: P) -> Just<P> {
-    Just::new(kind, pattern)
+pub fn empty<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Empty> {
+    AsParser::from(Empty)
+}
+pub fn fail<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Fail> {
+    AsParser::from(Fail)
+}
+pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, End> {
+    AsParser::from(End)
 }
 
-pub fn recursive<'src, F, I: Input + ?Sized, A, E: ParseEnvironment>(closure: F) -> Recursive<F>
+pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<I> + 'src>(
+    kind: rowan::SyntaxKind,
+    pattern: P,
+) -> AsParser<'src, I, P::Payload<'src>, E, Just<P>> {
+    AsParser::from(Just::new(kind, pattern))
+}
+
+pub fn recursive<'src, I: Input + ?Sized, A, E: ParseEnvironment, F, P>(
+    closure: F,
+) -> Recursive<Direct<'src, I, A, E>>
 where
-    Recursive<F>: Parser<'src, I, A, E>,
+    F: FnOnce(Recursive<Direct<'src, I, A, E>>) -> P,
+    P: Parser<'src, I, A, E> + 'src,
 {
-    Recursive::new(closure)
+    Recursive::recursive(closure)
 }

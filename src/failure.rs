@@ -31,7 +31,7 @@ pub enum FailureKind<I: Input + ?Sized, E: std::error::Error> {
     },
     LeftRecursion {
         description: Option<String>,
-        closure_typename: String,
+        diagnostic_name: String,
     },
     FailPrimitive,
     Custom {
@@ -56,7 +56,7 @@ impl ParseFailure for ZeroSized {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, From, Error)]
-#[error("({}, {}): {}", position.line, position.column,
+#[error("{position}: {}",
     if messages.len() == 1 {
         messages[0].clone()
     } else {
@@ -82,7 +82,7 @@ impl ParseFailure for Simple {
                 let location = input.to_line_col(difference_at);
                 format!(
                     "expected {expected}, found {found:?} at ({}, {})",
-                    location.line, location.column
+                    location.line, location.col
                 )
             }
             FailureKind::ExpectedEnd { found } => {
@@ -90,7 +90,7 @@ impl ParseFailure for Simple {
             }
             FailureKind::LeftRecursion {
                 description,
-                closure_typename,
+                diagnostic_name: closure_typename,
             } => {
                 format!(
                     "Zero-progress left recursion detected at '{}'",

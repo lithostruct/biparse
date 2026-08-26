@@ -2,7 +2,13 @@
 //!
 //! Refer to [`Input`] and [`Pattern`] for the central traits exported.
 
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display},
+    hash::Hash,
+    marker::PhantomData,
+    ops::Range,
+};
 
 /// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
 pub trait Input {
@@ -13,24 +19,51 @@ pub trait Input {
 
     /// Produces a cursor that points to the start of the input.
     fn start(&self) -> Self::Cursor;
+
     /// Peeks at the token in this input pointed at by a cursor.
     /// [`None`] signifies end-of-input.
     fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token, Self::Cursor>>;
+
     /// Produces the string slice over the range specified by the two cursors.
     ///
     /// Range is `start`-inclusive, `end`-exclusive.
-    fn slice(&self, start: Self::Cursor, end: Self::Cursor) -> &str;
+    fn slice(&self, start: Self::Cursor, end: Self::Cursor) -> Cow<'_, str> {
+        self.slice_bytes(self.byte_offset(start), self.byte_offset(end))
+    }
+
+    /// Returns the conceptual byte offset into the source string that this cursor points to.
+    ///
+    /// The returned value must be at an UTF-8 boundary.
+    fn byte_offset(&self, at: Self::Cursor) -> usize;
+    /// Produces the string slice over the range specified by the two cursors.
+    ///
+    /// Range is `start`-inclusive, `end`-exclusive. `start` and `end` must be at UTF-8 character boundaries.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start` and `end` are not at UTF-8 character boundaries.
+    fn slice_bytes(&self, start: usize, end: usize) -> Cow<'_, str>;
+
     /// Calculates the one-indexed line-column number that this cursor points towards.
     fn to_line_col(&self, at: Self::Cursor) -> LineCol;
 }
 
 /// The trait describing all pattern types that match onto a specific input type.
 pub trait Pattern<I: Input + ?Sized> {
+    /// The type of the payload.
+    type Payload<'src>
+    where
+        I: 'src;
     /// Checks whether self matches with the input at the specified cursor.
     ///
     /// - [`Ok`]: The match is successful, and the cursor is the position right after the match is consumed.
     /// - [`Err`]: The match is unsuccessful. The cursor points to the token where the mismatch occured.
-    fn matches_at(&self, input: &I, cursor: I::Cursor) -> Result<I::Cursor, I::Cursor>;
+    fn matches_at<'src>(
+        &self,
+        input: &'src I,
+        cursor: I::Cursor,
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, I>, I::Cursor>;
+
     /// Writes a description of what is expected by `self` as a string.
     ///
     /// This is used for error reporting:
@@ -50,7 +83,30 @@ pub struct InputItem<T, C> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LineCol {
     pub line: usize,
-    pub column: usize,
+    pub col: usize,
+}
+impl Display for LineCol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.line, self.col)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PatternMatch<'src, P, I: Input + ?Sized> {
+    pub payload: P,
+    pub spans: Vec<Range<usize>>,
+    pub advanced_cursor: I::Cursor,
+    _marker: PhantomData<fn(&'src P)>,
+}
+impl<'src, P, I: Input + ?Sized> PatternMatch<'src, P, I> {
+    pub fn new(payload: P, spans: Vec<Range<usize>>, advanced_cursor: I::Cursor) -> Self {
+        PatternMatch {
+            payload,
+            spans,
+            advanced_cursor,
+            _marker: PhantomData,
+        }
+    }
 }
 
 /// The cursor type for `str`-based input.
@@ -85,9 +141,14 @@ impl Input for str {
             }
         })
     }
-    fn slice(&self, start: Self::Cursor, end: Self::Cursor) -> &str {
-        &self[start.0..end.0]
+
+    fn byte_offset(&self, at: Self::Cursor) -> usize {
+        at.0
     }
+    fn slice_bytes(&self, start: usize, end: usize) -> Cow<'_, str> {
+        Cow::Borrowed(&self[start..end])
+    }
+
     fn to_line_col(&self, at: Self::Cursor) -> LineCol {
         // This is done with no caching, so time-complexity is O(N).
         let mut line = 1;
@@ -103,19 +164,25 @@ impl Input for str {
                 column += 1;
             }
         }
-        LineCol { line, column }
+        LineCol { line, col: column }
     }
 }
 
 impl Pattern<str> for char {
-    fn matches_at(
+    type Payload<'src> = &'src str;
+    fn matches_at<'src>(
         &self,
-        input: &str,
+        input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<<str as Input>::Cursor, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
+        let new_byte_offset = cursor.0 + self.len_utf8();
         input[cursor.0..]
             .starts_with(*self)
-            .then_some(StrIndex(cursor.0 + self.len_utf8()))
+            .then_some(PatternMatch::new(
+                &input[cursor.0..new_byte_offset],
+                vec![(cursor.0)..(new_byte_offset)],
+                StrIndex(new_byte_offset),
+            ))
             .ok_or(cursor)
     }
     fn describe(&self) -> String {
@@ -123,24 +190,30 @@ impl Pattern<str> for char {
     }
 }
 impl Pattern<str> for str {
-    fn matches_at(
+    type Payload<'src> = &'src str;
+    fn matches_at<'src>(
         &self,
-        input: &str,
+        input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<<str as Input>::Cursor, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
+        let new_byte_offset = cursor.0 + self.len();
         input[cursor.0..]
             .starts_with(self)
-            .then_some(StrIndex(cursor.0 + self.len()))
+            .then_some(PatternMatch::new(
+                &input[cursor.0..new_byte_offset],
+                vec![(cursor.0)..(new_byte_offset)],
+                StrIndex(new_byte_offset),
+            ))
             .ok_or_else(|| {
                 // Iterate character-by-character to find the mismatch.
                 let mut cursor = cursor;
                 for ch in self.chars() {
                     match ch.matches_at(input, cursor) {
                         Ok(new_position) => {
-                            cursor = new_position;
+                            cursor = new_position.advanced_cursor;
                             continue;
                         }
-                        Err(erron_cursor) => return erron_cursor,
+                        Err(error_cursor) => return error_cursor,
                     }
                 }
                 unreachable!("The whole pattern cannot match!")
@@ -151,11 +224,12 @@ impl Pattern<str> for str {
     }
 }
 impl Pattern<str> for String {
-    fn matches_at(
+    type Payload<'src> = &'src str;
+    fn matches_at<'src>(
         &self,
-        input: &str,
+        input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<<str as Input>::Cursor, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
         self.as_str().matches_at(input, cursor)
     }
     fn describe(&self) -> String {
@@ -163,11 +237,12 @@ impl Pattern<str> for String {
     }
 }
 impl Pattern<str> for &str {
-    fn matches_at(
+    type Payload<'src> = &'src str;
+    fn matches_at<'src>(
         &self,
-        input: &str,
+        input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<<str as Input>::Cursor, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
         (*self).matches_at(input, cursor)
     }
     fn describe(&self) -> String {
