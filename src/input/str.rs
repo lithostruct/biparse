@@ -61,6 +61,10 @@ impl Input for str {
         }
         LineCol { line, col: column }
     }
+    
+    fn describe_token(token: &Self::Token) -> String {
+        format!("UTF-8 character '{token}'")
+    }
 }
 
 impl Pattern<str> for char {
@@ -69,17 +73,22 @@ impl Pattern<str> for char {
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
         if cursor.0 >= input.len() {
-            return Err(cursor);
+            return Err(Some(cursor));
         }
-        input.peek(cursor)
-            .map(|item| PatternMatch::new(
-                &input[item.span.clone()],
-                vec![item.span], 
-                item.next_cursor, 
-            ))
-            .ok_or(cursor)
+        match input.peek(cursor) {
+            Some(item) => if item.token == *self {
+                Ok(PatternMatch::new(
+                    &input[item.span.clone()],
+                    vec![item.span], 
+                    item.next_cursor, 
+                ))
+            } else {
+                Err(Some(cursor))
+            },
+            None => Err(Some(cursor))
+        }
     }
     fn describe(&self) -> String {
         format!("character '{self}'")
@@ -91,32 +100,40 @@ impl Pattern<str> for str {
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
         if cursor.0 >= input.len() {
-            return Err(cursor);
+            return Err(Some(cursor));
         }
         let new_byte_offset = cursor.0 + self.len();
-        input[cursor.0..]
-            .starts_with(self)
-            .then_some(PatternMatch::new(
+        if input[cursor.0..].starts_with(self) {
+            // This is indeed intentional.
+            // It doesn't make much sense to separate these into character-by-character spans
+            // when the whole pattern matches contiguously.
+            // That's just extra work for the `Just` combinator.
+            #[allow(clippy::single_range_in_vec_init)]
+            Ok(PatternMatch::new(
                 &input[cursor.0..new_byte_offset],
                 vec![(cursor.0)..(new_byte_offset)],
                 StrIndex(new_byte_offset),
             ))
-            .ok_or_else(|| {
-                // Iterate character-by-character to find the mismatch.
-                let mut cursor = cursor;
-                for ch in self.chars() {
-                    match ch.matches_at(input, cursor) {
-                        Ok(new_position) => {
-                            cursor = new_position.next_cursor;
-                            continue;
-                        }
-                        Err(error_cursor) => return error_cursor,
+        } else {
+            // Iterate character-by-character to find the mismatch.
+            let mut cursor = cursor;
+            for ch in self.chars() {
+                match ch.matches_at(input, cursor) {
+                    Ok(new_position) => {
+                        cursor = new_position.next_cursor;
+                        continue;
                     }
+                    Err(error_cursor) => {
+                        return Err(Some(
+                            error_cursor.expect("<char as Pattern<I>> always has a meaningful error cursor!")
+                        ))
+                    },
                 }
-                unreachable!("The whole pattern cannot match!")
-            })
+            }
+            unreachable!("The whole pattern cannot match!")
+        }
     }
     fn describe(&self) -> String {
         format!("string \"{self:?}\"")
@@ -128,7 +145,7 @@ impl Pattern<str> for String {
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
         self.as_str().matches_at(input, cursor)
     }
     fn describe(&self) -> String {
@@ -141,7 +158,7 @@ impl Pattern<str> for &str {
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
         (*self).matches_at(input, cursor)
     }
     fn describe(&self) -> String {

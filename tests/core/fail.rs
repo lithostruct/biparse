@@ -17,17 +17,20 @@ proptest! {
         let (state, result): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = fail().then(just(SyntaxKind(kind), pattern.clone())).map(|(_, s)| s)
                 .parse_from_start(s.as_str());
+        // No input should be consumed.
         assert_eq!(state.cursor.into_usize(), 0);
         assert!(matches!(result.ast, ParseResult::Speculative(_)));
     }
 
     #[test]
     fn just_then_fail(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (state, result): (_, ParseOutput<&str, DefaultParseEnvironment>)
+        let (_, result): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = just(SyntaxKind(kind), pattern).then(fail()).map(|(s, _)| s)
                 .parse_from_start(s.as_str());
-        assert_eq!(state.cursor.into_usize(), 0);
         assert!(matches!(result.ast, ParseResult::Speculative(_)));
+        // Regression: this assert doesn't make sense and hence removed
+        // because the `Just` will consume input if it succeeds regardless of downstream failure.
+        // assert_eq!(state.cursor.into_usize(), 0);
     }
 
     #[test]

@@ -21,19 +21,24 @@ pub trait ParseFailure: Clone {
 /// The struct that carries information on what kind of failure is encountered by the parser,
 /// which is given to [`ParseFailure`] implementors for construction.
 pub enum FailureKind<I: Input + ?Sized, E: std::error::Error> {
+    /// Expected a certain pattern, failed to match.
+    /// This may correspond to a cursor location in which the input diverges.
     ExpectedFound {
         expected: String,
-        found: Option<I::Token>,
-        difference_at: I::Cursor,
+        difference_at: Option<I::Cursor>,
     },
+    /// Expected the end of the input, found an additional token.
     ExpectedEnd {
         found: I::Token,
     },
+    /// Zero-progress left recursion.
     LeftRecursion {
         description: Option<String>,
         diagnostic_name: String,
     },
+    /// Failure caused by the [`Fail`] primitive combinator.
     FailPrimitive,
+    /// A custom error.
     Custom {
         error: E,
     },
@@ -76,17 +81,23 @@ impl ParseFailure for Simple {
         let message: String = match kind {
             FailureKind::ExpectedFound {
                 expected,
-                found,
                 difference_at,
             } => {
-                let location = input.to_line_col(difference_at);
-                format!(
-                    "expected {expected}, found {found:?} at ({}, {})",
-                    location.line, location.col
-                )
+                match difference_at {
+                    Some(difference_location) => {
+                        let difference_line_col = input.to_line_col(difference_location);
+                        let found = input.peek(difference_location)
+                            .map_or("end-of-input".into(), 
+                            |item| {
+                                I::describe_token(&item.token)
+                            });
+                        format!("expected {expected}, found {found} at location {difference_line_col}")
+                    },
+                    None => format!("expected {expected}"),
+                }
             }
             FailureKind::ExpectedEnd { found } => {
-                format!("expected end-of-input, found {found:?}",)
+                format!("expected end-of-input, found {}", I::describe_token(&found))
             }
             FailureKind::LeftRecursion {
                 description,

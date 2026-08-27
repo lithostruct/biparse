@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub use self::{
-    binary::{Either, Or, Then},
+    binary::{Or, Then},
     blanket::{AsParser, WithEnv},
     just::Just,
     map_to_owned::{Map, ToOwned},

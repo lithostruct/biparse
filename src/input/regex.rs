@@ -9,7 +9,7 @@ impl Pattern<str> for regex::Regex {
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
         match self.find_at(input, cursor.into_usize()) {
             Some(matched) => if matched.start() == cursor.into_usize() {
                 Ok(PatternMatch::new(
@@ -18,11 +18,10 @@ impl Pattern<str> for regex::Regex {
                     StrIndex(matched.range().end))
                 )
             } else {
-                // There isn't really a meaningful "error at" cursor we can provide here,
-                // so return the current cursor.
-                Err(cursor)
+                // There isn't really a meaningful "error at" cursor we can provide here.
+                Err(None)
             },
-            None => Err(cursor),
+            None => Err(None),
         }
     }
 
@@ -37,7 +36,7 @@ impl Pattern<str> for regex_lite::Regex {
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, <str as Input>::Cursor> {
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
         // Literally identical to above.
         match self.find_at(input, cursor.into_usize()) {
             Some(matched) => if matched.start() == cursor.into_usize() {
@@ -47,11 +46,10 @@ impl Pattern<str> for regex_lite::Regex {
                     StrIndex(matched.range().end))
                 )
             } else {
-                // There isn't really a meaningful "error at" cursor we can provide here,
-                // so return the current cursor.
-                Err(cursor)
+                // There isn't really a meaningful "error at" cursor we can provide here.
+                Err(None)
             },
-            None => Err(cursor),
+            None => Err(None),
         }
     }
 

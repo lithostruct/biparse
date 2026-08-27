@@ -5,6 +5,7 @@ use crate::{
     input::Input,
     parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
 };
+use either::Either;
 
 /// Parser combinator that sequentially executes two parsers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -94,76 +95,6 @@ where
         }
         let (state, second_result) = self.second.check(input, state);
         (state, second_result)
-    }
-}
-
-/// Convenience structure for reporting either A or B.
-/// Isomorphic to [`Result<A, B>`], without the implicit assumption of a notion of success/failure.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Either<A, B> {
-    Left(A),
-    Right(B),
-}
-impl<A, B> Either<A, B> {
-    /// Converts self into a result type:
-    /// - [`Either::Left`] maps to [`Ok`].
-    /// - [`Either::Right`] maps to [`Err`].
-    pub fn into_result(self) -> Result<A, B> {
-        match self {
-            Either::Left(a) => Ok(a),
-            Either::Right(b) => Err(b),
-        }
-    }
-    /// Maps [`Either::Left`] using the given closure.
-    pub fn map_left<A2>(self, f: impl FnOnce(A) -> A2) -> Either<A2, B> {
-        match self {
-            Either::Left(a) => Either::Left(f(a)),
-            Either::Right(b) => Either::Right(b),
-        }
-    }
-    /// Maps [`Either::Right`] using the given closure.
-    pub fn map_right<B2>(self, f: impl FnOnce(B) -> B2) -> Either<A, B2> {
-        match self {
-            Either::Left(a) => Either::Left(a),
-            Either::Right(b) => Either::Right(f(b)),
-        }
-    }
-    /// Unwraps [`Either::Left`] to its payload.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` is [`Either::Right`].
-    pub fn unwrap_left(self) -> A
-    where
-        B: Debug,
-    {
-        match self {
-            Either::Left(a) => a,
-            Either::Right(b) => panic!("Unexpected 'Either::Right' payload:\n{b:?}"),
-        }
-    }
-    /// Unwraps [`Either::Right`] to its payload.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` is [`Either::Left`].
-    pub fn unwrap_right(self) -> B
-    where
-        A: Debug,
-    {
-        match self {
-            Either::Left(a) => panic!("Unexpected 'Either::Left' payload:\n{a:?}"),
-            Either::Right(b) => b,
-        }
-    }
-}
-impl<A> Either<A, A> {
-    /// Removes the [`Either`] wrapper if both items are of the same type.
-    pub fn into_inner(self) -> A {
-        match self {
-            Either::Left(a) => a,
-            Either::Right(a) => a,
-        }
     }
 }
 

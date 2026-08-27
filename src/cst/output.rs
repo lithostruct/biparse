@@ -14,7 +14,7 @@ where
     Id: Eq + Hash,
 {
     /// The forest of CST nodes.
-    pub cst: Cst<GreenElement>,
+    pub green: Cst<GreenElement>,
     /// The association table between `Id` and paths into `self.cst` to get those nodes.
     pub origin: CstAssociation<Id>,
 }
@@ -26,39 +26,39 @@ impl<Id: Debug + Clone + Eq + Hash> Default for CstOutput<Id> {
 impl<Id: Debug + Clone + Eq + Hash> CstOutput<Id> {
     pub fn new() -> Self {
         CstOutput {
-            cst: Cst::new(),
+            green: Cst::new(),
             origin: CstAssociation::new(),
         }
     }
     pub fn unit(value: GreenElement) -> Self {
         CstOutput {
-            cst: Cst::unit(value),
+            green: Cst::unit(value),
             origin: CstAssociation::new(),
         }
     }
 
     pub fn merge_with(self, rhs: Self) -> Self {
-        let merged_origin = self.origin.merge_with(rhs.origin, self.cst.len());
-        let merged_forest = self.cst + rhs.cst;
+        let merged_origin = self.origin.merge_with(rhs.origin, self.green.len());
+        let merged_forest = self.green + rhs.green;
         CstOutput {
-            cst: merged_forest,
+            green: merged_forest,
             origin: merged_origin,
         }
     }
     pub fn attach_parent(self, kind: SyntaxKind, interner: &mut GreenInterner) -> Self {
         let new_origin = self.origin.with_new_parent(0);
-        let new_node = interner.node(kind, self.cst);
+        let new_node = interner.node(kind, self.green);
         CstOutput {
-            cst: Cst::unit(new_node.into()),
+            green: Cst::unit(new_node.into()),
             origin: new_origin,
         }
     }
 
     pub fn associate_root_at(mut self, index: usize, with_id: Id) -> Self {
-        if index >= self.cst.len() {
+        if index >= self.green.len() {
             panic!(
                 "Cannot find node {index}; forest is of length {}!",
-                self.cst.len()
+                self.green.len()
             )
         }
         match self

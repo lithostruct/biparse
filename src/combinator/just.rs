@@ -54,13 +54,11 @@ where
                 )
             }
             Err(error_position) => {
-                let peek_ahead = input.peek(error_position);
                 let failure = E::Failure::failure_at::<_, E::Failure>(
                     input,
                     state.cursor,
                     FailureKind::ExpectedFound {
                         expected: self.pattern.describe(),
-                        found: peek_ahead.map(|item| item.token),
                         difference_at: error_position,
                     },
                 );
@@ -95,13 +93,11 @@ where
                 )
             }
             Err(error_position) => {
-                let peek_ahead = input.peek(error_position);
                 let failure = E::Failure::failure_at::<_, E::Failure>(
                     input,
                     state.cursor,
                     FailureKind::ExpectedFound {
                         expected: self.pattern.describe(),
-                        found: peek_ahead.map(|item| item.token),
                         difference_at: error_position,
                     },
                 );

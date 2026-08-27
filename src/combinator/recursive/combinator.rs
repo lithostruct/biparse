@@ -33,6 +33,9 @@ impl<P: ?Sized> Recursive<P> {
     fn diagnostic_name(&self) -> String {
         format!("{:p}", self.inner.as_ptr() as *const ())
     }
+    fn name(&self) -> String {
+        self.description.clone().unwrap_or(self.diagnostic_name().into()).into_owned()
+    }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'src, I, A, E>> {
     #[allow(clippy::self_named_constructors)]
@@ -179,15 +182,19 @@ macro_rules! recursive_growth {
         let input = ($input);
         let state = ($state);
 
-        // println!("{}@{:?}", &this.description.clone().unwrap_or(this.diagnostic_name().into()), state.cursor);
+        // println!("ENTER: {}@{:?}", &this.name(), state.cursor);
 
         // Check the recursive state on whether or not this recursive function has been entered.
         match state.recursive_state.get(this.recursive_id(), state.cursor) {
 
             Some(frame) => {
-                // check for stale-ness.
-                if this.entry_is_stale(state.cursor, &state.recursive_state) {
-                    recompute!(this, input, state, $method)
+                // check for stale-ness. This is only subject to non-active fixpoints.
+                if !frame.active_fixpoint && this.entry_is_stale_or_absent(state.cursor, &state.recursive_state) {
+                    // let Some(frame) = state.recursive_state.get_mut(this.recursive_id(), state.cursor)
+                    // else { unreachable!() };
+                    // frame.dependencies = im::Vector::new();
+                    // println!("CACHE STALE!: {}@{:?}", &this.name(), state.cursor);
+                    return recompute!(this, input, state, $method);
                 }
 
                 // encountered. check for seed?
@@ -201,6 +208,8 @@ macro_rules! recursive_growth {
                             this.recursive_id(),
                             "recursive output belongs to a different Recursive combinator!"
                         );
+
+                        // println!("CACHED SEED: {}@{:?}", &this.name(), state.cursor);
 
                         // # SAFETY:
                         // 1. Every `RecursiveFrame` is associated with exactly one `RecursiveId`,
@@ -229,6 +238,8 @@ macro_rules! recursive_growth {
                     }
 
                     None => {
+                        // println!("NO SEED: {}@{:?}", &this.name(), state.cursor);
+
                         // speculative error for left-recursion.
                         // no need to record failure dependency, because either:
                         // - speculative failure: replaced by alternative, or propagated.
@@ -242,8 +253,14 @@ macro_rules! recursive_growth {
                                 diagnostic_name: this.diagnostic_name(),
                             },
                         );
+
+                        // Overwrite seed state's recursive state with that discovered from the current state.
+                        // Hence, update dependency to the enclosure.
+                        let return_state = state.clone();
+                        // return_state.recursive_state.current_dependencies
+                        //     .push_back((this.recursive_id(), state.cursor, frame.generation));
                         (
-                            state,
+                            return_state,
                             ParseOutput {
                                 ast: ParseResult::Speculative(failure),
                                 cst: CstOutput::new(),
@@ -254,6 +271,7 @@ macro_rules! recursive_growth {
             }
 
             None => {
+                // println!("FIRST ENTRY!: {}@{:?}", &this.name(), state.cursor);
                 recompute!(this, input, state, $method)
             }
         }
@@ -275,8 +293,8 @@ macro_rules! recompute {
         //
         // Invariant regarding `RecursiveFrame` construction fulfilled;
         // This is the only location where it is constructed, and subsequent modifications do not change `id`.
-        let recursive_state
-        = state.recursive_state.push_to_top(this.recursive_id(), state.cursor,
+        let mut recursive_state = state.recursive_state.clone();
+        recursive_state.push_to_top(this.recursive_id(), state.cursor,
             RecursiveFrame {
                 id: this.recursive_id(),
                 description: this.description.clone(),
@@ -287,7 +305,7 @@ macro_rules! recompute {
                 generation: 0,
             });
         let seed_state = ParseState {
-            recursive_state: recursive_state.clone(),
+            recursive_state,
             ..state.clone()
         };
 
@@ -310,84 +328,87 @@ macro_rules! recompute {
         }
 
         let (mut rec_seed_state, mut rec_seed_result) = (sprout_state, sprout_result);
-        loop {
+
+        let (mut fixpoint_state, fixpoint_result) = loop {
+            // Entering from previous success:
+            // Modify the seed result, dependencies, and add to generation.
             let mut frame = rec_seed_state.recursive_state
                 .get_mut(this.recursive_id(), state.cursor).cloned()
                 .expect("Frame must have been allocated from above!");
             frame.seed_result = Some((rec_seed_state.clone(), rec_seed_result.clone_erased()));
             frame.dependencies = rec_seed_state.recursive_state.current_dependencies.clone();
             frame.generation += 1;
+            // println!("GENERATION {}: {}@{:?}", frame.generation, &this.name(), state.cursor);
             rec_seed_state.recursive_state.push_to_top(this.recursive_id(), state.cursor, frame);
 
+            // Subsequent iteration
             let current_best_cursor = rec_seed_state.cursor;
-            let (mut next_sprout_state, next_sprout_result) =
-                parser.$method(input, rec_seed_state.clone());
+            let current_state = ParseState {
+                recursive_state: rec_seed_state.recursive_state.clone(),
+                ..state.clone()
+            };
+            let (next_sprout_state, next_sprout_result) =
+                parser.$method(input, current_state);
 
             match &next_sprout_result.ast {
                 ParseResult::Success(_) => {
                     // Grow the seed and continue, if not zero-progress.
-                    if current_best_cursor != next_sprout_state.cursor {
+                    // println!("Best: {:?}\nCandidate: {:?}", current_best_cursor, next_sprout_state.cursor);
+                    if next_sprout_state.cursor > current_best_cursor {
+                        // Assign to the recursive seed state.
                         rec_seed_state = next_sprout_state;
                         rec_seed_result = next_sprout_result;
                         continue;
                     } else {
-                        // Zero progress encountered.
+                        // Zero (or negative) progress encountered.
                         // Treat stagnancy similarly to speculative error:
-                        // reached fixpoint and return.
-                        let frame = rec_seed_state.recursive_state
-                            .get_mut(this.recursive_id(), state.cursor)
-                            .expect("Frame must have been allocated from above!");
-                        frame.active_fixpoint = false;
-                        let generation = frame.generation;
-                        rec_seed_state.recursive_state.current_enclosing = outer_enclosure;
-                        rec_seed_state.recursive_state.current_dependencies
-                            .push_back((this.recursive_id(), state.cursor, generation));
-                        return (rec_seed_state, rec_seed_result);
+                        // reached fixpoint and break.
+                        break (rec_seed_state, rec_seed_result);
                     }
                 }
                 ParseResult::Speculative(_) => {
                     // The previous iteration has consumed as much as we can without speculative failure.
                     // It's time to stop.
-                    let frame = rec_seed_state.recursive_state
-                        .get_mut(this.recursive_id(), state.cursor)
-                        .expect("Frame must have been allocated from above!");
-                    frame.active_fixpoint = false;
-                    let generation = frame.generation;
-                    rec_seed_state.recursive_state.current_enclosing = outer_enclosure;
-                    rec_seed_state.recursive_state.current_dependencies
-                        .push_back((this.recursive_id(), state.cursor, generation));
-                    return (rec_seed_state, rec_seed_result);
+                    break (rec_seed_state, rec_seed_result);
                 }
                 ParseResult::Committed(_) => {
                     // Propagate failure.
-                    let frame = next_sprout_state.recursive_state
-                        .get_mut(this.recursive_id(), state.cursor)
-                        .expect("Frame must have been allocated from above!");
-                    frame.active_fixpoint = false;
-                    let generation = frame.generation;
-                    next_sprout_state.recursive_state.current_enclosing = outer_enclosure;
-                    next_sprout_state.recursive_state.current_dependencies
-                        .push_back((this.recursive_id(), state.cursor, generation));
-                    return (next_sprout_state, next_sprout_result);
+                    break (next_sprout_state, next_sprout_result);
                 }
             }
-        }
+        };
+
+        // Get frame and disable activity.
+        let frame = fixpoint_state.recursive_state
+            .get_mut(this.recursive_id(), state.cursor)
+            .expect("Frame must have been allocated from above!");
+        frame.active_fixpoint = false;
+        let generation = frame.generation;
+        // Restore to outer enclosing.
+        fixpoint_state.recursive_state.current_enclosing = outer_enclosure;
+        fixpoint_state.recursive_state.current_dependencies
+            .push_back((this.recursive_id(), state.cursor, generation));
+
+        (fixpoint_state, fixpoint_result)
     }};
 }
 impl<P: ?Sized> Recursive<P> {
-    fn entry_is_stale<'src, I: Input + ?Sized, A, E: ParseEnvironment>(&self, cursor: I::Cursor, state: &RecursiveState<'src, I::Cursor, E::Supply>) -> bool
+    /// Invariant: self at this cursor must not be actively participating in fixpoint calculation.
+    fn entry_is_stale_or_absent<'src, I: Input + ?Sized, A, E: ParseEnvironment>(&self, cursor: I::Cursor, state: &RecursiveState<'src, I::Cursor, E::Supply>) -> bool
     where
         P : Parser<'src, I, A, E>,
         A : Clone + 'src,
     {
-        let Some(dependencies) = state.get(self.recursive_id(), cursor)
-            .map(|frame| &frame.dependencies)
+        let Some(frame) = state.get(self.recursive_id(), cursor)
         else {
             return true;
         };
-        dependencies.iter().any(|(dep_id, dep_cursor, dep_gen)| {
+        frame.dependencies.iter().any(|(dep_id, dep_cursor, dep_gen)| {
+            if *dep_id == self.recursive_id() && *dep_cursor == cursor {
+                return false;
+            }
             state.get(*dep_id, *dep_cursor)
-                .is_none_or(|current| current.generation != *dep_gen)
+                .is_none_or(|current| current.generation != *dep_gen )
         })
     }
 }

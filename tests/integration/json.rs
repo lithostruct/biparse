@@ -211,7 +211,7 @@ fn package_data() {
         )
     "#]].assert_debug_eq(&result.ast);
 
-    let forest = result.cst.cst;
+    let forest = result.cst.green;
     println!("{:#?}", forest);
     assert_eq!(forest.len(), 1);
     let root = match &forest[0] {

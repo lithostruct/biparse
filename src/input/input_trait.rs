@@ -13,9 +13,9 @@ use std::{
 /// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
-    type Cursor: Debug + Copy + Eq + Hash;
+    type Cursor: Copy + Ord + Hash;
     /// The type of a single input in this input.
-    type Token: Debug + Clone + Eq;
+    type Token: Clone + Eq;
 
     /// Produces a cursor that points to the start of the input.
     fn start(&self) -> Self::Cursor;
@@ -46,6 +46,8 @@ pub trait Input {
 
     /// Calculates the one-indexed line-column number that this cursor points towards.
     fn to_line_col(&self, at: Self::Cursor) -> LineCol;
+    /// Displays the description of a token.
+    fn describe_token(token: &Self::Token) -> String;
 }
 
 /// The trait describing all pattern types that match onto a specific input type.
@@ -57,12 +59,15 @@ pub trait Pattern<I: Input + ?Sized> {
     /// Checks whether self matches with the input at the specified cursor.
     ///
     /// - [`Ok`]: The match is successful, and the cursor is the position right after the match is consumed.
-    /// - [`Err`]: The match is unsuccessful. The cursor points to the token where the mismatch occured.
+    /// - [`Err`]: The match is unsuccessful.
+    ///   The cursor points to the token where the mismatch occured, if any other than a generic "failure to match".
+    /// 
+    /// The cursor and byte spans returned within `PatternMatch` *must* be on UTF-8 character boundary.
     fn matches_at<'src>(
         &self,
         input: &'src I,
         cursor: I::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, I>, I::Cursor>;
+    ) -> Result<PatternMatch<'src, Self::Payload<'src>, I>, Option<I::Cursor>>;
 
     /// Writes a description of what is expected by `self` as a string.
     ///

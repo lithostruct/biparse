@@ -38,6 +38,15 @@ pub struct RecursiveState<'src, C, S: IdSupply> {
     /// Dependencies for the currently-enclosing recursive combinator.
     pub(super) current_dependencies: im::Vector<(RecursiveId, C, usize)>,
 }
+impl<'src, C: Clone + Eq + Hash + Debug, S: IdSupply> Debug for RecursiveState<'src, C, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RecursiveState")
+            .field("inner", &self.inner)
+            .field("current_enclosing", &self.current_enclosing)
+            .field("current_dependencies", &self.current_dependencies)
+            .finish()
+    }
+}
 impl<'src, C: Clone, S: IdSupply> Default for RecursiveState<'src, C, S> {
     fn default() -> Self {
         RecursiveState {
@@ -62,26 +71,24 @@ impl<'src, C: Clone, S: IdSupply> RecursiveState<'src, C, S> {
     }
 }
 impl<'src, C: Clone + Hash + Eq, S: IdSupply> RecursiveState<'src, C, S> {
-    pub(in super) fn get(&self, id: RecursiveId, start_cursor: C) -> Option<&RecursiveFrame<'src, C, S>>
+    pub(super) fn get(&self, id: RecursiveId, start_cursor: C) -> Option<&RecursiveFrame<'src, C, S>>
     where
         C: Eq,
     {
         self.inner
             .get(&(id, start_cursor))
     }
-    pub(in super) fn get_mut(&mut self, id: RecursiveId, start_cursor: C) -> Option<&mut RecursiveFrame<'src, C, S>>
+    pub(super) fn get_mut(&mut self, id: RecursiveId, start_cursor: C) -> Option<&mut RecursiveFrame<'src, C, S>>
     where
         C: Eq,
     {
         self.inner
             .get_mut(&(id, start_cursor))
     }
-    pub(in super) fn push_to_top(&self, id: RecursiveId, start_cursor: C, frame: RecursiveFrame<'src, C, S>) -> Self {
-        RecursiveState {
-            current_enclosing: Some((id, start_cursor.clone())),
-            current_dependencies: frame.dependencies.clone(),
-            inner: self.inner.update((id, start_cursor), frame),
-        }
+    pub(super) fn push_to_top(&mut self, id: RecursiveId, start_cursor: C, frame: RecursiveFrame<'src, C, S>) {
+        self.current_enclosing = Some((id, start_cursor.clone()));
+        self.current_dependencies = frame.dependencies.clone();
+        self.inner.insert((id, start_cursor), frame);
     }
 }
 
@@ -99,11 +106,16 @@ pub(super) struct RecursiveFrame<'src, C, S: IdSupply> {
     pub(super) generation: usize,
     pub(super) dependencies: im::Vector<(RecursiveId, C, usize)>,
 }
-impl<'src, C: Debug, S: IdSupply> Debug for RecursiveFrame<'src, C, S> {
+impl<'src, C: Clone + Debug, S: IdSupply> Debug for RecursiveFrame<'src, C, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecursiveFrame")
+            .field("id", &self.id)
             .field("description", &self.description)
-            .field("erased", &"<erased>")
+            .field("diagnostic_name", &self.diagnostic_name)
+            .field("seed_result", &if self.seed_result.is_none() {"None"} else {"<erased>"})
+            .field("active_fixpoint", &self.active_fixpoint)
+            .field("generation", &self.generation)
+            .field("dependencies", &self.dependencies)
             .finish()
     }
 }
