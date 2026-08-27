@@ -54,29 +54,29 @@ where
     }
 }
 
-/// Parser combinator that calls [`ToOwned::to_owned`](std::borrow::ToOwned::to_owned) onto its payload.
+/// Parser combinator that calls [`ToOwned::to_owned`] onto its payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToOwned<P, A> {
+pub struct IntoOwned<P, A: ?Sized> {
     inner: P,
     _marker: PhantomData<fn(A)>,
 }
-impl<P, A> ToOwned<P, A> {
+impl<P, A: ?Sized> IntoOwned<P, A> {
     pub fn new<'src, I: Input + ?Sized, E: ParseEnvironment>(inner: P) -> Self
     where
-        P: Parser<'src, I, A, E>,
-        A: std::borrow::ToOwned + 'src,
+        P: Parser<'src, I, &'src A, E>,
+        A: ToOwned + 'src,
     {
-        ToOwned {
+        IntoOwned {
             inner,
             _marker: PhantomData,
         }
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A::Owned, E>
-    for ToOwned<P, A>
+    for IntoOwned<P, A>
 where
-    P: Parser<'src, I, A, E>,
-    A: std::borrow::ToOwned + 'src,
+    P: Parser<'src, I, &'src A, E>,
+    A: ToOwned + ?Sized + 'src,
 {
     fn parse(
         &self,
@@ -90,9 +90,7 @@ where
         (
             state,
             ParseOutput {
-                ast: output
-                    .ast
-                    .map(|inner| std::borrow::ToOwned::to_owned(&inner)),
+                ast: output.ast.map(|inner| (*inner).to_owned()),
                 cst: output.cst,
             },
         )

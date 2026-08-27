@@ -61,7 +61,7 @@ impl Input for str {
     }
 
     fn describe_token(token: &Self::Token) -> String {
-        format!("UTF-8 character '{token}'")
+        format!("character '{token}'")
     }
 }
 

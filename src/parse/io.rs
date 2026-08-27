@@ -132,20 +132,47 @@ where
 {
 }
 
+pub type TopLevelResult<A, E> = Result<
+    (
+        A,
+        CstOutput<<<E as ParseEnvironment>::Supply as IdSupply>::Id>,
+    ),
+    <E as ParseEnvironment>::Failure,
+>;
+impl<A, E: ParseEnvironment> ParseOutput<A, E> {
+    /// Converts self into a [`Result`], erasing the parser-internal distinction between speculative and committed failure.
+    ///
+    /// This is typically used for top-level parser output.
+    pub fn into_result(self) -> TopLevelResult<A, E> {
+        self.ast.into_result().map(|success| (success, self.cst))
+    }
+}
+
 /// Status of parse result of the AST payload.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ParseResult<A, F> {
+    /// A successful AST parse.
     Success(A),
+    /// Speculative failure.
+    /// The combinator system is free to try out parsing alternatives,
+    /// and a later success will cause this value to be discarded.
     Speculative(F),
+    /// Committed failure.
+    /// The combinator system may not try other alternatives.
+    /// This failure is propagated outwards until explicitly handled.
     Committed(F),
 }
 impl<A, F> ParseResult<A, F> {
+    /// Converts self into a [`Result`], erasing the parser-internal distinction between speculative and committed failure.
+    ///
+    /// This is typically used for top-level parser output.
     pub fn into_result(self) -> Result<A, F> {
         match self {
             ParseResult::Success(success) => Ok(success),
             ParseResult::Speculative(failure) | ParseResult::Committed(failure) => Err(failure),
         }
     }
+    /// Maps the [`Self::Success`] payload to a different type.
     pub fn map<B>(self, f: impl FnOnce(A) -> B) -> ParseResult<B, F> {
         match self {
             ParseResult::Success(inner) => ParseResult::Success(f(inner)),
@@ -153,6 +180,7 @@ impl<A, F> ParseResult<A, F> {
             ParseResult::Committed(failure) => ParseResult::Committed(failure),
         }
     }
+    /// Maps the [`Self::Speculative`] and [`Self::Committed`] failure payloads to a different type.
     pub fn map_err<F2>(self, f: impl FnOnce(F) -> F2) -> ParseResult<A, F2> {
         match self {
             ParseResult::Success(inner) => ParseResult::Success(inner),

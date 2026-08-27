@@ -107,7 +107,7 @@ impl<E, P: Clone> Clone for WithEnv<E, P> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            _marker: self._marker.clone(),
+            _marker: self._marker,
         }
     }
 }
@@ -174,7 +174,7 @@ impl<'src, I: ?Sized, A, E, P: Clone> Clone for AsParser<'src, I, A, E, P> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            _marker: self._marker.clone(),
+            _marker: self._marker,
         }
     }
 }

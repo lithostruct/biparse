@@ -1,14 +1,17 @@
 use std::{fmt::Debug, hash::Hash};
 
+use derive_more::Into;
+
 use crate::cst::path::CstPath;
 
 /// Association table between an `Id` type and a CstOutput containing GreenNodes.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Into)]
 pub struct CstAssociation<Id>
 where
     Id: Eq + Hash,
 {
-    pub(crate) inner: im::HashMap<Id, CstPath>,
+    #[into]
+    pub(super) inner: im::HashMap<Id, CstPath>,
 }
 impl<Id> Default for CstAssociation<Id>
 where
@@ -24,9 +27,17 @@ impl<Id> CstAssociation<Id>
 where
     Id: Debug + Clone + Eq + Hash,
 {
+    /// Creates an empty association table.
     pub fn new() -> Self {
         CstAssociation::default()
     }
+
+    /// Associatively merges with `self` as the left-hand-side, and a given right-hand-side.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the [`IdSupply`](crate::cst::supply::IdSupply) protocol is violated,
+    /// such that there exists overlapping entries in both origin tables.
     pub fn merge_with(self, mut rhs: Self, left_width: usize) -> Self {
         rhs.inner
             .iter_mut()
@@ -41,6 +52,7 @@ where
         });
         CstAssociation { inner: merged }
     }
+    /// Updates all paths to be prepended by a new parent, which takes the whole forest as children.
     pub fn with_new_parent(mut self, at_index: usize) -> Self {
         self.inner
             .iter_mut()
@@ -49,5 +61,14 @@ where
             })
             .for_each(drop);
         self
+    }
+
+    /// Immutably borrows the inner [`im::HashMap`].
+    pub fn inner(&self) -> &im::HashMap<Id, CstPath> {
+        &self.inner
+    }
+    /// Converts self into the inner [`im::HashMap`].
+    pub fn into_inner(self) -> im::HashMap<Id, CstPath> {
+        self.inner
     }
 }

@@ -62,7 +62,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
     let mut value: Recursive<Indirect<'_, str, Json, E>> = Recursive::declare_as("json");
 
     // Primitives
-    let optional_whitespace = Recursive::recursive_as("whitespace", |this| {
+    let optional_whitespace = Recursive::new_as("whitespace", |this| {
         just(Kind::Whitespace.into(), ' ')
             .or(just(Kind::Whitespace.into(), '\t'))
             .or(just(Kind::Whitespace.into(), '\n'))
@@ -90,13 +90,13 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
             regex_lite::Regex::new(r"[a-zA-Z0-9_ ]+").unwrap(),
         ))
         .then_ignore(just(Kind::DoubleQuote.into(), '\"'))
-        .map(|s| s.to_owned())
+        .into_owned()
         .node(Kind::String.into())
         .shared();
 
     // corresponds to (',' value)*.
     let values: Recursive<dyn Parser<'_, str, Vec<Json>, _>> =
-        Recursive::recursive_as("values", |this| {
+        Recursive::new_as("values", |this| {
             this.then(
                 optional_whitespace
                     .clone()
@@ -140,7 +140,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
         .then(value.clone())
         .node(Kind::Pair.into());
     // corresponds to (',' pair)*
-    let members: Recursive<dyn Parser<'_, str, Vec<(String, Json)>, _>> = Recursive::recursive_as(
+    let members: Recursive<dyn Parser<'_, str, Vec<(String, Json)>, _>> = Recursive::new_as(
         "members",
         |this: Recursive<dyn Parser<'_, str, Vec<(String, Json)>, _>>| {
             this.then(

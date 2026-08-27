@@ -1,6 +1,6 @@
 //! Tests for the `End` sentinel combinator.
 
-use biparse::{failure, prelude::*};
+use biparse::prelude::*;
 use rowan::SyntaxKind;
 
 #[test]

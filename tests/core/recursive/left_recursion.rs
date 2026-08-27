@@ -8,7 +8,7 @@ use rowan::SyntaxKind;
 /// Matches string `s` on zero or more occurences of 'a'.
 fn left_recursive_a(s: String) -> String {
     let combinator: Recursive<Direct<'_, str, String, DefaultParseEnvironment>> =
-        Recursive::recursive_as("left-recursive-a", |this| {
+        Recursive::new_as("left-recursive-a", |this| {
             this.then(just(SyntaxKind(0), 'a'))
                 .map(|(mut rest, last)| {
                     rest += last;

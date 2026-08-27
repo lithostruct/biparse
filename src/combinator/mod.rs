@@ -5,21 +5,21 @@ mod blanket;
 
 mod binary;
 mod just;
-mod map_to_owned;
+mod map_into_owned;
 mod node_association;
 mod recursive;
 mod sentinel;
 
 use crate::{
     input::{Input, Pattern},
-    parse::{ParseEnvironment, Parser},
+    parse::ParseEnvironment,
 };
 
 pub use self::{
     binary::{Or, Then},
     blanket::{AsParser, WithEnv},
     just::Just,
-    map_to_owned::{Map, ToOwned},
+    map_into_owned::{IntoOwned, Map},
     node_association::{Associate, Node},
     recursive::{
         combinator::{Direct, Indirect, Recursive},
@@ -46,14 +46,4 @@ pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<I> + 'src>(
     pattern: P,
 ) -> AsParser<'src, I, P::Payload<'src>, E, Just<P>> {
     AsParser::from(Just::new(kind, pattern))
-}
-
-pub fn recursive<'src, I: Input + ?Sized, A, E: ParseEnvironment, F, P>(
-    closure: F,
-) -> Recursive<Direct<'src, I, A, E>>
-where
-    F: FnOnce(Recursive<Direct<'src, I, A, E>>) -> P,
-    P: Parser<'src, I, A, E> + 'src,
-{
-    Recursive::recursive(closure)
 }

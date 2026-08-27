@@ -48,11 +48,11 @@ impl<P: ?Sized> Recursive<P> {
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'src, I, A, E>> {
-    #[allow(clippy::self_named_constructors)]
-    pub fn recursive<F, P>(closure: F) -> Self
+    pub fn new<'p, F, P>(closure: F) -> Self
     where
         F: FnOnce(Recursive<Direct<'src, I, A, E>>) -> P,
-        P: Parser<'src, I, A, E> + 'src,
+        P: Parser<'src, I, A, E> + 'p,
+        'p: 'src,
     {
         let rc: Rc<P> = Rc::new_cyclic(|weak| {
             let this: Recursive<Direct<'src, I, A, E>> = Recursive {
@@ -67,10 +67,11 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'src, I, 
         }
     }
 
-    pub fn recursive_as<F, P>(s: impl Into<Cow<'static, str>>, closure: F) -> Self
+    pub fn new_as<'p, F, P>(s: impl Into<Cow<'static, str>>, closure: F) -> Self
     where
         F: FnOnce(Recursive<Direct<'src, I, A, E>>) -> P,
-        P: Parser<'src, I, A, E> + 'src,
+        P: Parser<'src, I, A, E> + 'p,
+        'p: 'src,
     {
         let description = s.into();
         let rc: Rc<P> = Rc::new_cyclic(|weak| {
@@ -114,9 +115,10 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I
     /// and stored and resused throughout the lifetime of the program.
     ///
     /// Future mitigation of this would entail a `RecursiveGroup`-like structure involving n-variadic type arguments.
-    pub fn define<P>(&mut self, parser: P)
+    pub fn define<'p, P>(&mut self, parser: P)
     where
-        P: Parser<'src, I, A, E> + 'src,
+        P: Parser<'src, I, A, E> + 'p,
+        'p: 'src,
     {
         match &mut self.inner {
             RecursiveInner::Owned(owned) => owned
