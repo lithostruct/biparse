@@ -2,10 +2,17 @@
 
 pub use crate::{
     combinator::{
+        AsParser,
+        Direct,
+        Indirect,
         // We can omit most of these, because `ParserExt` includes convenience constructors anyways!
-        Recursive, RecursiveState, Direct, Indirect,
-        success, fail, end, just,
-        WithEnv, AsParser,
+        Recursive,
+        RecursiveState,
+        WithEnv,
+        end,
+        fail,
+        just,
+        success,
     },
     cst::{Cst, CstOutput, CstPath, IdSupply},
     failure::{FailureKind, ParseFailure},

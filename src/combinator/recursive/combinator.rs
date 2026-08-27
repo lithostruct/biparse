@@ -6,7 +6,14 @@ use std::{
 };
 
 use crate::{
-    combinator::{RecursiveState, recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId}}, cst::CstOutput, failure::{FailureKind, ParseFailure}, input::Input, parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
+    combinator::{
+        RecursiveState,
+        recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId},
+    },
+    cst::CstOutput,
+    failure::{FailureKind, ParseFailure},
+    input::Input,
+    parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
 };
 
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.
@@ -31,10 +38,13 @@ impl<P: ?Sized> Recursive<P> {
         self.inner.recursive_id()
     }
     fn diagnostic_name(&self) -> String {
-        format!("{:p}", self.inner.as_ptr() as *const ())
+        format!("<{:p}>", self.inner.as_ptr() as *const ())
     }
     fn name(&self) -> String {
-        self.description.clone().unwrap_or(self.diagnostic_name().into()).into_owned()
+        self.description
+            .clone()
+            .unwrap_or(self.diagnostic_name().into())
+            .into_owned()
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'src, I, A, E>> {
@@ -114,12 +124,22 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I
                 .inner
                 .set(Box::new(parser))
                 .unwrap_or_else(|_| {
-                    panic!("Called Recursive::define on already-defined combinator{}!",
-                        self.description.as_ref().map(|s| format!(" '{s}'")).unwrap_or("".into()))
+                    panic!(
+                        "Called Recursive::define on already-defined combinator{}!",
+                        self.description
+                            .as_ref()
+                            .map(|s| format!(" '{s}'"))
+                            .unwrap_or("".into())
+                    )
                 }),
             RecursiveInner::Unowned(_) => {
-                panic!("Called Recursive::define on weak reference{}!",
-                    self.description.as_ref().map(|s| format!(" '{s}'")).unwrap_or("".into()))
+                panic!(
+                    "Called Recursive::define on weak reference{}!",
+                    self.description
+                        .as_ref()
+                        .map(|s| format!(" '{s}'"))
+                        .unwrap_or("".into())
+                )
             }
         }
     }
@@ -163,7 +183,6 @@ pub struct Indirect<'src, I: Input + ?Sized, A, E: ParseEnvironment> {
     description: Option<Cow<'static, str>>,
     inner: OnceCell<Box<dyn Parser<'src, I, A, E> + 'src>>,
 }
-
 
 /// # Internal Notes
 ///
@@ -248,9 +267,7 @@ macro_rules! recursive_growth {
                             input,
                             state.cursor,
                             FailureKind::LeftRecursion {
-                                description: this.description.as_ref()
-                                    .map(|s| s.clone().into_owned()),
-                                diagnostic_name: this.diagnostic_name(),
+                                name: this.name()
                             },
                         );
 
@@ -394,113 +411,146 @@ macro_rules! recompute {
 }
 impl<P: ?Sized> Recursive<P> {
     /// Invariant: self at this cursor must not be actively participating in fixpoint calculation.
-    fn entry_is_stale_or_absent<'src, I: Input + ?Sized, A, E: ParseEnvironment>(&self, cursor: I::Cursor, state: &RecursiveState<'src, I::Cursor, E::Supply>) -> bool
+    fn entry_is_stale_or_absent<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
+        &self,
+        cursor: I::Cursor,
+        state: &RecursiveState<'src, I::Cursor, E::Supply>,
+    ) -> bool
     where
-        P : Parser<'src, I, A, E>,
-        A : Clone + 'src,
+        P: Parser<'src, I, A, E>,
+        A: Clone + 'src,
     {
-        let Some(frame) = state.get(self.recursive_id(), cursor)
-        else {
+        let Some(frame) = state.get(self.recursive_id(), cursor) else {
             return true;
         };
-        frame.dependencies.iter().any(|(dep_id, dep_cursor, dep_gen)| {
-            if *dep_id == self.recursive_id() && *dep_cursor == cursor {
-                return false;
-            }
-            state.get(*dep_id, *dep_cursor)
-                .is_none_or(|current| current.generation != *dep_gen )
-        })
+        frame
+            .dependencies
+            .iter()
+            .any(|(dep_id, dep_cursor, dep_gen)| {
+                if *dep_id == self.recursive_id() && *dep_cursor == cursor {
+                    return false;
+                }
+                state
+                    .get(*dep_id, *dep_cursor)
+                    .is_none_or(|current| current.generation != *dep_gen)
+            })
     }
 }
 
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I, A, E> for Recursive<P>
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I, A, E>
+    for Recursive<P>
 where
-    P : Parser<'src, I, A, E>,
-    A : Clone + 'src,
+    P: Parser<'src, I, A, E>,
+    A: Clone + 'src,
 {
     fn parse(
         &self,
         input: &'src I,
         state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<A, E>) {
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<A, E>,
+    ) {
         recursive_growth!(self, input, state, parse)
     }
     fn check(
         &self,
         input: &'src I,
         state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<(), E>)
-    {
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<(), E>,
+    ) {
         recursive_growth!(self, input, state, check)
     }
 }
 
 // The helper implementors:
 
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I, A, E> for RecursiveInner<P>
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I, A, E>
+    for RecursiveInner<P>
 where
-    P : Parser<'src, I, A, E>,
-    A : Clone + 'src,
+    P: Parser<'src, I, A, E>,
+    A: Clone + 'src,
 {
     fn parse(
         &self,
         input: &'src I,
         state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<A, E>)
-    {
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<A, E>,
+    ) {
         match self {
-            RecursiveInner::Owned(owned) => {
-                owned.as_ref().parse(input, state)
-            },
-            RecursiveInner::Unowned(weak) => {
-                weak.upgrade()
-                    .expect("Weak pointer is unconstructible by users; source must be alive!")
-                    .parse(input, state)
-            },
+            RecursiveInner::Owned(owned) => owned.as_ref().parse(input, state),
+            RecursiveInner::Unowned(weak) => weak
+                .upgrade()
+                .expect("Weak pointer is unconstructible by users; source must be alive!")
+                .parse(input, state),
         }
     }
     fn check(
         &self,
         input: &'src I,
         state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<(), E>)
-    {
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<(), E>,
+    ) {
         match self {
-            RecursiveInner::Owned(owned) => {
-                owned.as_ref().check(input, state)
-            },
-            RecursiveInner::Unowned(weak) => {
-                weak.upgrade()
-                    .expect("Weak pointer is unconstructible by users; source must be alive!")
-                    .check(input, state)
-            },
+            RecursiveInner::Owned(owned) => owned.as_ref().check(input, state),
+            RecursiveInner::Unowned(weak) => weak
+                .upgrade()
+                .expect("Weak pointer is unconstructible by users; source must be alive!")
+                .check(input, state),
         }
     }
 }
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E> for Indirect<'src, I, A, E>
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E>
+    for Indirect<'src, I, A, E>
 where
-    A : Clone + 'src,
+    A: Clone + 'src,
 {
     fn parse(
         &self,
         input: &'src I,
         state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<A, E>)
-    {
-        self.inner.get()
-            .unwrap_or_else(|| panic!("Called Parser::parse on undefined combinator{}!",
-                    self.description.as_ref().map(|s| format!(" '{s}'")).unwrap_or("".into())))
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<A, E>,
+    ) {
+        self.inner
+            .get()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Called Parser::parse on undefined combinator{}!",
+                    self.description
+                        .as_ref()
+                        .map(|s| format!(" '{s}'"))
+                        .unwrap_or("".into())
+                )
+            })
             .parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
         state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>, ParseOutput<(), E>)
-    {
-        self.inner.get()
-            .unwrap_or_else(|| panic!("Called Parser::parse on undefined combinator{}!",
-                    self.description.as_ref().map(|s| format!(" '{s}'")).unwrap_or("".into())))
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<(), E>,
+    ) {
+        self.inner
+            .get()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Called Parser::parse on undefined combinator{}!",
+                    self.description
+                        .as_ref()
+                        .map(|s| format!(" '{s}'"))
+                        .unwrap_or("".into())
+                )
+            })
             .check(input, state)
     }
 }

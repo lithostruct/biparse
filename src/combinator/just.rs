@@ -23,7 +23,8 @@ impl<P> Just<P> {
         Just { kind, pattern }
     }
 }
-impl<'src, I: Input + ?Sized, P, E: ParseEnvironment> Parser<'src, I, P::Payload<'src>, E> for Just<P>
+impl<'src, I: Input + ?Sized, P, E: ParseEnvironment> Parser<'src, I, P::Payload<'src>, E>
+    for Just<P>
 where
     P: Pattern<I> + 'src,
 {

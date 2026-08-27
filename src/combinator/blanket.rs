@@ -105,7 +105,10 @@ impl<E, P: Debug> Debug for WithEnv<E, P> {
 }
 impl<E, P: Clone> Clone for WithEnv<E, P> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), _marker: self._marker.clone() }
+        Self {
+            inner: self.inner.clone(),
+            _marker: self._marker.clone(),
+        }
     }
 }
 impl<E, P: Copy> Copy for WithEnv<E, P> {}
@@ -169,7 +172,10 @@ impl<'src, I: ?Sized, A, E, P: Debug> Debug for AsParser<'src, I, A, E, P> {
 }
 impl<'src, I: ?Sized, A, E, P: Clone> Clone for AsParser<'src, I, A, E, P> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), _marker: self._marker.clone() }
+        Self {
+            inner: self.inner.clone(),
+            _marker: self._marker.clone(),
+        }
     }
 }
 impl<'src, I: ?Sized, A, E, P: Copy> Copy for AsParser<'src, I, A, E, P> {}

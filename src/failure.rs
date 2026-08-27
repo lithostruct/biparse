@@ -28,20 +28,13 @@ pub enum FailureKind<I: Input + ?Sized, E: std::error::Error> {
         difference_at: Option<I::Cursor>,
     },
     /// Expected the end of the input, found an additional token.
-    ExpectedEnd {
-        found: I::Token,
-    },
+    ExpectedEnd { found: I::Token },
     /// Zero-progress left recursion.
-    LeftRecursion {
-        description: Option<String>,
-        diagnostic_name: String,
-    },
+    LeftRecursion { name: String },
     /// Failure caused by the [`Fail`] primitive combinator.
     FailPrimitive,
     /// A custom error.
-    Custom {
-        error: E,
-    },
+    Custom { error: E },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
@@ -82,31 +75,21 @@ impl ParseFailure for Simple {
             FailureKind::ExpectedFound {
                 expected,
                 difference_at,
-            } => {
-                match difference_at {
-                    Some(difference_location) => {
-                        let difference_line_col = input.to_line_col(difference_location);
-                        let found = input.peek(difference_location)
-                            .map_or("end-of-input".into(), 
-                            |item| {
-                                I::describe_token(&item.token)
-                            });
-                        format!("expected {expected}, found {found} at location {difference_line_col}")
-                    },
-                    None => format!("expected {expected}"),
+            } => match difference_at {
+                Some(difference_location) => {
+                    let difference_line_col = input.to_line_col(difference_location);
+                    let found = input
+                        .peek(difference_location)
+                        .map_or("end-of-input".into(), |item| I::describe_token(&item.token));
+                    format!("expected {expected}, found {found} at location {difference_line_col}")
                 }
-            }
+                None => format!("expected {expected}"),
+            },
             FailureKind::ExpectedEnd { found } => {
                 format!("expected end-of-input, found {}", I::describe_token(&found))
             }
-            FailureKind::LeftRecursion {
-                description,
-                diagnostic_name: closure_typename,
-            } => {
-                format!(
-                    "Zero-progress left recursion detected at '{}'",
-                    description.unwrap_or(closure_typename)
-                )
+            FailureKind::LeftRecursion { name } => {
+                format!("Zero-progress left recursion detected at '{name}'")
             }
             FailureKind::FailPrimitive => "'Fail' primitive combinator encountered".to_string(),
             FailureKind::Custom { error } => error.to_string(),

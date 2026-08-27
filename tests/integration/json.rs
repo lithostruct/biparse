@@ -5,10 +5,10 @@ use std::{rc::Rc, sync::OnceLock};
 
 use biparse::prelude::*;
 use expect_test::expect;
+use indoc::indoc;
+use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use rowan::Language;
-use num_derive::{FromPrimitive, ToPrimitive};
-use indoc::indoc;
 
 #[derive(Debug, Clone)]
 enum Json {
@@ -63,55 +63,60 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
 
     // Primitives
     let optional_whitespace = Recursive::recursive_as("whitespace", |this| {
-        this
-            .or(just(Kind::Whitespace.into(), ' '))
+        just(Kind::Whitespace.into(), ' ')
             .or(just(Kind::Whitespace.into(), '\t'))
             .or(just(Kind::Whitespace.into(), '\n'))
+            .then(this)
             .or(success())
             .ignore()
-    }).node(Kind::Whitespace.into()).shared();
+    })
+    .node(Kind::Whitespace.into())
+    .shared();
 
-    let null = just(Kind::Null.into(), "null")
-        .map(|_| Json::Null);
+    let null = just(Kind::Null.into(), "null").map(|_| Json::Null);
     let boolean = just(Kind::True.into(), "true")
         .or(just(Kind::False.into(), "false"))
         .map(|either| match either {
             Either::Left(_) => Json::Boolean(true),
             Either::Right(_) => Json::Boolean(false),
         });
-    
+
     // Simplifying assumption:
     // Strings consist of characters matching the following `Regex`, with no regard for escape characters.
     // - Alphanumeric, space or underscore.
     let string = just(Kind::DoubleQuote.into(), '\"')
         .ignore_then(just(
-            Kind::RawText.into(), 
+            Kind::RawText.into(),
             regex_lite::Regex::new(r"[a-zA-Z0-9_ ]+").unwrap(),
-        )).then_ignore(just(Kind::DoubleQuote.into(), '\"'))
+        ))
+        .then_ignore(just(Kind::DoubleQuote.into(), '\"'))
         .map(|s| s.to_owned())
         .node(Kind::String.into())
         .shared();
 
     // corresponds to (',' value)*.
-    let values: Recursive<dyn Parser<'_, str, Vec<Json>, _>> = Recursive::recursive_as("values", 
-    |this| {
-        this.then(
-            optional_whitespace.clone()
-                .ignore_then(just(Kind::Comma.into(), ','))
-                .ignore_then(optional_whitespace.clone())
-                .ignore_then(value.clone())
-                
-        ).map(|(mut rest, last): (Vec<Json>, Json)| {
-            rest.push(last);
-            rest
-        }).or(success())
-        .map(|either: Either<Vec<Json>, ()>| either.map_right(|()| Vec::new()).into_inner())
-    });
+    let values: Recursive<dyn Parser<'_, str, Vec<Json>, _>> =
+        Recursive::recursive_as("values", |this| {
+            this.then(
+                optional_whitespace
+                    .clone()
+                    .ignore_then(just(Kind::Comma.into(), ','))
+                    .ignore_then(optional_whitespace.clone())
+                    .ignore_then(value.clone()),
+            )
+            .map(|(mut rest, last): (Vec<Json>, Json)| {
+                rest.push(last);
+                rest
+            })
+            .or(success())
+            .map(|either: Either<Vec<Json>, ()>| either.map_right(|()| Vec::new()).into_inner())
+        });
     // corresponds to array ::= '[' (value (',' value)*)? ']'
     let array = just(Kind::LeftBracket.into(), '[')
         .ignore_then(optional_whitespace.clone())
         .ignore_then(
-            value.clone()
+            value
+                .clone()
                 .then_ignore(optional_whitespace.clone())
                 .then(values)
                 .map(|(first, mut rest)| {
@@ -119,7 +124,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                     rest
                 })
                 .or(success())
-                .map(|either| either.map_right(|_| Vec::new()).into_inner())
+                .map(|either| either.map_right(|_| Vec::new()).into_inner()),
         )
         .then_ignore(optional_whitespace.clone())
         .then_ignore(just(Kind::RightBracket.into(), ']'))
@@ -127,32 +132,40 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
         .node(Kind::Array.into());
 
     // key-value pair.
-    let key_value = string.clone()
+    let key_value = string
+        .clone()
         .then_ignore(optional_whitespace.clone())
         .then_ignore(just(Kind::Colon.into(), ':'))
         .then_ignore(optional_whitespace.clone())
         .then(value.clone())
         .node(Kind::Pair.into());
     // corresponds to (',' pair)*
-    let members: Recursive<dyn Parser<'_, str, Vec<(String, Json)>, _>> = Recursive::recursive_as("members", 
-    |this: Recursive<dyn Parser<'_, str, Vec<(String, Json)>, _>>| {
-        this.then(
-            optional_whitespace.clone()
-                .ignore_then(just(Kind::Comma.into(), ','))
-                .ignore_then(optional_whitespace.clone())
-                .ignore_then(key_value.clone())
-                
-        ).map(|(mut rest, last)| {
-            rest.push(last);
-            rest
-        }).or(success())
-        .map(|either: Either<Vec<(String, Json)>, ()>| either.map_right(|()| Vec::new()).into_inner())
-    });
+    let members: Recursive<dyn Parser<'_, str, Vec<(String, Json)>, _>> = Recursive::recursive_as(
+        "members",
+        |this: Recursive<dyn Parser<'_, str, Vec<(String, Json)>, _>>| {
+            this.then(
+                optional_whitespace
+                    .clone()
+                    .ignore_then(just(Kind::Comma.into(), ','))
+                    .ignore_then(optional_whitespace.clone())
+                    .ignore_then(key_value.clone()),
+            )
+            .map(|(mut rest, last)| {
+                rest.push(last);
+                rest
+            })
+            .or(success())
+            .map(|either: Either<Vec<(String, Json)>, ()>| {
+                either.map_right(|()| Vec::new()).into_inner()
+            })
+        },
+    );
     // corresponds to object ::= '{' (pair (',' pair)*)? '}'
     let object = just(Kind::LeftBracket.into(), '{')
         .ignore_then(optional_whitespace.clone())
         .ignore_then(
-            key_value.clone()
+            key_value
+                .clone()
                 .then_ignore(optional_whitespace.clone())
                 .then(members)
                 .map(|(first, mut rest)| {
@@ -160,7 +173,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                     rest
                 })
                 .or(success())
-                .map(|either| either.map_right(|_| Vec::new()).into_inner())
+                .map(|either| either.map_right(|_| Vec::new()).into_inner()),
         )
         .then_ignore(optional_whitespace.clone())
         .then_ignore(just(Kind::RightBracket.into(), '}'))
@@ -169,12 +182,17 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
 
     // Finally!
     value.define(
-        null.or(boolean).map(Either::into_inner)
-            .or(string.map(Json::String)).map(Either::into_inner)
-            .or(array).map(Either::into_inner)
-            .or(object).map(Either::into_inner)
+        null.or(boolean)
+            .map(Either::into_inner)
+            .or(string.map(Json::String))
+            .map(Either::into_inner)
+            .or(array)
+            .map(Either::into_inner)
+            .or(object)
+            .map(Either::into_inner),
     );
-    optional_whitespace.clone()
+    optional_whitespace
+        .clone()
         .ignore_then(value)
         .then_ignore(optional_whitespace)
         .then_ignore(end())
@@ -195,21 +213,22 @@ fn package_data() {
         }
     "#};
     let parser = json_parser();
-    let (_, result) : (_, ParseOutput<Json, DefaultParseEnvironment>)
-        = parser.parse_from_start(data);
+    let (_, result): (_, ParseOutput<Json, DefaultParseEnvironment>) =
+        parser.parse_from_start(data);
     expect![[r#"
         Speculative(
             Simple {
                 position: LineCol {
                     line: 2,
-                    col: 2,
+                    col: 22,
                 },
                 messages: [
-                    "expected character '}', found Some(' ') at (2, 2)",
+                    "expected character '}', found UTF-8 character ',' at location (2, 22)",
                 ],
             },
         )
-    "#]].assert_debug_eq(&result.ast);
+    "#]]
+    .assert_debug_eq(&result.ast);
 
     let forest = result.cst.green;
     println!("{:#?}", forest);

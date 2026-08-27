@@ -3,7 +3,7 @@ use std::{fmt::Debug, hash::Hash};
 use rowan::SyntaxKind;
 
 use crate::{
-    cst::{CstAssociation, Cst, CstPath},
+    cst::{Cst, CstAssociation, CstPath},
     green::{GreenElement, GreenInterner},
 };
 

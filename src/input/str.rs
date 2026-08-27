@@ -2,12 +2,10 @@ use std::borrow::Cow;
 
 use crate::input::{Input, InputItem, LineCol, Pattern, PatternMatch};
 
-
-
 /// The cursor type for `str`-based input.
 /// The contained value is asserted to be at a UTF-8 boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct StrIndex(pub(in super) usize);
+pub struct StrIndex(pub(super) usize);
 impl From<StrIndex> for usize {
     fn from(val: StrIndex) -> Self {
         val.0
@@ -61,7 +59,7 @@ impl Input for str {
         }
         LineCol { line, col: column }
     }
-    
+
     fn describe_token(token: &Self::Token) -> String {
         format!("UTF-8 character '{token}'")
     }
@@ -78,16 +76,18 @@ impl Pattern<str> for char {
             return Err(Some(cursor));
         }
         match input.peek(cursor) {
-            Some(item) => if item.token == *self {
-                Ok(PatternMatch::new(
-                    &input[item.span.clone()],
-                    vec![item.span], 
-                    item.next_cursor, 
-                ))
-            } else {
-                Err(Some(cursor))
-            },
-            None => Err(Some(cursor))
+            Some(item) => {
+                if item.token == *self {
+                    Ok(PatternMatch::new(
+                        &input[item.span.clone()],
+                        vec![item.span],
+                        item.next_cursor,
+                    ))
+                } else {
+                    Err(Some(cursor))
+                }
+            }
+            None => Err(Some(cursor)),
         }
     }
     fn describe(&self) -> String {
@@ -126,10 +126,10 @@ impl Pattern<str> for str {
                         continue;
                     }
                     Err(error_cursor) => {
-                        return Err(Some(
-                            error_cursor.expect("<char as Pattern<I>> always has a meaningful error cursor!")
-                        ))
-                    },
+                        return Err(Some(error_cursor.expect(
+                            "<char as Pattern<I>> always has a meaningful error cursor!",
+                        )));
+                    }
                 }
             }
             unreachable!("The whole pattern cannot match!")

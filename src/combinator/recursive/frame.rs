@@ -8,18 +8,18 @@ use crate::{
 /// The recursive state stored in [`ParseState`], which can be cheaply cloned.
 ///
 /// # Note / Warning to [`Parser`](crate::parse::Parser) Implementors
-/// 
+///
 /// This data type encapsulates a lot of the invariants and information
 /// that makes [`Recursive`](crate::combinator::Recursive) work, including but not limited to:
 /// - Left-recursion and seed-growing,
 /// - Memoization and deduplication of work,
 /// - Dependency tracking between recursive combinator invocations.
-/// 
+///
 /// Implementors *must* observe the following invariants when it comes to threading [`RecursiveState`]
 /// throughout the input and output [`ParseState`] of their combinators.
-/// 
+///
 /// Failure to do so may cause correctness issues or exponential blowup of recursive parsing.
-/// 
+///
 /// - **Leaf Combinators:** Return the `RecursiveState` as-is.
 ///   Do *not* return a [`RecursiveState::new()`] or [`Default::default()`] instance.
 /// - **Sequential Combinators:** The `RecursiveState` must be threaded through each step.
@@ -71,21 +71,32 @@ impl<'src, C: Clone, S: IdSupply> RecursiveState<'src, C, S> {
     }
 }
 impl<'src, C: Clone + Hash + Eq, S: IdSupply> RecursiveState<'src, C, S> {
-    pub(super) fn get(&self, id: RecursiveId, start_cursor: C) -> Option<&RecursiveFrame<'src, C, S>>
+    pub(super) fn get(
+        &self,
+        id: RecursiveId,
+        start_cursor: C,
+    ) -> Option<&RecursiveFrame<'src, C, S>>
     where
         C: Eq,
     {
-        self.inner
-            .get(&(id, start_cursor))
+        self.inner.get(&(id, start_cursor))
     }
-    pub(super) fn get_mut(&mut self, id: RecursiveId, start_cursor: C) -> Option<&mut RecursiveFrame<'src, C, S>>
+    pub(super) fn get_mut(
+        &mut self,
+        id: RecursiveId,
+        start_cursor: C,
+    ) -> Option<&mut RecursiveFrame<'src, C, S>>
     where
         C: Eq,
     {
-        self.inner
-            .get_mut(&(id, start_cursor))
+        self.inner.get_mut(&(id, start_cursor))
     }
-    pub(super) fn push_to_top(&mut self, id: RecursiveId, start_cursor: C, frame: RecursiveFrame<'src, C, S>) {
+    pub(super) fn push_to_top(
+        &mut self,
+        id: RecursiveId,
+        start_cursor: C,
+        frame: RecursiveFrame<'src, C, S>,
+    ) {
         self.current_enclosing = Some((id, start_cursor.clone()));
         self.current_dependencies = frame.dependencies.clone();
         self.inner.insert((id, start_cursor), frame);
@@ -112,7 +123,14 @@ impl<'src, C: Clone + Debug, S: IdSupply> Debug for RecursiveFrame<'src, C, S> {
             .field("id", &self.id)
             .field("description", &self.description)
             .field("diagnostic_name", &self.diagnostic_name)
-            .field("seed_result", &if self.seed_result.is_none() {"None"} else {"<erased>"})
+            .field(
+                "seed_result",
+                &if self.seed_result.is_none() {
+                    "None"
+                } else {
+                    "<erased>"
+                },
+            )
             .field("active_fixpoint", &self.active_fixpoint)
             .field("generation", &self.generation)
             .field("dependencies", &self.dependencies)

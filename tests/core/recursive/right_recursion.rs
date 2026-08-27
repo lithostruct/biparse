@@ -5,20 +5,19 @@ use expect_test::expect;
 use proptest::{prop_oneof, proptest, strategy::Strategy, test_runner::Config};
 use rowan::SyntaxKind;
 
-
-
 /// Matches string `s` on zero or more occurences of 'a'.
 fn right_recursive_a(s: String) -> String {
-    let combinator: Recursive<Direct<'_, str, String, DefaultParseEnvironment>>
-    = Recursive::recursive(|this| {
-        just(SyntaxKind(0), 'a').then(this)
-            .map(|(first, mut rest): (&str, String)| {
-                rest.insert_str(0, first);
-                rest
-            })
-            .or(success())
-            .map(|either| either.map_right(|_| String::new()).into_inner())
-    });
+    let combinator: Recursive<Direct<'_, str, String, DefaultParseEnvironment>> =
+        Recursive::recursive(|this| {
+            just(SyntaxKind(0), 'a')
+                .then(this)
+                .map(|(first, mut rest): (&str, String)| {
+                    rest.insert_str(0, first);
+                    rest
+                })
+                .or(success())
+                .map(|either| either.map_right(|_| String::new()).into_inner())
+        });
     let (state, result) = combinator.node(SyntaxKind(1)).parse_from_start(&s);
     match result.ast {
         ParseResult::Success(header) => {
@@ -28,9 +27,8 @@ fn right_recursive_a(s: String) -> String {
                 assert_eq!(header, s);
             }
             header
-        },
-        ParseResult::Speculative(_)
-        | ParseResult::Committed(_) => unreachable!(),
+        }
+        ParseResult::Speculative(_) | ParseResult::Committed(_) => unreachable!(),
     }
 }
 
@@ -52,13 +50,13 @@ fn other_string() {
 }
 
 /// Regression:
-/// 
+///
 /// Previous versions of the seed-growing algorithm discard each fixpoint growth after its invocation,
 /// and the seed and growth phases ran at least twice, leading to recurrence relation:
 /// `T(n) = 2*T(n-1) + O(n)`
 /// Where no caching occurs for the recurrence,
 /// for a worst-case exponential time complexity for right-recursive grammars of `O(2^N)`.
-/// 
+///
 /// This previously took >60 seconds to run. It should now be with near-linear or low-polynomic time complexity instead.
 #[test]
 fn too_many_a() {
@@ -74,7 +72,7 @@ fn some_amount_of_a() -> impl Strategy<Value = String> {
 proptest! {
     #![proptest_config(Config {
         // Timeout in milliseconds.
-        timeout: 10000, 
+        timeout: 10000,
         .. Config::default()
     })]
     #[test]

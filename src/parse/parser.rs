@@ -3,7 +3,10 @@ use std::rc::Rc;
 use rowan::SyntaxKind;
 
 use crate::{
-    combinator::{Associate, Map, Node, Or, Then, ToOwned, WithEnv}, cst::{CstOutput, IdSupply}, input::Input, parse::{DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState},
+    combinator::{Associate, Map, Node, Or, Then, ToOwned, WithEnv},
+    cst::{CstOutput, IdSupply},
+    input::Input,
+    parse::{DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState},
 };
 
 /// The central parsing trait, implemented by all combinators.
@@ -101,21 +104,27 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         WithEnv::new(Associate::new(self, kind, closure))
     }
-    
+
     fn ignore(self) -> WithEnv<E, Map<Self, fn(A) -> (), A>>
     where
         Self: Sized,
     {
         self.map(|_| ())
     }
-    fn then_ignore<P, B>(self, next: P) -> WithEnv<E, Map<WithEnv<E, Then<Self, P>>, fn((A, B)) -> A, (A, B)>>
+    fn then_ignore<P, B>(
+        self,
+        next: P,
+    ) -> WithEnv<E, Map<WithEnv<E, Then<Self, P>>, fn((A, B)) -> A, (A, B)>>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
     {
         self.then(next).map(|(first, _)| first)
     }
-    fn ignore_then<P, B>(self, next: P) -> WithEnv<E, Map<WithEnv<E, Then<Self, P>>, fn((A, B)) -> B, (A, B)>>
+    fn ignore_then<P, B>(
+        self,
+        next: P,
+    ) -> WithEnv<E, Map<WithEnv<E, Then<Self, P>>, fn((A, B)) -> B, (A, B)>>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,

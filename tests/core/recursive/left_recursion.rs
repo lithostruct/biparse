@@ -7,16 +7,16 @@ use rowan::SyntaxKind;
 
 /// Matches string `s` on zero or more occurences of 'a'.
 fn left_recursive_a(s: String) -> String {
-    let combinator: Recursive<Direct<'_, str, String, DefaultParseEnvironment>>
-    = Recursive::recursive_as("left-recursive-a", |this| {
-        this.then(just(SyntaxKind(0), 'a'))
-            .map(|(mut rest, last)| {
-                rest += last;
-                rest
-            })
-            .or(success())
-            .map(|either| either.left_or_default())
-    });
+    let combinator: Recursive<Direct<'_, str, String, DefaultParseEnvironment>> =
+        Recursive::recursive_as("left-recursive-a", |this| {
+            this.then(just(SyntaxKind(0), 'a'))
+                .map(|(mut rest, last)| {
+                    rest += last;
+                    rest
+                })
+                .or(success())
+                .map(|either| either.left_or_default())
+        });
     let (state, result) = combinator.node(SyntaxKind(1)).parse_from_start(&s);
     println!("{:#?}", state.recursive_state);
     match result.ast {
@@ -27,9 +27,8 @@ fn left_recursive_a(s: String) -> String {
                 assert_eq!(header, s);
             }
             header
-        },
-        ParseResult::Speculative(_)
-        | ParseResult::Committed(_) => unreachable!(),
+        }
+        ParseResult::Speculative(_) | ParseResult::Committed(_) => unreachable!(),
     }
 }
 
@@ -65,7 +64,7 @@ fn some_amount_of_a() -> impl Strategy<Value = String> {
 proptest! {
     #![proptest_config(Config {
         // Timeout in milliseconds.
-        timeout: 10000, 
+        timeout: 10000,
         .. Config::default()
     })]
     #[test]

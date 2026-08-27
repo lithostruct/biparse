@@ -61,7 +61,7 @@ pub trait Pattern<I: Input + ?Sized> {
     /// - [`Ok`]: The match is successful, and the cursor is the position right after the match is consumed.
     /// - [`Err`]: The match is unsuccessful.
     ///   The cursor points to the token where the mismatch occured, if any other than a generic "failure to match".
-    /// 
+    ///
     /// The cursor and byte spans returned within `PatternMatch` *must* be on UTF-8 character boundary.
     fn matches_at<'src>(
         &self,

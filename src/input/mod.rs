@@ -1,8 +1,6 @@
 mod input_trait;
-mod str;
 #[cfg(feature = "regex")]
 mod regex;
+mod str;
 
-pub use self::{
-    input_trait::*,
-};
+pub use self::input_trait::*;

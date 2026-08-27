@@ -11,16 +11,18 @@ impl Pattern<str> for regex::Regex {
         cursor: <str as Input>::Cursor,
     ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
         match self.find_at(input, cursor.into_usize()) {
-            Some(matched) => if matched.start() == cursor.into_usize() {
-                Ok(PatternMatch::new(
-                    matched.as_str(),
-                    vec![matched.range()],
-                    StrIndex(matched.range().end))
-                )
-            } else {
-                // There isn't really a meaningful "error at" cursor we can provide here.
-                Err(None)
-            },
+            Some(matched) => {
+                if matched.start() == cursor.into_usize() {
+                    Ok(PatternMatch::new(
+                        matched.as_str(),
+                        vec![matched.range()],
+                        StrIndex(matched.range().end),
+                    ))
+                } else {
+                    // There isn't really a meaningful "error at" cursor we can provide here.
+                    Err(None)
+                }
+            }
             None => Err(None),
         }
     }
@@ -39,16 +41,18 @@ impl Pattern<str> for regex_lite::Regex {
     ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
         // Literally identical to above.
         match self.find_at(input, cursor.into_usize()) {
-            Some(matched) => if matched.start() == cursor.into_usize() {
-                Ok(PatternMatch::new(
-                    matched.as_str(),
-                    vec![matched.range()],
-                    StrIndex(matched.range().end))
-                )
-            } else {
-                // There isn't really a meaningful "error at" cursor we can provide here.
-                Err(None)
-            },
+            Some(matched) => {
+                if matched.start() == cursor.into_usize() {
+                    Ok(PatternMatch::new(
+                        matched.as_str(),
+                        vec![matched.range()],
+                        StrIndex(matched.range().end),
+                    ))
+                } else {
+                    // There isn't really a meaningful "error at" cursor we can provide here.
+                    Err(None)
+                }
+            }
             None => Err(None),
         }
     }

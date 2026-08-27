@@ -1,9 +1,8 @@
 //! Test regarding `Just` combinator for pattern matching.
 
 use biparse::prelude::*;
-use proptest::{proptest, prop_oneof, strategy::Strategy};
+use proptest::{prop_oneof, proptest, strategy::Strategy};
 use rowan::SyntaxKind;
-
 
 fn some_amount_of_a() -> impl Strategy<Value = String> {
     prop_oneof![
@@ -21,7 +20,7 @@ fn char_a(s: String) -> Option<String> {
             assert_eq!(state.cursor.into_usize(), "a".len());
             assert_eq!(result.cst.green.len(), 1);
             Some(matched.to_owned())
-        },
+        }
         ParseResult::Speculative(_) => {
             assert_eq!(state.cursor.into_usize(), 0);
             assert_eq!(result.cst.green.len(), 0);
@@ -46,7 +45,7 @@ fn str_a(s: String) -> Option<String> {
             assert_eq!(state.cursor.into_usize(), "a".len());
             assert_eq!(result.cst.green.len(), 1);
             Some(matched.to_owned())
-        },
+        }
         ParseResult::Speculative(_) => {
             assert_eq!(state.cursor.into_usize(), 0);
             assert_eq!(result.cst.green.len(), 0);

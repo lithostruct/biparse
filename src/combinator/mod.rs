@@ -25,12 +25,13 @@ pub use self::{
         combinator::{Direct, Indirect, Recursive},
         frame::RecursiveState,
     },
-    sentinel::{Success, End, Fail},
+    sentinel::{End, Fail, Success},
 };
 
 // Constants and functions.
 
-pub fn success<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Success> {
+pub fn success<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Success>
+{
     AsParser::from(Success)
 }
 pub fn fail<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Fail> {
