@@ -1,8 +1,10 @@
 use std::borrow::Cow;
 
+use rowan::SyntaxKind;
+
 use crate::input::{Input, InputItem, LineCol, Pattern, PatternMatch};
 
-/// The cursor type for `str`-based input.
+/// The cursor type for `str`-based input, which wraps a byyte offset into the source string.
 /// The contained value is asserted to be at a UTF-8 boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StrIndex(pub(super) usize);
@@ -63,9 +65,16 @@ impl Input for str {
     fn describe_token(token: &Self::Token) -> String {
         format!("character '{token}'")
     }
+    fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind> {
+        None
+    }
 }
 
-impl Pattern<str> for char {
+/// Single matching on `str` for `char`.
+impl<K> Pattern<str> for (K, char)
+where
+    K: Clone + Into<SyntaxKind>,
+{
     type Payload<'src> = &'src str;
     fn matches_at<'src>(
         &self,
@@ -77,10 +86,10 @@ impl Pattern<str> for char {
         }
         match input.peek(cursor) {
             Some(item) => {
-                if item.token == *self {
+                if item.token == self.1 {
                     Ok(PatternMatch::new(
                         &input[item.span.clone()],
-                        vec![item.span],
+                        vec![(self.0.clone().into(), item.span)],
                         item.next_cursor,
                     ))
                 } else {
@@ -91,10 +100,15 @@ impl Pattern<str> for char {
         }
     }
     fn describe(&self) -> String {
-        format!("character '{self}'")
+        format!("character '{}'", self.1)
     }
 }
-impl Pattern<str> for str {
+
+/// Contigious matching on [`str`] for [`&str`].
+impl<K> Pattern<str> for (K, &str)
+where
+    K: Clone + Into<SyntaxKind>,
+{
     type Payload<'src> = &'src str;
     fn matches_at<'src>(
         &self,
@@ -104,8 +118,9 @@ impl Pattern<str> for str {
         if cursor.0 >= input.len() {
             return Err(Some(cursor));
         }
-        let new_byte_offset = cursor.0 + self.len();
-        if input[cursor.0..].starts_with(self) {
+        let new_byte_offset = cursor.0 + self.1.len();
+        if input[cursor.0..].starts_with(self.1) {
+            let str_span = (cursor.0)..(new_byte_offset);
             // This is indeed intentional.
             // It doesn't make much sense to separate these into character-by-character spans
             // when the whole pattern matches contiguously.
@@ -113,14 +128,15 @@ impl Pattern<str> for str {
             #[allow(clippy::single_range_in_vec_init)]
             Ok(PatternMatch::new(
                 &input[cursor.0..new_byte_offset],
-                vec![(cursor.0)..(new_byte_offset)],
+                vec![(self.0.clone().into(), str_span)],
                 StrIndex(new_byte_offset),
             ))
         } else {
             // Iterate character-by-character to find the mismatch.
             let mut cursor = cursor;
-            for ch in self.chars() {
-                match ch.matches_at(input, cursor) {
+            let kind = self.0.clone().into();
+            for ch in self.1.chars() {
+                match (kind, ch).matches_at(input, cursor) {
                     Ok(new_position) => {
                         cursor = new_position.next_cursor;
                         continue;
@@ -136,32 +152,24 @@ impl Pattern<str> for str {
         }
     }
     fn describe(&self) -> String {
-        format!("string \"{self:?}\"")
+        format!("string \"{:?}\"", self.1)
     }
 }
-impl Pattern<str> for String {
+
+/// Contigious matching on [`str`] for [`String`], deferring to the inner [`&str`] implementation.
+impl<K> Pattern<str> for (K, String)
+where
+    K: Clone + Into<SyntaxKind>,
+{
     type Payload<'src> = &'src str;
     fn matches_at<'src>(
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
     ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
-        self.as_str().matches_at(input, cursor)
+        (self.0.clone(), self.1.as_str()).matches_at(input, cursor)
     }
     fn describe(&self) -> String {
-        self.as_str().describe()
-    }
-}
-impl Pattern<str> for &str {
-    type Payload<'src> = &'src str;
-    fn matches_at<'src>(
-        &self,
-        input: &'src str,
-        cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
-        (*self).matches_at(input, cursor)
-    }
-    fn describe(&self) -> String {
-        (*self).describe()
+        (self.0.clone(), self.1.as_str()).describe()
     }
 }

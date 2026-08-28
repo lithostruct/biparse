@@ -42,8 +42,7 @@ pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, 
 }
 
 pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<I> + 'src>(
-    kind: rowan::SyntaxKind,
     pattern: P,
 ) -> AsParser<'src, I, P::Payload<'src>, E, Just<P>> {
-    AsParser::from(Just::new(kind, pattern))
+    AsParser::from(Just::new(pattern))
 }

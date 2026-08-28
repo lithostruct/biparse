@@ -12,3 +12,8 @@ pub mod parse;
 pub mod prelude;
 
 pub use rowan;
+
+#[cfg(feature = "logos")]
+pub use logos;
+#[cfg(feature = "regex")]
+pub use {regex, regex_lite};

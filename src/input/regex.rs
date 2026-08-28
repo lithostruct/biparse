@@ -1,8 +1,13 @@
 //! Optional implementation of [`Pattern`] for [`regex::Regex`] and [`regex_lite::Regex`].
 
+use rowan::SyntaxKind;
+
 use crate::input::{Input, Pattern, PatternMatch, str::StrIndex};
 
-impl Pattern<str> for regex::Regex {
+impl<K> Pattern<str> for (K, regex::Regex)
+where
+    K: Clone + Into<SyntaxKind>,
+{
     type Payload<'src> = &'src str;
 
     fn matches_at<'src>(
@@ -10,12 +15,12 @@ impl Pattern<str> for regex::Regex {
         input: &'src str,
         cursor: <str as Input>::Cursor,
     ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
-        match self.find_at(input, cursor.into_usize()) {
+        match self.1.find_at(input, cursor.into_usize()) {
             Some(matched) => {
                 if matched.start() == cursor.into_usize() {
                     Ok(PatternMatch::new(
                         matched.as_str(),
-                        vec![matched.range()],
+                        vec![(self.0.clone().into(), matched.range())],
                         StrIndex(matched.range().end),
                     ))
                 } else {
@@ -28,10 +33,14 @@ impl Pattern<str> for regex::Regex {
     }
 
     fn describe(&self) -> String {
-        format!("regex pattern {:?}", self.as_str())
+        format!("regex pattern {:?}", self.1.as_str())
     }
 }
-impl Pattern<str> for regex_lite::Regex {
+
+impl<K> Pattern<str> for (K, regex_lite::Regex)
+where
+    K: Clone + Into<SyntaxKind>,
+{
     type Payload<'src> = &'src str;
 
     fn matches_at<'src>(
@@ -39,13 +48,12 @@ impl Pattern<str> for regex_lite::Regex {
         input: &'src str,
         cursor: <str as Input>::Cursor,
     ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
-        // Literally identical to above.
-        match self.find_at(input, cursor.into_usize()) {
+        match self.1.find_at(input, cursor.into_usize()) {
             Some(matched) => {
                 if matched.start() == cursor.into_usize() {
                     Ok(PatternMatch::new(
                         matched.as_str(),
-                        vec![matched.range()],
+                        vec![(self.0.clone().into(), matched.range())],
                         StrIndex(matched.range().end),
                     ))
                 } else {
@@ -58,6 +66,6 @@ impl Pattern<str> for regex_lite::Regex {
     }
 
     fn describe(&self) -> String {
-        format!("regex pattern {:?}", self.as_str())
+        format!("regex pattern {:?}", self.1.as_str())
     }
 }

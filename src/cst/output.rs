@@ -90,7 +90,9 @@ impl<Id: Debug + Clone + Eq + Hash> CstOutput<Id> {
     /// Canonizes `self` as a syntax tree, returning the materialized red node and origin table as an [`im::HashMap`].
     ///
     /// Returns `None` if `self.cst.len != 1`, or the current root is a `GreenToken`.
-    pub fn canonize<L: rowan::Language>(&self) -> Option<(SyntaxNode<L>, im::HashMap<Id, CstPath>)> {
+    pub fn canonize<L: rowan::Language>(
+        &self,
+    ) -> Option<(SyntaxNode<L>, im::HashMap<Id, CstPath>)> {
         // Preconditions.
         if self.green.len() != 1 || matches!(self.green[0], NodeOrToken::Token(_)) {
             return None;

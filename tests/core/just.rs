@@ -12,7 +12,8 @@ fn some_amount_of_a() -> impl Strategy<Value = String> {
 }
 
 fn char_a(s: String) -> Option<String> {
-    let combinator: AsParser<'_, str, &str, DefaultParseEnvironment, _> = just(SyntaxKind(0), 'a');
+    let combinator: AsParser<'_, str, &str, DefaultParseEnvironment, _> =
+        just((SyntaxKind(0), 'a'));
     let (state, result) = combinator.parse_from_start(&s);
     match result.ast {
         ParseResult::Success(matched) => {
@@ -37,7 +38,8 @@ proptest! {
 }
 
 fn str_a(s: String) -> Option<String> {
-    let combinator: AsParser<'_, str, &str, DefaultParseEnvironment, _> = just(SyntaxKind(0), "a");
+    let combinator: AsParser<'_, str, &str, DefaultParseEnvironment, _> =
+        just((SyntaxKind(0), "a"));
     let (state, result) = combinator.parse_from_start(&s);
     match result.ast {
         ParseResult::Success(matched) => {

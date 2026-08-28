@@ -38,7 +38,7 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
 /// Convenience methods available to all implementors of [`Parser<'src, I, A, E>`]. Enables combinator method chaining.
 ///
 /// This is separated from the main [`Parser`] to allow [`Parser`] to be dyn-compatible.
-/// 
+///
 /// Due to additional type restrictions on the payload type `A` (namely being a reference to a [`ToOwned`] implementor),
 /// the [.into_owned()](crate::parse::parser::ParserOwnedExt::into_owned) method is separated into trait [`ParserOwnedExt`].
 pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment>:
@@ -134,20 +134,14 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         self.map(|_| ())
     }
-    fn then_ignore<P, B>(
-        self,
-        next: P,
-    ) -> composite::ThenIgnore<E, Self, P, A, B>
+    fn then_ignore<P, B>(self, next: P) -> composite::ThenIgnore<E, Self, P, A, B>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
     {
         self.then(next).map(|(first, _)| first)
     }
-    fn ignore_then<P, B>(
-        self,
-        next: P,
-    ) -> composite::IgnoreThen<E, Self, P, A, B>
+    fn ignore_then<P, B>(self, next: P) -> composite::IgnoreThen<E, Self, P, A, B>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
@@ -162,15 +156,17 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E
 
 /// Types of composite and/or derived parsers formed by `ParserExt`,
 /// expressed in terms of the primitive parser combinators.
-/// 
+///
 /// These are here mostly due to `clippy::type_complexity`.
 /// They are what you expect from the corresponding value definitions,
 /// with closures type-erased to function pointers.
 mod composite {
     use super::*;
     pub type Ignore<E, P, A> = WithEnv<E, Map<P, fn(A) -> (), A>>;
-    pub type ThenIgnore<E, L, R, A, B> = WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
-    pub type IgnoreThen<E, L, R, A, B> = WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> B, (A, B)>>;
+    pub type ThenIgnore<E, L, R, A, B> =
+        WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
+    pub type IgnoreThen<E, L, R, A, B> =
+        WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> B, (A, B)>>;
 }
 
 /// Convenience trait for [`.into_owned()`](Self::into_owned) method chaining.

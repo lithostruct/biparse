@@ -9,7 +9,7 @@ use rowan::SyntaxKind;
 fn left_recursive_a(s: String) -> String {
     let combinator: Recursive<Direct<'_, str, String, DefaultParseEnvironment>> =
         Recursive::new_as("left-recursive-a", |this| {
-            this.then(just(SyntaxKind(0), 'a'))
+            this.then(just((SyntaxKind(0), 'a')))
                 .map(|(mut rest, last)| {
                     rest += last;
                     rest

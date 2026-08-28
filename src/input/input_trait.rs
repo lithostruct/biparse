@@ -10,6 +10,8 @@ use std::{
     ops::Range,
 };
 
+use rowan::SyntaxKind;
+
 /// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
@@ -46,8 +48,12 @@ pub trait Input {
 
     /// Calculates the one-indexed line-column number that this cursor points towards.
     fn to_line_col(&self, at: Self::Cursor) -> LineCol;
+
     /// Displays the description of a token.
     fn describe_token(token: &Self::Token) -> String;
+    /// Returns the default `SyntaxKind` returned for skipped byte spans within the current stream.
+    /// If `Self` emits contigious input such that discontinuities should be treated as errors, return `None`.
+    fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind>;
 }
 
 /// The trait describing all pattern types that match onto a specific input type.
@@ -70,6 +76,7 @@ pub trait Pattern<I: Input + ?Sized> {
     ) -> Result<PatternMatch<'src, Self::Payload<'src>, I>, Option<I::Cursor>>;
 
     /// Writes a description of what is expected by `self` as a string.
+    /// Omit [`rowan::SyntaxKind`] information.
     ///
     /// This is used for error reporting:
     /// Assume a typical format of "expected \<description\>, got \<token\>".
@@ -96,18 +103,29 @@ impl Display for LineCol {
     }
 }
 
+/// Output information regarding [`Pattern::matches_at`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PatternMatch<'src, P, I: Input + ?Sized> {
+    /// The payload type.
     pub payload: P,
-    pub spans: Vec<Range<usize>>,
+    /// A sequence of kinds + spans, corresponding to a CST token to be constructed.
+    /// Spans must be in order, and must not overlap.
+    pub cst_spans: Vec<(SyntaxKind, Range<usize>)>,
+    /// The next cursor returned by the match.
+    /// Matching cannot backtrack;
+    /// `next_cursor` must be strictly greater than the input cursor of the match.
     pub next_cursor: I::Cursor,
     _marker: PhantomData<fn(&'src P)>,
 }
 impl<'src, P, I: Input + ?Sized> PatternMatch<'src, P, I> {
-    pub fn new(payload: P, spans: Vec<Range<usize>>, next_cursor: I::Cursor) -> Self {
+    pub fn new(
+        payload: P,
+        cst_spans: Vec<(SyntaxKind, Range<usize>)>,
+        next_cursor: I::Cursor,
+    ) -> Self {
         PatternMatch {
             payload,
-            spans,
+            cst_spans,
             next_cursor,
             _marker: PhantomData,
         }
