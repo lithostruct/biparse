@@ -13,7 +13,7 @@ use crate::{
     cst::CstOutput,
     failure::{FailureKind, ParseFailure},
     input::Input,
-    parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
 };
 
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.
@@ -268,8 +268,8 @@ macro_rules! recursive_growth {
                         let failure = E::Failure::failure_at::<_, E::Failure>(
                             input,
                             state.cursor,
-                            FailureKind::LeftRecursion {
-                                name: this.name()
+                            FailureKind::ZeroProgressRecursion {
+                                name: this.description.as_ref().map(|s| s.clone().into_owned())
                             },
                         );
 
@@ -464,6 +464,16 @@ where
         ParseOutput<(), E>,
     ) {
         recursive_growth!(self, input, state, check)
+    }
+    fn hint(&self) -> ParseHint {
+        if let Some(inner) = &self.description {
+            ParseHint::Named {
+                name: inner.clone().into_owned(),
+                inner: Box::new(ParseHint::Opaque),
+            }
+        } else {
+            ParseHint::Opaque
+        }
     }
 }
 

@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     input::Input,
-    parse::{ParseEnvironment, ParseOutput, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseState, Parser},
 };
 
 /// Parser combinator for mapping successful AST payloads via the given closure.
@@ -51,6 +51,9 @@ where
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         self.inner.check(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        self.inner.hint()
     }
 }
 
@@ -101,5 +104,8 @@ where
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         self.inner.check(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        self.inner.hint()
     }
 }

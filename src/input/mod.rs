@@ -1,10 +1,12 @@
 mod input_trait;
 
 mod str;
+pub use self::input_trait::*;
 
-#[cfg(feature = "logos")]
-mod logos;
 #[cfg(feature = "regex")]
 mod regex;
 
-pub use self::input_trait::*;
+#[cfg(feature = "logos")]
+mod logos;
+#[cfg(feature = "logos")]
+pub use logos::{LexerStream, LexerIndex};

@@ -5,7 +5,7 @@ use rowan::SyntaxKind;
 use crate::{
     cst::IdSupply,
     input::Input,
-    parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -59,6 +59,9 @@ where
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         self.inner.check(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        self.inner.hint()
     }
 }
 
@@ -131,5 +134,18 @@ where
                 )
             }
         }
+    }
+    fn check(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<(), E>,
+    ) {
+        self.inner.check(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        self.inner.hint()
     }
 }

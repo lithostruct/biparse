@@ -2,7 +2,10 @@
 
 use rowan::SyntaxKind;
 
-use crate::input::{Input, Pattern, PatternMatch, str::StrIndex};
+use crate::{
+    input::{Input, Pattern, PatternMatch, str::StrIndex},
+    parse::{Expectation, ParseHint},
+};
 
 impl<K> Pattern<str> for (K, regex::Regex)
 where
@@ -33,7 +36,14 @@ where
     }
 
     fn describe(&self) -> String {
-        format!("regex pattern {:?}", self.1.as_str())
+        format!("regex {:?}", self.1.as_str())
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Expectation(Expectation::Pattern {
+            kind: "regex".to_string(),
+            kind_plural: "regexes".to_string(),
+            data: format!("{:?}", self.1.as_str()),
+        })
     }
 }
 
@@ -66,6 +76,13 @@ where
     }
 
     fn describe(&self) -> String {
-        format!("regex pattern {:?}", self.1.as_str())
+        format!("regex {:?}", self.1.as_str())
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Expectation(Expectation::Pattern {
+            kind: "regex".to_string(),
+            kind_plural: "regexes".to_string(),
+            data: format!("{:?}", self.1.as_str()),
+        })
     }
 }

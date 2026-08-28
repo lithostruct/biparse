@@ -8,6 +8,7 @@ mod just;
 mod map_into_owned;
 mod node_association;
 mod recursive;
+mod repetition;
 mod sentinel;
 
 use crate::{
@@ -25,6 +26,7 @@ pub use self::{
         combinator::{Direct, Indirect, Recursive},
         frame::RecursiveState,
     },
+    repetition::Many,
     sentinel::{End, Fail, Success},
 };
 

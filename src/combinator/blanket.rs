@@ -4,7 +4,7 @@ use derive_more::{From, Into};
 
 use crate::{
     input::Input,
-    parse::{ParseEnvironment, ParseOutput, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseState, Parser},
 };
 
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> for &P
@@ -24,6 +24,9 @@ where
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         <P as Parser<'src, I, A, E>>::check(*self, input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        <P as Parser<'src, I, A, E>>::hint(self)
     }
 }
 
@@ -45,6 +48,9 @@ where
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
     }
+    fn hint(&self) -> ParseHint {
+        <P as Parser<'src, I, A, E>>::hint(self as &P)
+    }
 }
 
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> for Arc<P>
@@ -65,6 +71,9 @@ where
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
     }
+    fn hint(&self) -> ParseHint {
+        <P as Parser<'src, I, A, E>>::hint(self as &P)
+    }
 }
 
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> for Rc<P>
@@ -84,6 +93,9 @@ where
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        <P as Parser<'src, I, A, E>>::hint(self as &P)
     }
 }
 
@@ -153,6 +165,9 @@ where
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         self.inner.check(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        self.inner.hint()
     }
 }
 
@@ -227,5 +242,8 @@ where
         ParseOutput<(), E>,
     ) {
         self.inner.check(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        self.inner.hint()
     }
 }

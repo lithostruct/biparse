@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use crate::{
     failure::ParseFailure,
     input::Input,
-    parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
 };
 use either::Either;
 
@@ -96,6 +96,9 @@ where
         let (state, second_result) = self.second.check(input, state);
         (state, second_result)
     }
+    fn hint(&self) -> ParseHint {
+        ParseHint::sequence([self.first.hint(), self.second.hint()])
+    }
 }
 
 /// Parser combinator that returns the first viable alternative, preferring the first result wherever possible.
@@ -146,7 +149,7 @@ where
             ParseResult::Speculative(error) => error,
         };
 
-        let (second_state, second_result) = self.second.parse(input, state);
+        let (second_state, second_result) = self.second.parse(input, state.clone());
         let second_speculative_error = match second_result.ast {
             ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {
                 // Termination, discard first speculative error.
@@ -162,7 +165,11 @@ where
             ParseResult::Speculative(error) => error,
         };
 
-        let overall_speculation = first_speculative_error.merge(second_speculative_error);
+        let overall_speculation = E::Failure::composite(
+            input,
+            state.cursor,
+            [first_speculative_error, second_speculative_error],
+        );
         (
             second_state,
             ParseOutput {
@@ -187,7 +194,7 @@ where
             ParseResult::Speculative(error) => error,
         };
 
-        let (second_state, mut second_result) = self.second.check(input, state);
+        let (second_state, mut second_result) = self.second.check(input, state.clone());
         let second_speculative_error = match second_result.ast {
             ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {
                 // Termination, discard first speculative error.
@@ -198,7 +205,11 @@ where
             ParseResult::Speculative(error) => error,
         };
 
-        let overall_speculation = first_speculative_error.merge(second_speculative_error);
+        let overall_speculation = E::Failure::composite(
+            input,
+            state.cursor,
+            [first_speculative_error, second_speculative_error],
+        );
         (
             second_state,
             ParseOutput {
@@ -206,5 +217,8 @@ where
                 cst: second_result.cst,
             },
         )
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::choice([self.first.hint(), self.second.hint()])
     }
 }

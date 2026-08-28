@@ -1,13 +1,11 @@
 use std::cmp::Ordering;
 
-use rowan::SyntaxKind;
-
 use crate::{
     cst::{Cst, CstAssociation, CstOutput},
     failure::{FailureKind, ParseFailure},
     green::GreenElement,
     input::{Input, Pattern},
-    parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
 };
 
 /// Parser combinator that matches on a pattern compatible with the input type.
@@ -177,5 +175,9 @@ where
                 )
             }
         }
+    }
+
+    fn hint(&self) -> ParseHint {
+        self.pattern.hint()
     }
 }

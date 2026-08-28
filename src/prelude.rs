@@ -9,8 +9,10 @@ pub use crate::{
     failure::{FailureKind, ParseFailure},
     input::{Input, InputItem, LineCol},
     parse::{
-        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser,
-        ParserExt, ParserOwnedExt,
+        Parser, ParserExt, ParserOwnedExt,
+
+        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState,
+        composite,
     },
     rowan,
 };

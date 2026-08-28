@@ -1,18 +1,17 @@
 use std::borrow::Cow;
 
+use derive_more::Into;
 use rowan::SyntaxKind;
 
-use crate::input::{Input, InputItem, LineCol, Pattern, PatternMatch};
+use crate::{
+    input::{Input, InputItem, LineCol, Pattern, PatternMatch},
+    parse::{Expectation, ParseHint},
+};
 
 /// The cursor type for `str`-based input, which wraps a byyte offset into the source string.
 /// The contained value is asserted to be at a UTF-8 boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct StrIndex(pub(super) usize);
-impl From<StrIndex> for usize {
-    fn from(val: StrIndex) -> Self {
-        val.0
-    }
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Into)]
+pub struct StrIndex(#[into] pub(super) usize);
 impl StrIndex {
     pub fn into_usize(self) -> usize {
         self.into()
@@ -44,12 +43,14 @@ impl Input for str {
         Cow::Borrowed(&self[start..end])
     }
 
-    fn to_line_col(&self, at: Self::Cursor) -> LineCol {
-        // This is done with no caching, so time-complexity is O(N).
+    /// As the raw [`str`] representation does not cache linebreak positions,
+    /// this function needs to traverse the whole string (at worst-case),
+    /// resulting in time complexity `O(N)`.`
+    fn byte_to_line_col(&self, at_offset: usize) -> LineCol {
         let mut line = 1;
         let mut column = 1;
         for (offset, ch) in self.char_indices() {
-            if offset >= at.0 {
+            if offset >= at_offset {
                 break;
             }
             if ch == '\n' {
@@ -99,8 +100,16 @@ where
             None => Err(Some(cursor)),
         }
     }
+
     fn describe(&self) -> String {
         format!("character '{}'", self.1)
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Expectation(Expectation::Pattern {
+            kind: "character".to_string(),
+            kind_plural: "characters".to_string(),
+            data: format!("'{}'", self.1),
+        })
     }
 }
 
@@ -154,6 +163,13 @@ where
     fn describe(&self) -> String {
         format!("string \"{:?}\"", self.1)
     }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Expectation(Expectation::Pattern {
+            kind: "string".to_string(),
+            kind_plural: "strings".to_string(),
+            data: format!("\"{:?}\"", self.1),
+        })
+    }
 }
 
 /// Contigious matching on [`str`] for [`String`], deferring to the inner [`&str`] implementation.
@@ -171,5 +187,8 @@ where
     }
     fn describe(&self) -> String {
         (self.0.clone(), self.1.as_str()).describe()
+    }
+    fn hint(&self) -> ParseHint {
+        (self.0.clone(), self.1.as_str()).hint()
     }
 }

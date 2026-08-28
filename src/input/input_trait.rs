@@ -12,12 +12,14 @@ use std::{
 
 use rowan::SyntaxKind;
 
+use crate::parse::ParseHint;
+
 /// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
     type Cursor: Copy + Ord + Hash;
     /// The type of a single input in this input.
-    type Token: Clone + Eq;
+    type Token: Clone;
 
     /// Produces a cursor that points to the start of the input.
     fn start(&self) -> Self::Cursor;
@@ -26,34 +28,46 @@ pub trait Input {
     /// [`None`] signifies end-of-input.
     fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token, Self::Cursor>>;
 
+    /// Returns the default [`SyntaxKind`] returned for skipped byte spans within the current stream.
+    /// If `Self` emits contigious input such that discontinuities should be treated as errors, return [`None`].
+    fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind>;
+
+    /// Returns the conceptual byte offset into the source string that this cursor points to.
+    /// In the event `at` exceeds the source string length, return the byte length of the source string.
+    ///
+    /// The returned value must be at an UTF-8 boundary.
+    fn byte_offset(&self, at: Self::Cursor) -> usize;
     /// Produces the string slice over the range specified by the two cursors.
     ///
     /// Range is `start`-inclusive, `end`-exclusive.
     fn slice(&self, start: Self::Cursor, end: Self::Cursor) -> Cow<'_, str> {
         self.slice_bytes(self.byte_offset(start), self.byte_offset(end))
     }
-
-    /// Returns the conceptual byte offset into the source string that this cursor points to.
-    ///
-    /// The returned value must be at an UTF-8 boundary.
-    fn byte_offset(&self, at: Self::Cursor) -> usize;
     /// Produces the string slice over the range specified by the two cursors.
     ///
-    /// Range is `start`-inclusive, `end`-exclusive. `start` and `end` must be at UTF-8 character boundaries.
+    /// Range is `start`-inclusive, `end`-exclusive.
+    /// `start` and `end` must be at UTF-8 character boundaries and bounded within the source input.
     ///
     /// # Panics
     ///
-    /// Panics if `start` and `end` are not at UTF-8 character boundaries.
+    /// Panics if `start` and `end` are not at UTF-8 character boundaries,
+    /// or if either exceeds the bounds of this source string.
     fn slice_bytes(&self, start: usize, end: usize) -> Cow<'_, str>;
 
     /// Calculates the one-indexed line-column number that this cursor points towards.
-    fn to_line_col(&self, at: Self::Cursor) -> LineCol;
+    fn to_line_col(&self, at: Self::Cursor) -> LineCol {
+        self.byte_to_line_col(self.byte_offset(at))
+    }
+    /// Calculates the one-indexed line-column number that this byte offset points into.
+    /// `at_offset` must be at a UTF-8 character boundary.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at_offset` is not at a UTF-8 character boundary.
+    fn byte_to_line_col(&self, at_offset: usize) -> LineCol;
 
     /// Displays the description of a token.
     fn describe_token(token: &Self::Token) -> String;
-    /// Returns the default `SyntaxKind` returned for skipped byte spans within the current stream.
-    /// If `Self` emits contigious input such that discontinuities should be treated as errors, return `None`.
-    fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind>;
 }
 
 /// The trait describing all pattern types that match onto a specific input type.
@@ -81,6 +95,11 @@ pub trait Pattern<I: Input + ?Sized> {
     /// This is used for error reporting:
     /// Assume a typical format of "expected \<description\>, got \<token\>".
     fn describe(&self) -> String;
+
+    /// Returns the [`ParseHint`] represented by this pattern.
+    fn hint(&self) -> ParseHint {
+        ParseHint::Opaque
+    }
 }
 
 /// Information relating to tokens from [`Input::peek`].

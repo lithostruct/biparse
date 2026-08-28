@@ -2,7 +2,9 @@ use crate::{
     cst::CstOutput,
     failure::{FailureKind, ParseFailure},
     input::Input,
-    parse::{ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{
+        Expectation, ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser,
+    },
 };
 use std::fmt::Debug;
 
@@ -29,6 +31,19 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Su
                 cst: CstOutput::new(),
             },
         )
+    }
+    fn check(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<(), E>,
+    ) {
+        self.parse(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Empty
     }
 }
 
@@ -61,6 +76,19 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
             },
         )
     }
+    fn check(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<(), E>,
+    ) {
+        self.parse(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Fails
+    }
 }
 
 /// Parser combinator that checks for the end-of-file.
@@ -92,5 +120,18 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
                 cst: CstOutput::new(),
             },
         )
+    }
+    fn check(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<(), E>,
+    ) {
+        self.parse(input, state)
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Expectation(Expectation::EndOfInput)
     }
 }

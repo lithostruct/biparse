@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
+use either::Either;
 use rowan::SyntaxKind;
 
 use crate::{
-    combinator::{Associate, IntoOwned, Map, Node, Or, Then, WithEnv, end},
-    cst::{CstOutput, IdSupply},
-    input::Input,
-    parse::{DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState, TopLevelResult},
+    combinator::{AsParser, Associate, IntoOwned, Many, Map, Node, Or, Success, Then, WithEnv, end, success}, cst::{CstOutput, IdSupply}, input::Input, parse::{
+        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState, TopLevelResult,
+        diagnostics::ParseHint,
+    },
 };
 
 /// The central parsing trait, implemented by all combinators.
@@ -32,6 +33,14 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
             cst: CstOutput::new(),
         };
         (new_state, erased_output)
+    }
+
+    /// Returns the diagnostics of `self`:
+    ///
+    /// Diagnostics are an approximation of the expected input of self,
+    /// and are used for error reporting.
+    fn hint(&self) -> ParseHint {
+        ParseHint::Opaque
     }
 }
 
@@ -78,6 +87,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
             .into_result()
     }
 
+    /// Creates a type-erased [`Box`]-ed parser from `self`.
     fn boxed<'p>(self) -> WithEnv<E, Box<dyn Parser<'src, I, A, E> + 'p>>
     where
         Self: Sized + 'p,
@@ -85,6 +95,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         let boxed: Box<dyn Parser<'src, I, A, E> + 'p> = Box::new(self);
         WithEnv::<E, Box<dyn Parser<'src, I, A, E> + 'p>>::new::<'src, I, A>(boxed)
     }
+    /// Creates a type-erased shared parser from `self` using [`Rc`].
     fn shared<'p>(self) -> WithEnv<E, Rc<dyn Parser<'src, I, A, E> + 'p>>
     where
         Self: Sized + 'p,
@@ -93,6 +104,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         WithEnv::<E, Rc<dyn Parser<'src, I, A, E> + 'p>>::new::<'src, I, A>(rc)
     }
 
+    /// Chains `self` to then sequentially execute the second parser.
     fn then<P, B>(self, next: P) -> WithEnv<E, Then<Self, P>>
     where
         P: Parser<'src, I, B, E>,
@@ -100,6 +112,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         WithEnv::new(Then::new(self, next))
     }
+    /// Chains `self` as an alternative, falling through to the second parser.
     fn or<P, B>(self, other: P) -> WithEnv<E, Or<Self, P>>
     where
         P: Parser<'src, I, B, E>,
@@ -107,6 +120,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         WithEnv::new(Or::new(self, other))
     }
+    /// Chains `self` to execute `map` on the success payload.
     fn map<F, B>(self, closure: F) -> WithEnv<E, Map<Self, F, A>>
     where
         F: Fn(A) -> B,
@@ -114,12 +128,15 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         WithEnv::new(Map::new(self, closure))
     }
+    /// Chains `self` to add a new parent to the current CST forest.
     fn node(self, kind: SyntaxKind) -> WithEnv<E, Node<Self>>
     where
         Self: Sized,
     {
         WithEnv::new(Node::new(kind, self))
     }
+    /// Chains `self` to add a new parent to the current CST forest,
+    /// and associate it with the fresh `Id` supplied to the closure.
     fn associate<F, B>(self, kind: SyntaxKind, closure: F) -> WithEnv<E, Associate<Self, F, A>>
     where
         F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
@@ -128,12 +145,39 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         WithEnv::new(Associate::new(self, kind, closure))
     }
 
+    fn many(self) -> WithEnv<E, Many<Self>>
+    where
+        Self: Sized,
+    {
+        WithEnv::new(Many::new(self))
+    }
+    fn some(self) -> composite::Some<E, Self, A>
+    where
+        Self: Sized + Clone,
+    {
+        self.clone().many().then(self).map(|(mut rest, last)| {
+            rest.push(last);
+            rest
+        })
+    }
+    fn optional(self) -> composite::Optional<'src, I, A, E, Self>
+    where
+        Self: Sized,
+    {
+        self.or(success()).map(|either| match either {
+            Either::Left(a) => Some(a),
+            Either::Right(()) => None,
+        })
+    }
+
+    /// Discards the current AST payload.
     fn ignore(self) -> composite::Ignore<E, Self, A>
     where
         Self: Sized,
     {
         self.map(|_| ())
     }
+    /// Sequentially executes the next parser, discarding the next parser's payload.
     fn then_ignore<P, B>(self, next: P) -> composite::ThenIgnore<E, Self, P, A, B>
     where
         P: Parser<'src, I, B, E>,
@@ -141,6 +185,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         self.then(next).map(|(first, _)| first)
     }
+    /// Sequentially executes the next parser, discarding `self`'s payload.
     fn ignore_then<P, B>(self, next: P) -> composite::IgnoreThen<E, Self, P, A, B>
     where
         P: Parser<'src, I, B, E>,
@@ -160,8 +205,22 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E
 /// These are here mostly due to `clippy::type_complexity`.
 /// They are what you expect from the corresponding value definitions,
 /// with closures type-erased to function pointers.
-mod composite {
+pub mod composite {
     use super::*;
+
+    pub type Some<E, P, A> =
+        WithEnv<E, Map<
+            WithEnv<E, Then<WithEnv<E, Many<P>>, P>>,
+            fn((Vec<A>, A)) -> Vec<A>,
+            (Vec<A>, A)
+        >>;
+    pub type Optional<'src, I, A, E, P> =
+        WithEnv<E, Map<
+            WithEnv<E, Or<P, AsParser<'src, I, (), E, Success>>>,
+            fn(Either<A, ()>) -> Option<A>,
+            Either<A, ()>
+        >>;
+
     pub type Ignore<E, P, A> = WithEnv<E, Map<P, fn(A) -> (), A>>;
     pub type ThenIgnore<E, L, R, A, B> =
         WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
@@ -175,6 +234,7 @@ pub trait ParserOwnedExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = Defau
 where
     A: ToOwned + ?Sized + 'src,
 {
+    /// Chains `self` by turning an AST payload reference into owned data.
     fn into_owned(self) -> WithEnv<E, IntoOwned<Self, A>>
     where
         Self: Sized,

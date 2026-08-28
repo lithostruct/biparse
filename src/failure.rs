@@ -6,16 +6,24 @@ use derive_more::From;
 use thiserror::Error;
 
 use crate::input::{Input, LineCol};
-use std::{cmp::Ordering, fmt::Debug};
+use std::fmt::Debug;
 
 /// The trait required by parser failure types to implement.
 pub trait ParseFailure: Clone {
+    /// Constructs the failure value given its location and error information.
     fn failure_at<I: Input + ?Sized, E: std::error::Error>(
         input: &I,
         cursor: I::Cursor,
         kind: FailureKind<I, E>,
     ) -> Self;
-    fn merge(self, other: Self) -> Self;
+    /// Constructs the composite failure at this location from the given failures from distinct branches.
+    /// Branch failures may contain different locations than the one supplied in this call.
+    /// Branch failures are provided in order of occurence. Maintain iteration order where applicable.
+    fn composite<I: Input + ?Sized>(
+        input: &I,
+        cursor: I::Cursor,
+        branches: impl IntoIterator<Item = Self>,
+    ) -> Self;
 }
 
 /// The struct that carries information on what kind of failure is encountered by the parser,
@@ -30,7 +38,7 @@ pub enum FailureKind<I: Input + ?Sized, E: std::error::Error> {
     /// Expected the end of the input, found an additional token.
     ExpectedEnd { found: I::Token },
     /// Zero-progress left recursion.
-    LeftRecursion { name: String },
+    ZeroProgressRecursion { name: Option<String> },
     /// Failure caused by the [`Fail`] primitive combinator.
     FailPrimitive,
     /// A custom error.
@@ -48,8 +56,12 @@ impl ParseFailure for ZeroSized {
     ) -> Self {
         ZeroSized
     }
-    fn merge(self, _: Self) -> Self {
-        self
+    fn composite<I: Input + ?Sized>(
+        _: &I,
+        _: I::Cursor,
+        _: impl IntoIterator<Item = Self>,
+    ) -> Self {
+        ZeroSized
     }
 }
 
@@ -80,7 +92,7 @@ impl ParseFailure for Simple {
                     let difference_line_col = input.to_line_col(difference_location);
                     let found = input
                         .peek(difference_location)
-                        .map_or("end-of-input".into(), |item| I::describe_token(&item.token));
+                        .map_or("end of input".into(), |item| I::describe_token(&item.token));
                     format!("expected {expected}, found {found} at location {difference_line_col}")
                 }
                 None => format!("expected {expected}"),
@@ -88,23 +100,34 @@ impl ParseFailure for Simple {
             FailureKind::ExpectedEnd { found } => {
                 format!("expected end-of-input, found {}", I::describe_token(&found))
             }
-            FailureKind::LeftRecursion { name } => {
-                format!("Zero-progress left recursion detected at '{name}'")
+            FailureKind::ZeroProgressRecursion { name } => {
+                format!(
+                    "zero-progress recursion detected{}",
+                    name.map(|s| format!(" in '{s}'")).unwrap_or("".into())
+                )
             }
             FailureKind::FailPrimitive => "'Fail' primitive combinator encountered".to_string(),
             FailureKind::Custom { error } => error.to_string(),
         };
         (line_col, vec![message]).into()
     }
-    fn merge(mut self, mut other: Self) -> Self {
-        // Retain the most advanced error position, for now.
-        match self.position.cmp(&other.position) {
-            Ordering::Less => other,
-            Ordering::Equal => {
-                self.messages.append(&mut other.messages);
-                self
+    fn composite<I: Input + ?Sized>(
+        input: &I,
+        cursor: I::Cursor,
+        branches: impl IntoIterator<Item = Self>,
+    ) -> Self {
+        let line_col = input.to_line_col(cursor);
+        let mut messages = Vec::new();
+        for mut branch in branches {
+            if branch.position == line_col {
+                messages.append(&mut branch.messages);
+            } else {
+                messages.push(branch.to_string());
             }
-            Ordering::Greater => self,
+        }
+        Simple {
+            position: line_col,
+            messages,
         }
     }
 }
