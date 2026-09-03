@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::VecDeque, fmt::Display};
 
 /// The diagnostics information for
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -11,11 +11,14 @@ pub enum ParseHint {
     Empty,
     /// Fails unconditionally.
     Fails,
-    /// Expects something.
+    /// Expects something, consuming up to that point.
     Expectation(Expectation),
 
-    /// Anything but this.
+    /// Anything but this; consumes no input.
     Not(Box<Self>),
+    /// This, but consume no input.
+    Positive(Box<Self>),
+
     /// All of the following in sequential order.
     Sequence(Vec<Self>),
     /// Any of the following as ordered choice.
@@ -50,6 +53,106 @@ impl ParseHint {
             }
         }
         ParseHint::Choice(result)
+    }
+
+    /// Postorder traversal to canonize a `ParseHint`, to be used by text renderers.
+    pub fn canonize(self) -> Self {
+        match self {
+            // Leaves.
+            ParseHint::Opaque => ParseHint::Opaque,
+            ParseHint::Empty => ParseHint::Empty,
+            ParseHint::Fails => ParseHint::Fails,
+
+            ParseHint::Expectation(expectation) => ParseHint::Expectation(expectation),
+            ParseHint::Not(hint) => {
+                match hint.canonize() {
+                    // Leaf propagation.
+                    ParseHint::Empty => ParseHint::Fails,
+                    ParseHint::Fails => ParseHint::Empty,
+                    // Inner inversion.
+                    ParseHint::Not(inner) => ParseHint::Positive(inner),
+                    ParseHint::Positive(inner) => ParseHint::Not(inner),
+                    hint => ParseHint::Not(Box::new(hint)),
+                }
+            }
+            ParseHint::Positive(hint) => {
+                match hint.canonize() {
+                    // Leaf propagation.
+                    ParseHint::Empty => ParseHint::Empty,
+                    ParseHint::Fails => ParseHint::Fails,
+                    // Inner de-nesting.
+                    ParseHint::Not(inner) => ParseHint::Not(inner),
+                    ParseHint::Positive(inner) => ParseHint::Positive(inner),
+                    hint => ParseHint::Positive(Box::new(hint)),
+                }
+            }
+            ParseHint::Many(hint) => {
+                match hint.canonize() {
+                    // Leaf propagation.
+                    ParseHint::Empty => ParseHint::Empty,
+                    ParseHint::Fails => ParseHint::Empty,
+                    // Inner de-nesting.
+                    ParseHint::Many(inner) => ParseHint::Many(inner),
+                    hint => ParseHint::Many(Box::new(hint)),
+                }
+            }
+            ParseHint::Named { name, inner } => ParseHint::Named {
+                name,
+                inner: Box::new(inner.canonize()),
+            },
+            ParseHint::Sequence(hints) => {
+                let mut queue: VecDeque<ParseHint> = hints.into();
+                let mut result = Vec::new();
+                while let Some(front) = queue.pop_front() {
+                    match front.canonize() {
+                        // Remove empty elements.
+                        ParseHint::Empty => (),
+                        // Any sequence containing an unconditional failure itself unconditionally fails.
+                        ParseHint::Fails => {
+                            return ParseHint::Fails;
+                        }
+                        // De-nesting.
+                        ParseHint::Sequence(subarray) => {
+                            // Preserving order, push subarray elements into the queue.
+                            for item in subarray.into_iter().rev() {
+                                queue.push_front(item);
+                            }
+                        }
+                        element => result.push(element),
+                    }
+                }
+                if result.is_empty() {
+                    ParseHint::Empty
+                } else {
+                    ParseHint::Sequence(result)
+                }
+            }
+            ParseHint::Choice(hints) => {
+                let mut queue: VecDeque<ParseHint> = hints.into();
+                let mut result = Vec::new();
+                while let Some(front) = queue.pop_front() {
+                    match front.canonize() {
+                        // Eliminate failing branches.
+                        ParseHint::Fails => (),
+                        // De-nesting.
+                        ParseHint::Choice(subarray) => {
+                            // Preserving order, push subarray elements into the queue.
+                            for item in subarray.into_iter().rev() {
+                                queue.push_front(item);
+                            }
+                        }
+                        element => result.push(element),
+                    }
+                }
+                if result.is_empty() {
+                    // This indicates that there exists no valid alternatives to take,
+                    // usually because all alternatives canonized to `Fails`.
+                    ParseHint::Fails
+                } else {
+                    ParseHint::Choice(result)
+                }
+            }
+        }
     }
 }
 

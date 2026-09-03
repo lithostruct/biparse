@@ -17,7 +17,13 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
+    ) -> Result<
+        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
+        Option<<str as Input>::Cursor>,
+    >
+    where
+        str: 'src,
+    {
         match self.1.find_at(input, cursor.into_usize()) {
             Some(matched) => {
                 if matched.start() == cursor.into_usize() {
@@ -57,7 +63,13 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
+    ) -> Result<
+        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
+        Option<<str as Input>::Cursor>,
+    >
+    where
+        str: 'src,
+    {
         match self.1.find_at(input, cursor.into_usize()) {
             Some(matched) => {
                 if matched.start() == cursor.into_usize() {

@@ -7,6 +7,10 @@ use crate::{
 
 /// The recursive state stored in [`ParseState`], which can be cheaply cloned.
 ///
+/// A [`RecursiveState`] must only be used by the parser invocation for which it was created,
+/// and must not be retained and reused across unrelated parsing or checking invocations.
+/// Violating this requirement may result in a panic.
+///
 /// # Note / Warning to [`Parser`](crate::parse::Parser) Implementors
 ///
 /// This data type encapsulates a lot of the invariants and information
@@ -104,9 +108,6 @@ impl<'src, C: Clone + Hash + Eq, S: IdSupply> RecursiveState<'src, C, S> {
 }
 
 pub(super) struct RecursiveFrame<'src, C, S: IdSupply> {
-    // Safety information
-    pub(super) id: RecursiveId,
-
     // Diagnostic information.
     pub(super) description: Option<Cow<'static, str>>,
     pub(super) diagnostic_name: String,
@@ -120,7 +121,6 @@ pub(super) struct RecursiveFrame<'src, C, S: IdSupply> {
 impl<'src, C: Clone + Debug, S: IdSupply> Debug for RecursiveFrame<'src, C, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecursiveFrame")
-            .field("id", &self.id)
             .field("description", &self.description)
             .field("diagnostic_name", &self.diagnostic_name)
             .field(
@@ -140,7 +140,6 @@ impl<'src, C: Clone + Debug, S: IdSupply> Debug for RecursiveFrame<'src, C, S> {
 impl<'src, C: Clone, S: IdSupply> Clone for RecursiveFrame<'src, C, S> {
     fn clone(&self) -> Self {
         RecursiveFrame {
-            id: self.id,
             description: self.description.clone(),
             diagnostic_name: self.diagnostic_name.clone(),
             seed_result: self.seed_result.clone(),
@@ -159,6 +158,7 @@ pub(super) struct RecursiveId(pub(super) *const ());
 pub(super) trait ErasedOutput<'src> {
     fn clone_erased(&self) -> Rc<dyn ErasedOutput<'src> + 'src>;
     fn as_ptr(&self) -> *const ();
+    fn type_id(&self) -> std::any::TypeId;
 }
 impl<'src, A, E: ParseEnvironment> ErasedOutput<'src> for ParseOutput<A, E>
 where
@@ -169,5 +169,8 @@ where
     }
     fn as_ptr(&self) -> *const () {
         self as *const Self as *const ()
+    }
+    fn type_id(&self) -> std::any::TypeId {
+        typeid::of::<Self>()
     }
 }

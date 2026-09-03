@@ -54,8 +54,8 @@ fn other_string() {
 /// Previous versions of the seed-growing algorithm discard each fixpoint growth after its invocation,
 /// and the seed and growth phases ran at least twice, leading to recurrence relation:
 /// `T(n) = 2*T(n-1) + O(n)`
-/// Where no caching occurs for the recurrence,
-/// for a worst-case exponential time complexity for right-recursive grammars of `O(2^N)`.
+/// where no caching occurs for the recurrence,
+/// for a worst-case exponential time complexity `O(2^N)` for right-recursive grammars.
 ///
 /// This previously took >60 seconds to run. It should now be with near-linear or low-polynomic time complexity instead.
 #[test]

@@ -4,7 +4,10 @@ use derive_more::Into;
 use logos::{Lexer, Logos, SpannedIter};
 use rowan::SyntaxKind;
 
-use crate::input::{Input, InputItem, LineCol};
+use crate::{
+    input::{CachedStr, Input, InputItem, LineColumn, Pattern, PatternMatch},
+    parse::{Expectation, ParseHint},
+};
 
 /// Type alias for an iterator item returned by a [`logos::SpannedIter<'src, T>`].
 pub type LexerItem<'src, Token> = (Result<Token, <Token as Logos<'src>>::Error>, Range<usize>);
@@ -16,14 +19,14 @@ pub struct LexerIndex(#[into] usize);
 /// A caching structure for [`logos::Lexer`], which supports arbitrary indexing.
 pub struct LexerStream<'src, Token: Logos<'src>> {
     inner: Rc<RefCell<LexerStreamInner<'src, Token>>>,
-    source: &'src str,
+    source: CachedStr<'src>,
     skipped_kind: Option<SyntaxKind>,
 }
 impl<'src, Token: Logos<'src>> Clone for LexerStream<'src, Token> {
     fn clone(&self) -> Self {
         Self {
             inner: Rc::clone(&self.inner),
-            source: self.source,
+            source: self.source.clone(),
             skipped_kind: self.skipped_kind,
         }
     }
@@ -41,17 +44,17 @@ where
         LexerStream {
             inner: Rc::new(RefCell::new(LexerStreamInner::new(source))),
             skipped_kind: Some(skipped_kind.into()),
-            source,
+            source: CachedStr::new(source),
         }
     }
 
     /// Creates a new `LexerStream` that assumes the lexer produces contiguous output.
     ///
-    /// # Invariants
+    /// # Caller Invariant
     ///
     /// This constructor assumes the caller has asserted that
     /// the Lexer created from this `Token` type produces gapless input coverage.
-    /// Biparse may panic during parsing if this invariant is violated.
+    /// Biparse may panic during parsing if this invariant is not upheld.
     pub fn assume_contiguous(source: &'src Token::Source) -> Self
     where
         Token: Clone,
@@ -60,7 +63,7 @@ where
         LexerStream {
             inner: Rc::new(RefCell::new(LexerStreamInner::new(source))),
             skipped_kind: None,
-            source,
+            source: CachedStr::new(source),
         }
     }
 }
@@ -118,7 +121,7 @@ impl<'src, Token: Logos<'src>> LexerStreamInner<'src, Token> {
 
 impl<'src, Token> Input for LexerStream<'src, Token>
 where
-    Token: Debug + Clone + Eq,
+    Token: Debug + Clone,
     Token: Logos<'src, Source = str>,
 {
     type Cursor = LexerIndex;
@@ -144,7 +147,7 @@ where
         match self.peek(at) {
             Some(item) => item.span.start,
             // end of input.
-            None => self.inner.borrow().lexer.source().len(),
+            None => self.source.len(),
         }
     }
 
@@ -152,25 +155,8 @@ where
         Cow::Borrowed(&self.source[start..end])
     }
 
-    /// Naive formulation for now. O(N) time.
-    ///
-    /// This structure would be a good candidate for embedding line-start caching though.
-    fn byte_to_line_col(&self, at_offset: usize) -> LineCol {
-        let source = self.inner.borrow().lexer.source();
-        let mut line = 1;
-        let mut column = 1;
-        for (offset, ch) in source.char_indices() {
-            if offset >= at_offset {
-                break;
-            }
-            if ch == '\n' {
-                line += 1;
-                column = 1;
-            } else {
-                column += 1;
-            }
-        }
-        LineCol { line, col: column }
+    fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
+        self.source.byte_to_line_col(at_offset)
     }
 
     fn describe_token(token: &Self::Token) -> String {
@@ -179,5 +165,97 @@ where
 
     fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind> {
         self.skipped_kind
+    }
+}
+
+impl<'src, T> Pattern<LexerStream<'src, T>> for (SyntaxKind, T)
+where
+    T: Debug + Clone + Logos<'src, Source = str>,
+{
+    type Payload<'p>
+        = T
+    where
+        LexerStream<'src, T>: 'p;
+
+    fn matches_at<'p>(
+        &self,
+        input: &'p LexerStream<'src, T>,
+        cursor: <LexerStream<'src, T> as Input>::Cursor,
+    ) -> Result<
+        PatternMatch<'p, Self::Payload<'p>, <LexerStream<'src, T> as Input>::Cursor>,
+        Option<<LexerStream<'src, T> as Input>::Cursor>,
+    >
+    where
+        LexerStream<'src, T>: 'p,
+    {
+        match input.peek(cursor) {
+            Some(item) => item.token.map_or_else(
+                |_error| Err(None),
+                |token| {
+                    Ok(PatternMatch::new(
+                        token,
+                        vec![(self.0, item.span)],
+                        item.next_cursor,
+                    ))
+                },
+            ),
+            None => Err(Some(cursor)),
+        }
+    }
+    fn describe(&self) -> String {
+        format!("token {self:?}")
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Expectation(Expectation::Pattern {
+            kind: "token".into(),
+            kind_plural: "tokens".into(),
+            data: format!("{self:?}"),
+        })
+    }
+}
+
+impl<'src, T> Pattern<LexerStream<'src, T>> for T
+where
+    T: Debug + Logos<'src, Source = str> + rowan::Language<Kind = T>,
+{
+    type Payload<'p>
+        = T
+    where
+        LexerStream<'src, T>: 'p;
+
+    fn matches_at<'p>(
+        &self,
+        input: &'p LexerStream<'src, T>,
+        cursor: <LexerStream<'src, T> as Input>::Cursor,
+    ) -> Result<
+        PatternMatch<'p, Self::Payload<'p>, <LexerStream<'src, T> as Input>::Cursor>,
+        Option<<LexerStream<'src, T> as Input>::Cursor>,
+    >
+    where
+        LexerStream<'src, T>: 'p,
+    {
+        match input.peek(cursor) {
+            Some(item) => item.token.map_or_else(
+                |_error| Err(None),
+                |token| {
+                    Ok(PatternMatch::new(
+                        token,
+                        vec![(Self::kind_to_raw(*self), item.span)],
+                        item.next_cursor,
+                    ))
+                },
+            ),
+            None => Err(Some(cursor)),
+        }
+    }
+    fn describe(&self) -> String {
+        format!("token {self:?}")
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Expectation(Expectation::Pattern {
+            kind: "token".into(),
+            kind_plural: "tokens".into(),
+            data: format!("{self:?}"),
+        })
     }
 }

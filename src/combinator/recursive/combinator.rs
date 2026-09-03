@@ -43,11 +43,12 @@ impl<P: ?Sized> Recursive<P> {
     fn name(&self) -> String {
         self.description
             .clone()
-            .unwrap_or(self.diagnostic_name().into())
+            .unwrap_or_else(|| self.diagnostic_name().into())
             .into_owned()
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'src, I, A, E>> {
+    /// Creates a new self-recursive combinator.
     pub fn new<'p, F, P>(closure: F) -> Self
     where
         F: FnOnce(Recursive<Direct<'src, I, A, E>>) -> P,
@@ -67,6 +68,8 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'src, I, 
         }
     }
 
+    /// Creates a new self-recursive combinator with the given name.
+    /// Combinator names are used for error reporting and better diagnostics.
     pub fn new_as<'p, F, P>(s: impl Into<Cow<'static, str>>, closure: F) -> Self
     where
         F: FnOnce(Recursive<Direct<'src, I, A, E>>) -> P,
@@ -89,6 +92,10 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'src, I, 
 }
 
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I, A, E>> {
+    /// Declares a new recursive combinator.
+    ///
+    /// This is preferred when direct self-recursion is insufficient or unergonomic,
+    /// and a named object is required to define mutual recursion between related combinators.
     pub fn declare() -> Self {
         Recursive {
             inner: RecursiveInner::Owned(Rc::new(Indirect {
@@ -98,6 +105,11 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I
             description: None,
         }
     }
+    /// Declares a new recursive combinator with the given name.
+    /// Combinator names are used for error reporting and better diagnostics.
+    ///
+    /// This is preferred when direct self-recursion is insufficient or unergonomic,
+    /// and a named object is required to define mutual recursion between related combinators.
     pub fn declare_as(s: impl Into<Cow<'static, str>>) -> Self {
         Recursive {
             inner: RecursiveInner::Owned(Rc::new(Indirect {
@@ -107,12 +119,16 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I
             description: None,
         }
     }
-    /// # Note on Strong Cycles
+    /// Defines a parser to use the following inner definition.
     ///
-    /// Strong cycles formed by recursive groups never deallocate even after becoming inaccessible.
+    /// # Limitation on Strong Cycles
+    ///
+    /// Strong reference cycles formed by [`Recursive<Indirect<...>>`] groups (including `self` cycles)
+    /// *never* deallocate, even after becoming inaccessible, throughout the lifetime of the program.
     ///
     /// This is currently considered acceptable because parsers typically are constructed no more than once,
-    /// and stored and resused throughout the lifetime of the program.
+    /// and stored and reused throughout the lifetime of the program.
+    /// In other words, the memory leak is bounded to the creation of a mutually-recursive combinator group.
     ///
     /// Future mitigation of this would entail a `RecursiveGroup`-like structure involving n-variadic type arguments.
     pub fn define<'p, P>(&mut self, parser: P)
@@ -148,10 +164,11 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I
 }
 
 #[derive(Debug)]
-pub enum RecursiveInner<P: ?Sized> {
-    // Owned. What users get during direct construction, declaration and definition.
+enum RecursiveInner<P: ?Sized> {
+    /// Owned. What users get during direct construction, declaration and definition.
     Owned(Rc<P>),
-    // Unowned, supplied to the inner closure for the back-edge. A user should never be able to construct this.
+    /// Unowned, supplied to the inner closure for the back-edge of self-recursion.
+    /// A user should never be able to construct this.
     Unowned(Weak<P>),
 }
 impl<P: ?Sized> Clone for RecursiveInner<P> {
@@ -196,7 +213,7 @@ pub struct Indirect<'src, I: Input + ?Sized, A, E: ParseEnvironment> {
 ///   which have differing signatures and different names, thus not abstractible as a method.
 ///   You should conceptually think of this as a method of `Recursive` though.
 macro_rules! recursive_growth {
-    ($self:expr, $input:expr, $state:expr, $method:ident) => {{
+    ($self:expr, $input:expr, $state:expr, $method:ident, $payload:tt) => {{
         // Convenience let-bindings.
         // A shame we can't really do this for self.
         let this = ($self);
@@ -225,9 +242,9 @@ macro_rules! recursive_growth {
                     // clone seed value, restore its type and return.
                     Some((seed_state, erased)) => {
                         assert_eq!(
-                            frame.id,
-                            this.recursive_id(),
-                            "recursive output belongs to a different Recursive combinator!"
+                            typeid::of::<ParseOutput<$payload, E>>(),
+                            erased.type_id(),
+                            "recursive output has different expected type!"
                         );
 
                         // println!("CACHED SEED: {}@{:?}", &this.name(), state.cursor);
@@ -235,17 +252,20 @@ macro_rules! recursive_growth {
                         // # SAFETY:
                         // 1. Every `RecursiveFrame` is associated with exactly one `RecursiveId`,
                         //    identifying the Recursive combinator whose invocation the frame represents.
-                        // 2. Assume the invariant that construction of `RecursiveFrame`
-                        //    stores the payload and RecursiveId of the combinator that produced it,
-                        //    which must not be decoupled after erasure within this parse invocation.
-                        // 3. Following 1 and 2: the erased payload is asserted to be created by this Recursive combinator,
+                        // 2. Each `RecursiveId` uniquely corresponds to exactly one output type in this invocation,
+                        //    which is identified by `erased.type_id()`.
+                        // 3. Following 1 and 2: the erased payload is asserted to be
+                        //    created by this Recursive combinator in this invocation,
                         //    hence the output must be of type:
                         //    - `ParseOutput<A, E>` for `parse`;
                         //    - `ParseOutput<(), E>` for `check`.
                         // 4. `ErasedOutput::as_ptr` points directly to its contained `ParseOutput<_, E>`.
                         //    We borrow that value and clone it; ownership of the erased output remains unchanged.
+                        // 5. Lifetime `'src` of A is recovered during cloning from the recursive state.
+                        //    A non-`'src` payload will not survive the parser invocation from which it originates.
+                        //    Hence, using `::typeid::of` is sufficient to establish type identity despite lifetime erasure.
                         let parse_output = unsafe {
-                            let output = &*(erased.as_ptr() as *const ParseOutput<_, E>);
+                            let output = &*(erased.as_ptr() as *const ParseOutput<$payload, E>);
                             output.clone()
                         };
 
@@ -274,10 +294,7 @@ macro_rules! recursive_growth {
                         );
 
                         // Overwrite seed state's recursive state with that discovered from the current state.
-                        // Hence, update dependency to the enclosure.
                         let return_state = state.clone();
-                        // return_state.recursive_state.current_dependencies
-                        //     .push_back((this.recursive_id(), state.cursor, frame.generation));
                         (
                             return_state,
                             ParseOutput {
@@ -315,7 +332,6 @@ macro_rules! recompute {
         let mut recursive_state = state.recursive_state.clone();
         recursive_state.push_to_top(this.recursive_id(), state.cursor,
             RecursiveFrame {
-                id: this.recursive_id(),
                 description: this.description.clone(),
                 diagnostic_name: this.diagnostic_name(),
                 seed_result: None,
@@ -453,7 +469,7 @@ where
         ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<A, E>,
     ) {
-        recursive_growth!(self, input, state, parse)
+        recursive_growth!(self, input, state, parse, A)
     }
     fn check(
         &self,
@@ -463,7 +479,7 @@ where
         ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
-        recursive_growth!(self, input, state, check)
+        recursive_growth!(self, input, state, check, ())
     }
     fn hint(&self) -> ParseHint {
         if let Some(inner) = &self.description {

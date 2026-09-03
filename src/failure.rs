@@ -5,7 +5,7 @@
 use derive_more::From;
 use thiserror::Error;
 
-use crate::input::{Input, LineCol};
+use crate::input::{Input, LineColumn};
 use std::fmt::Debug;
 
 /// The trait required by parser failure types to implement.
@@ -73,7 +73,7 @@ impl ParseFailure for ZeroSized {
         "\n\t".to_string() + &messages.join("\n\t")
     })]
 pub struct Simple {
-    pub position: LineCol,
+    pub position: LineColumn,
     pub messages: Vec<String>,
 }
 impl ParseFailure for Simple {

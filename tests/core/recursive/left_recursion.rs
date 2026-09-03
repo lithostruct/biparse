@@ -18,7 +18,6 @@ fn left_recursive_a(s: String) -> String {
                 .map(|either| either.left_or_default())
         });
     let (state, result) = combinator.node(SyntaxKind(1)).parse_from_start(&s);
-    println!("{:#?}", state.recursive_state);
     match result.ast {
         ParseResult::Success(header) => {
             if state.cursor.into_usize() == 0 {

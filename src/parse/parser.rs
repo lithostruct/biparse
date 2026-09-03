@@ -4,7 +4,12 @@ use either::Either;
 use rowan::SyntaxKind;
 
 use crate::{
-    combinator::{AsParser, Associate, IntoOwned, Many, Map, Node, Or, Success, Then, WithEnv, end, success}, cst::{CstOutput, IdSupply}, input::Input, parse::{
+    combinator::{
+        AsParser, Associate, IntoOwned, Many, Map, Node, Or, Success, Then, WithEnv, end, success,
+    },
+    cst::{CstOutput, IdSupply},
+    input::Input,
+    parse::{
         DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState, TopLevelResult,
         diagnostics::ParseHint,
     },
@@ -12,16 +17,17 @@ use crate::{
 
 /// The central parsing trait, implemented by all combinators.
 pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment> {
-    /// Parse the input.
+    /// Parse the input from the given state, returning a result state and output.
     fn parse(
         &self,
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>);
 
-    /// Checks the input for any errors.
+    /// Checks the input for any errors from the given state.
+    /// AST, CST and origin information is discarded.
     ///
-    /// AST, CST and origin information is discarded. CST information *must* be empty (equivalent to [`CstOutput::new`]).
+    /// Implementors are encouraged to override this default implementation.
     fn check(
         &self,
         input: &'src I,
@@ -35,10 +41,9 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
         (new_state, erased_output)
     }
 
-    /// Returns the diagnostics of `self`:
+    /// Returns a parse hint conceptually relating the item that is expected by this parser.
     ///
-    /// Diagnostics are an approximation of the expected input of self,
-    /// and are used for error reporting.
+    /// Implementors are encouraged to override this default implementation.
     fn hint(&self) -> ParseHint {
         ParseHint::Opaque
     }
@@ -145,29 +150,29 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         WithEnv::new(Associate::new(self, kind, closure))
     }
 
+    /// Chains `self` to repeat zero or more times, returning [`Vec<A>`].
     fn many(self) -> WithEnv<E, Many<Self>>
     where
         Self: Sized,
     {
         WithEnv::new(Many::new(self))
     }
+    /// Chains `self` to repeat one or more times, returning a non-empty [`Vec<A>`].
     fn some(self) -> composite::Some<E, Self, A>
     where
         Self: Sized + Clone,
     {
-        self.clone().many().then(self).map(|(mut rest, last)| {
-            rest.push(last);
+        self.clone().then(self.many()).map(|(first, mut rest)| {
+            rest.insert(0, first);
             rest
         })
     }
+    /// Chains `self` to match on zero or one occurence, returning [`Option<A>`].
     fn optional(self) -> composite::Optional<'src, I, A, E, Self>
     where
         Self: Sized,
     {
-        self.or(success()).map(|either| match either {
-            Either::Left(a) => Some(a),
-            Either::Right(()) => None,
-        })
+        self.or(success()).map(Either::left)
     }
 
     /// Discards the current AST payload.
@@ -193,6 +198,17 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         self.then(next).map(|(_, second)| second)
     }
+
+    /// Speculatively parses `self` and the given parser.
+    /// Both parsers are of the same type,
+    /// and the resulting [`Either<A, A>`] is converted to an `A` payload.
+    fn or_same<P>(self, other: P) -> composite::OrSame<E, Self, P, A>
+    where
+        P: Parser<'src, I, A, E>,
+        Self: Sized,
+    {
+        self.or(other).map(Either::into_inner)
+    }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E> for T where
     T: Parser<'src, I, A, E>
@@ -208,24 +224,27 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E
 pub mod composite {
     use super::*;
 
-    pub type Some<E, P, A> =
-        WithEnv<E, Map<
-            WithEnv<E, Then<WithEnv<E, Many<P>>, P>>,
-            fn((Vec<A>, A)) -> Vec<A>,
-            (Vec<A>, A)
-        >>;
-    pub type Optional<'src, I, A, E, P> =
-        WithEnv<E, Map<
+    pub type Some<E, P, A> = WithEnv<
+        E,
+        Map<WithEnv<E, Then<P, WithEnv<E, Many<P>>>>, fn((A, Vec<A>)) -> Vec<A>, (A, Vec<A>)>,
+    >;
+    pub type Optional<'src, I, A, E, P> = WithEnv<
+        E,
+        Map<
             WithEnv<E, Or<P, AsParser<'src, I, (), E, Success>>>,
             fn(Either<A, ()>) -> Option<A>,
-            Either<A, ()>
-        >>;
+            Either<A, ()>,
+        >,
+    >;
 
     pub type Ignore<E, P, A> = WithEnv<E, Map<P, fn(A) -> (), A>>;
     pub type ThenIgnore<E, L, R, A, B> =
         WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
     pub type IgnoreThen<E, L, R, A, B> =
         WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> B, (A, B)>>;
+
+    pub type OrSame<E, L, R, A> =
+        WithEnv<E, Map<WithEnv<E, Or<L, R>>, fn(Either<A, A>) -> A, Either<A, A>>>;
 }
 
 /// Convenience trait for [`.into_owned()`](Self::into_owned) method chaining.

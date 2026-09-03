@@ -4,7 +4,7 @@ use derive_more::Into;
 use rowan::SyntaxKind;
 
 use crate::{
-    input::{Input, InputItem, LineCol, Pattern, PatternMatch},
+    input::{Input, InputItem, LineColumn, Pattern, PatternMatch},
     parse::{Expectation, ParseHint},
 };
 
@@ -46,7 +46,13 @@ impl Input for str {
     /// As the raw [`str`] representation does not cache linebreak positions,
     /// this function needs to traverse the whole string (at worst-case),
     /// resulting in time complexity `O(N)`.`
-    fn byte_to_line_col(&self, at_offset: usize) -> LineCol {
+    fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
+        let at_offset = at_offset.min(self.len());
+        assert!(
+            self.is_char_boundary(at_offset),
+            "byte offset is not a UTF-8 character boundary"
+        );
+
         let mut line = 1;
         let mut column = 1;
         for (offset, ch) in self.char_indices() {
@@ -60,7 +66,7 @@ impl Input for str {
                 column += 1;
             }
         }
-        LineCol { line, col: column }
+        LineColumn { line, column }
     }
 
     fn describe_token(token: &Self::Token) -> String {
@@ -81,7 +87,13 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
+    ) -> Result<
+        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
+        Option<<str as Input>::Cursor>,
+    >
+    where
+        str: 'src,
+    {
         if cursor.0 >= input.len() {
             return Err(Some(cursor));
         }
@@ -123,7 +135,13 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
+    ) -> Result<
+        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
+        Option<<str as Input>::Cursor>,
+    >
+    where
+        str: 'src,
+    {
         if cursor.0 >= input.len() {
             return Err(Some(cursor));
         }
@@ -172,7 +190,7 @@ where
     }
 }
 
-/// Contigious matching on [`str`] for [`String`], deferring to the inner [`&str`] implementation.
+/// Contiguous matching on [`str`] for [`String`], deferring to the inner [`&str`] implementation.
 impl<K> Pattern<str> for (K, String)
 where
     K: Clone + Into<SyntaxKind>,
@@ -182,13 +200,19 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, str>, Option<<str as Input>::Cursor>> {
+    ) -> Result<
+        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
+        Option<<str as Input>::Cursor>,
+    >
+    where
+        str: 'src,
+    {
         (self.0.clone(), self.1.as_str()).matches_at(input, cursor)
     }
     fn describe(&self) -> String {
-        (self.0.clone(), self.1.as_str()).describe()
+        <(K, &str) as Pattern<str>>::describe(&(self.0.clone(), self.1.as_str()))
     }
     fn hint(&self) -> ParseHint {
-        (self.0.clone(), self.1.as_str()).hint()
+        <(K, &str) as Pattern<str>>::hint(&(self.0.clone(), self.1.as_str()))
     }
 }

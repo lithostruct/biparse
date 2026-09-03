@@ -15,6 +15,9 @@ use rowan::SyntaxKind;
 use crate::parse::ParseHint;
 
 /// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
+///
+/// This trait describes a [`str`]-based input, indexed via a given cursor (which delineates each token item),
+/// and the byte offset corresponding to the underlying [`str`] source.
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
     type Cursor: Copy + Ord + Hash;
@@ -32,10 +35,10 @@ pub trait Input {
     /// If `Self` emits contigious input such that discontinuities should be treated as errors, return [`None`].
     fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind>;
 
-    /// Returns the conceptual byte offset into the source string that this cursor points to.
-    /// In the event `at` exceeds the source string length, return the byte length of the source string.
+    /// Returns the conceptual starting byte offset into the source string that this cursor points to.
+    /// In the event the cursor points past the source, return the byte length of the source string.
     ///
-    /// The returned value must be at an UTF-8 boundary.
+    /// The returned value **must** correspond to a UTF-8 character boundary in the source string.
     fn byte_offset(&self, at: Self::Cursor) -> usize;
     /// Produces the string slice over the range specified by the two cursors.
     ///
@@ -55,20 +58,33 @@ pub trait Input {
     fn slice_bytes(&self, start: usize, end: usize) -> Cow<'_, str>;
 
     /// Calculates the one-indexed line-column number that this cursor points towards.
-    fn to_line_col(&self, at: Self::Cursor) -> LineCol {
+    ///
+    /// If the cursor points past the source string length,
+    /// return the line-column number corresponding to end-of-input,
+    /// typically one column past the final character.
+    fn to_line_col(&self, at: Self::Cursor) -> LineColumn {
         self.byte_to_line_col(self.byte_offset(at))
     }
     /// Calculates the one-indexed line-column number that this byte offset points into.
     /// `at_offset` must be at a UTF-8 character boundary.
     ///
+    /// If the byte offset exceeds the source string length,
+    /// return the line-column number corresponding to end-of-input,
+    /// typically one column past the final character.
+    ///
     /// # Panics
     ///
     /// Panics if `at_offset` is not at a UTF-8 character boundary.
-    fn byte_to_line_col(&self, at_offset: usize) -> LineCol;
+    fn byte_to_line_col(&self, at_offset: usize) -> LineColumn;
 
     /// Displays the description of a token.
     fn describe_token(token: &Self::Token) -> String;
 }
+
+pub type PatternMatchResult<'src, S, I> = Result<
+    PatternMatch<'src, <S as Pattern<I>>::Payload<'src>, <I as Input>::Cursor>,
+    Option<<I as Input>::Cursor>,
+>;
 
 /// The trait describing all pattern types that match onto a specific input type.
 pub trait Pattern<I: Input + ?Sized> {
@@ -78,16 +94,21 @@ pub trait Pattern<I: Input + ?Sized> {
         I: 'src;
     /// Checks whether self matches with the input at the specified cursor.
     ///
-    /// - [`Ok`]: The match is successful, and the cursor is the position right after the match is consumed.
+    /// - [`Ok`]: The match is successful, and the contained cursor is the position right after the match is consumed.
     /// - [`Err`]: The match is unsuccessful.
-    ///   The cursor points to the token where the mismatch occured, if any other than a generic "failure to match".
+    ///   The cursor points to the token where the mismatch occured, such information is available.
     ///
-    /// The cursor and byte spans returned within `PatternMatch` *must* be on UTF-8 character boundary.
+    /// Matching must not backtrack;
+    /// The field `next_cursor` must be strictly be [`Ordering::Greater`](std::cmp::Ordering::Greater) than the `input` cursor.
+    ///
+    /// The cursor and byte spans returned within [`PatternMatch`] *must* be on UTF-8 character boundaries.
     fn matches_at<'src>(
         &self,
         input: &'src I,
         cursor: I::Cursor,
-    ) -> Result<PatternMatch<'src, Self::Payload<'src>, I>, Option<I::Cursor>>;
+    ) -> PatternMatchResult<'src, Self, I>
+    where
+        I: 'src;
 
     /// Writes a description of what is expected by `self` as a string.
     /// Omit [`rowan::SyntaxKind`] information.
@@ -97,9 +118,11 @@ pub trait Pattern<I: Input + ?Sized> {
     fn describe(&self) -> String;
 
     /// Returns the [`ParseHint`] represented by this pattern.
-    fn hint(&self) -> ParseHint {
-        ParseHint::Opaque
-    }
+    ///
+    /// Unlike in [`Parser`](crate::parse::Parser), this method is not default-implemented
+    /// as patterns may have non-trivial information that is useful to error reporting.
+    /// Implementors may (but are discouraged from) returning the default value [`ParseHint::Opaque`].
+    fn hint(&self) -> ParseHint;
 }
 
 /// Information relating to tokens from [`Input::peek`].
@@ -112,36 +135,32 @@ pub struct InputItem<T, C> {
 
 /// One-indexed line and column number.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct LineCol {
+pub struct LineColumn {
     pub line: usize,
-    pub col: usize,
+    pub column: usize,
 }
-impl Display for LineCol {
+impl Display for LineColumn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {})", self.line, self.col)
+        write!(f, "({}, {})", self.line, self.column)
     }
 }
 
 /// Output information regarding [`Pattern::matches_at`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PatternMatch<'src, P, I: Input + ?Sized> {
+pub struct PatternMatch<'src, P, C> {
     /// The payload type.
     pub payload: P,
     /// A sequence of kinds + spans, corresponding to a CST token to be constructed.
     /// Spans must be in order, and must not overlap.
     pub cst_spans: Vec<(SyntaxKind, Range<usize>)>,
     /// The next cursor returned by the match.
-    /// Matching cannot backtrack;
-    /// `next_cursor` must be strictly greater than the input cursor of the match.
-    pub next_cursor: I::Cursor,
+    /// Matching must not backtrack;
+    /// `next_cursor` must be strictly be [`Ordering::Greater`](std::cmp::Ordering::Greater) than the input cursor of the match.
+    pub next_cursor: C,
     _marker: PhantomData<fn(&'src P)>,
 }
-impl<'src, P, I: Input + ?Sized> PatternMatch<'src, P, I> {
-    pub fn new(
-        payload: P,
-        cst_spans: Vec<(SyntaxKind, Range<usize>)>,
-        next_cursor: I::Cursor,
-    ) -> Self {
+impl<'src, P, C> PatternMatch<'src, P, C> {
+    pub fn new(payload: P, cst_spans: Vec<(SyntaxKind, Range<usize>)>, next_cursor: C) -> Self {
         PatternMatch {
             payload,
             cst_spans,

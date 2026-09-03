@@ -38,4 +38,17 @@ proptest! {
         assert!(matches!(result.ast, ParseResult::Speculative(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
+
+    #[test]
+    fn mut_rec(s in any::<String>()) {
+        type Rec<'a> = Recursive::<Indirect<'a, str, (), DefaultParseEnvironment>>;
+        let mut rec_a : Rec<'_> = Recursive::declare_as("rec_a");
+        let mut rec_b : Rec<'_> = Recursive::declare_as("rec_b");
+        rec_a.define(rec_b.clone());
+        rec_b.define(rec_a.clone());
+
+        let (state, result) = rec_a.parse_from_start(&s);
+        assert!(matches!(result.ast, ParseResult::Speculative(_)));
+        assert_eq!(state.cursor.into_usize(), 0);
+    }
 }

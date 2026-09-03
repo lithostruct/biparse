@@ -7,12 +7,10 @@ pub use crate::{
     },
     cst::{Cst, CstOutput, CstPath, IdSupply},
     failure::{FailureKind, ParseFailure},
-    input::{Input, InputItem, LineCol},
+    input::{Input, InputItem, LineColumn},
     parse::{
-        Parser, ParserExt, ParserOwnedExt,
-
-        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState,
-        composite,
+        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState, Parser,
+        ParserExt, ParserOwnedExt, composite,
     },
     rowan,
 };
