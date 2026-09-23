@@ -33,7 +33,7 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
-        let (new_state, output) = self.parse(input, state);
+        let (new_state, output) = <Self as Parser<'src, I, A, E>>::parse(self, input, state);
         let erased_output = ParseOutput {
             ast: output.ast.map(|_| ()),
             cst: CstOutput::new(),
@@ -93,20 +93,18 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Creates a type-erased [`Box`]-ed parser from `self`.
-    fn boxed<'p>(self) -> WithEnv<E, Box<dyn Parser<'src, I, A, E> + 'p>>
+    fn boxed<'p>(self) -> Box<dyn Parser<'src, I, A, E> + 'p>
     where
         Self: Sized + 'p,
     {
-        let boxed: Box<dyn Parser<'src, I, A, E> + 'p> = Box::new(self);
-        WithEnv::<E, Box<dyn Parser<'src, I, A, E> + 'p>>::new::<'src, I, A>(boxed)
+        Box::new(self) as Box<dyn Parser<'src, I, A, E>>
     }
     /// Creates a type-erased shared parser from `self` using [`Rc`].
-    fn shared<'p>(self) -> WithEnv<E, Rc<dyn Parser<'src, I, A, E> + 'p>>
+    fn shared<'p>(self) -> Rc<dyn Parser<'src, I, A, E> + 'p>
     where
         Self: Sized + 'p,
     {
-        let rc: Rc<dyn Parser<'src, I, A, E> + 'p> = Rc::new(self);
-        WithEnv::<E, Rc<dyn Parser<'src, I, A, E> + 'p>>::new::<'src, I, A>(rc)
+        Rc::new(self) as Rc<dyn Parser<'src, I, A, E>>
     }
 
     /// Chains `self` to then sequentially execute the second parser.

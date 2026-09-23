@@ -101,11 +101,12 @@ impl<'src, Token: Logos<'src>> LexerStreamInner<'src, Token> {
         Token: Clone,
     {
         // Already exists in cache.
-        if self.cache.len() < index.0 {
+        if index.0 < self.cache.len() {
             return Some(&self.cache[index.0]);
         }
 
-        // Request items from the lexer to get a new
+        // Request items from the lexer.
+        // This should never panic due to the guard above; requested_len > 0.
         let requested_len = index.0 - self.cache.len() + 1;
         let requested = self
             .lexer

@@ -100,10 +100,11 @@ where
 }
 
 /// Parser combinator wrapper that allows for a parser combinator to carry its associated [`ParseEnvironment`].
-#[derive(From, Into)]
+/// Used to wrap combinators, where the associated `ParseEnvironment` information is likely to be lost for type inference.
+///
+/// See [`AsParser<'src, I, A, E>`] for a stronger typed variant.
 #[repr(transparent)]
 pub struct WithEnv<E, P> {
-    #[from]
     pub inner: P,
     _marker: PhantomData<fn(E)>,
 }
@@ -172,6 +173,9 @@ where
 }
 
 /// Parser combinator wrapper that restricts the inner parser to use the specified [`Parser<'src, I, A, E>`] instance.
+/// Usually used to wrap leaf combinators where type information otherwise cannot be propagated.
+///
+/// See [`WithEnv`] for a weaker version that only requires proof of the [`Parser`] instance at construction, then forgets it.
 #[repr(transparent)]
 pub struct AsParser<'src, I: ?Sized, A, E, P> {
     pub inner: P,

@@ -1,11 +1,15 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, fmt::Debug, marker::PhantomData};
+
+use rowan::SyntaxKind;
 
 use crate::{
     cst::{Cst, CstAssociation, CstOutput},
-    failure::{FailureKind, ParseFailure},
+    failure::{ParseFailure, ParseFailureKind},
     green::GreenElement,
-    input::{Input, Pattern},
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
+    input::{Input, InputItem, Pattern},
+    parse::{
+        ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser, composite::Some,
+    },
 };
 
 /// Parser combinator that matches on a pattern compatible with the input type.
@@ -111,19 +115,16 @@ where
                     new_state,
                     ParseOutput {
                         ast: ParseResult::Success(matched.payload),
-                        cst: CstOutput {
-                            green: leaf_cst,
-                            origin: CstAssociation::new(),
-                        },
+                        cst: CstOutput::leaves(leaf_cst),
                     },
                 )
             }
             Err(error_position) => {
-                let failure = E::Failure::failure_at::<_, E::Failure>(
+                let failure = E::Failure::failure_at(
                     input,
                     state.cursor,
-                    FailureKind::ExpectedFound {
-                        expected: self.pattern.describe(),
+                    ParseFailureKind::ExpectedFound {
+                        hint: self.pattern.hint(),
                         difference_at: error_position,
                     },
                 );
@@ -158,11 +159,11 @@ where
                 )
             }
             Err(error_position) => {
-                let failure = E::Failure::failure_at::<_, E::Failure>(
+                let failure = E::Failure::failure_at(
                     input,
                     state.cursor,
-                    FailureKind::ExpectedFound {
-                        expected: self.pattern.describe(),
+                    ParseFailureKind::ExpectedFound {
+                        hint: self.pattern.hint(),
                         difference_at: error_position,
                     },
                 );
@@ -179,5 +180,145 @@ where
 
     fn hint(&self) -> ParseHint {
         self.pattern.hint()
+    }
+}
+
+/// Parser combinator that peeks at the current item and conditionally accepts it based on a predicate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Satisfies<F, Success, Failure> {
+    kind: SyntaxKind,
+    predicate: F,
+    _marker: PhantomData<fn(Success, Failure)>,
+}
+impl<F, Success, Failure> Satisfies<F, Success, Failure> {
+    pub fn new<I>(kind: SyntaxKind, predicate: F) -> Self
+    where
+        I: Input + ?Sized,
+        F: Fn(&I, &InputItem<I::Token, I::Cursor>) -> Result<Success, Failure>,
+    {
+        Satisfies {
+            kind,
+            predicate,
+            _marker: PhantomData,
+        }
+    }
+}
+impl<'src, I: Input + ?Sized, E: ParseEnvironment, F, Success, Failure> Parser<'src, I, Success, E>
+    for Satisfies<F, Success, Failure>
+where
+    F: Fn(&I, &InputItem<I::Token, I::Cursor>) -> Result<Success, Failure>,
+    Failure: std::error::Error,
+{
+    fn parse(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<Success, E>,
+    ) {
+        match input.peek(state.cursor) {
+            Some(item) => {
+                match (self.predicate)(input, &item) {
+                    Ok(payload) => {
+                        // Predicate succeeded, match!
+                        let mut leaf_cst = im::Vector::new();
+
+                        let substring = input.slice_bytes(item.span.start, item.span.end);
+                        let token = state.intern_token(self.kind, &substring);
+                        leaf_cst.push_back(token.into());
+
+                        let next_offset = input.byte_offset(item.next_cursor);
+                        let end_offset = item.span.end;
+                        match end_offset.cmp(&next_offset) {
+                            Ordering::Less => {
+                                // The span (end_offset)..(next_offset) contains skipped trivia, which should be included.
+                                let Some(trivia_kind) = input.skipped_trivia_kind() else {
+                                    panic!(
+                                        "Byte span ({}..{}) not covered by contigious input of type {}!",
+                                        end_offset,
+                                        next_offset,
+                                        std::any::type_name::<I>()
+                                    );
+                                };
+                                let substring = input.slice_bytes(end_offset, next_offset);
+                                let trivia_element: GreenElement =
+                                    state.intern_token(trivia_kind, &substring).into();
+                                leaf_cst.push_back(trivia_element);
+                            }
+                            // Fallthrough, do nothing.
+                            Ordering::Equal => (),
+                            Ordering::Greater => {
+                                // Logically unsound; some `Pattern` implementor messed up.
+                                panic!(
+                                    "Last end offset {end_offset} is greater than the cursor indicating offset {next_offset}!"
+                                );
+                            }
+                        }
+
+                        let new_state = ParseState {
+                            cursor: item.next_cursor,
+                            ..state
+                        };
+                        (
+                            new_state,
+                            ParseOutput {
+                                ast: ParseResult::Success(payload),
+                                cst: CstOutput::leaves(leaf_cst),
+                            },
+                        )
+                    }
+                    Err(error) => {
+                        let failure = E::Failure::custom_failure_at(input, state.cursor, error);
+                        (
+                            state,
+                            ParseOutput {
+                                ast: ParseResult::Speculative(failure),
+                                cst: CstOutput::new(),
+                            },
+                        )
+                    }
+                }
+            }
+            None => {
+                let failure = E::Failure::failure_at(
+                    input,
+                    state.cursor,
+                    ParseFailureKind::ExpectedFound {
+                        hint: <Self as Parser<'src, I, _, E>>::hint(self),
+                        difference_at: Some(state.cursor),
+                    },
+                );
+                (
+                    state,
+                    ParseOutput {
+                        ast: ParseResult::Speculative(failure),
+                        cst: CstOutput::new(),
+                    },
+                )
+            }
+        }
+    }
+
+    /// There isn't much of a point to custom-implementing this,
+    /// since `peek` is relatively cheap and the cost is basically just the construction of one/two CST nodes.
+    fn check(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+    ) -> (
+        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseOutput<(), E>,
+    ) {
+        let (new_state, output) = <Self as Parser<'src, I, _, E>>::parse(self, input, state);
+        let erased_output = ParseOutput {
+            ast: output.ast.map(|_| ()),
+            cst: CstOutput::new(),
+        };
+        (new_state, erased_output)
+    }
+
+    fn hint(&self) -> ParseHint {
+        ParseHint::Opaque
     }
 }

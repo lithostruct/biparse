@@ -41,9 +41,9 @@ proptest! {
 
     #[test]
     fn mut_rec(s in any::<String>()) {
-        type Rec<'a> = Recursive::<Indirect<'a, str, (), DefaultParseEnvironment>>;
-        let mut rec_a : Rec<'_> = Recursive::declare_as("rec_a");
-        let mut rec_b : Rec<'_> = Recursive::declare_as("rec_b");
+        type Rec<'p, 'a> = Recursive::<Indirect<'p, 'a, str, (), DefaultParseEnvironment>>;
+        let mut rec_a : Rec<'_, '_> = Recursive::declare_as("rec_a");
+        let mut rec_b : Rec<'_, '_> = Recursive::declare_as("rec_b");
         rec_a.define(rec_b.clone());
         rec_b.define(rec_a.clone());
 

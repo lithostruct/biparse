@@ -1,8 +1,8 @@
-use derive_more::{Deref, Into};
+use derive_more::Deref;
 use rowan::SyntaxKind;
 
 use crate::{
-    input::{Input, InputItem, LineColumn, Pattern, PatternMatch, PatternMatchResult},
+    input::{Input, InputItem, LineColumn, Pattern, PatternMatchResult},
     parse::ParseHint,
 };
 
@@ -14,7 +14,7 @@ use crate::{
 /// which may be useful for large input values and wide, speculative parsing,
 /// where line-column calculation becomes significant.
 ///
-/// # Note to Implementors
+/// # Note to [`Pattern<str>`] Implementors
 ///
 /// [`Pattern<str>`] implementors are not blanket implemented as [`Pattern<CachedStr<'_>>`] due to trait coherence.
 ///

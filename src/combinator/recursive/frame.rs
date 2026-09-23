@@ -1,4 +1,9 @@
-use std::{borrow::Cow, fmt::Debug, hash::Hash, rc::Rc};
+use std::{
+    borrow::Cow,
+    fmt::Debug,
+    hash::Hash,
+    rc::{Rc, Weak},
+};
 
 use crate::{
     cst::IdSupply,
@@ -107,15 +112,44 @@ impl<'src, C: Clone + Hash + Eq, S: IdSupply> RecursiveState<'src, C, S> {
     }
 }
 
+/// A frame containing recursive information.
 pub(super) struct RecursiveFrame<'src, C, S: IdSupply> {
-    // Diagnostic information.
+    // IDENTIFYING INFORMATION
+    /// The user-given name for this recursive combinator.
     pub(super) description: Option<Cow<'static, str>>,
+    /// Diagnostic name, for use in debugging. Typically a string representation of the pointer address.
     pub(super) diagnostic_name: String,
 
-    // Payload information.
+    // SAFETY INFORMATION
+    /// A weak pointer to this recursive combinator.
+    ///
+    /// Unsafe code in [`Recursive`](crate::combinator::Recursive) assumes the critical invariant that
+    /// the identical parser that produces this frame is the one that reads and downcasts the payload.
+    /// This may be invalid in cases where the pointer address of the original combinator
+    /// is overwritten by another of a different payload type,
+    /// leading to UB when downcasting to type or lifetime mismatch.
+    ///
+    /// This field is such that while this frame remains live in the [`RecursiveState`],
+    /// the underlying allocation store to the combinator remains live,
+    /// even if the inner combinator is dropped,
+    /// thus occupying the pointer address and not allowing for overwriting.
+    pub(super) allocation_store: Box<dyn ErasedWeak + 'src>,
+
+    // PAYLOAD INFORMATION
+    /// The seed result of this recursion. [`None`] represents an unevaluated recursion (or unbounded recursion),
+    /// [`Some`] means that there exists a seed state that can be recovered.
+    /// Payload reased via [`ErasedOutput`], which is recovered via unsafe code in [`Recursive`](crate::combinator::Recursive).
     pub(super) seed_result: Option<(ParseState<'src, C, S>, Rc<dyn ErasedOutput<'src> + 'src>)>,
+
+    /// Informs whether this frame is currently involved in fixpoint seed growing.
     pub(super) active_fixpoint: bool,
+
+    /// Returns the generation of this fixpoint. This is incremented every seed-growing iteration.
+    /// Used to determine whether cached results can be reused.
     pub(super) generation: usize,
+
+    /// Dependencies used to calculate this seed result.
+    /// Used for cache invalidation.
     pub(super) dependencies: im::Vector<(RecursiveId, C, usize)>,
 }
 impl<'src, C: Clone + Debug, S: IdSupply> Debug for RecursiveFrame<'src, C, S> {
@@ -142,6 +176,7 @@ impl<'src, C: Clone, S: IdSupply> Clone for RecursiveFrame<'src, C, S> {
         RecursiveFrame {
             description: self.description.clone(),
             diagnostic_name: self.diagnostic_name.clone(),
+            allocation_store: self.allocation_store.clone_erased(),
             seed_result: self.seed_result.clone(),
             active_fixpoint: self.active_fixpoint,
             generation: self.generation,
@@ -172,5 +207,19 @@ where
     }
     fn type_id(&self) -> std::any::TypeId {
         typeid::of::<Self>()
+    }
+}
+
+pub(super) trait ErasedWeak {
+    fn clone_erased<'a>(&self) -> Box<dyn ErasedWeak + 'a>
+    where
+        Self: 'a;
+}
+impl<P: ?Sized> ErasedWeak for Weak<P> {
+    fn clone_erased<'a>(&self) -> Box<dyn ErasedWeak + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(self.clone())
     }
 }

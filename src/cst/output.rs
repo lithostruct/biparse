@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
-use rowan::{NodeOrToken, SyntaxKind, SyntaxNode};
+use rowan::{Language, NodeOrToken, SyntaxKind, SyntaxNode};
 
 use crate::{
     cst::{Cst, CstAssociation, CstPath},
@@ -34,6 +34,12 @@ impl<Id: Debug + Clone + Eq + Hash> CstOutput<Id> {
     pub fn unit(value: GreenElement) -> Self {
         CstOutput {
             green: Cst::unit(value),
+            origin: CstAssociation::new(),
+        }
+    }
+    pub fn leaves(green: Cst<GreenElement>) -> Self {
+        CstOutput {
+            green,
             origin: CstAssociation::new(),
         }
     }
@@ -90,9 +96,10 @@ impl<Id: Debug + Clone + Eq + Hash> CstOutput<Id> {
     /// Canonizes `self` as a syntax tree, returning the materialized red node and origin table as an [`im::HashMap`].
     ///
     /// Returns `None` if `self.cst.len != 1`, or the current root is a `GreenToken`.
-    pub fn canonize<L: rowan::Language>(
-        &self,
-    ) -> Option<(SyntaxNode<L>, im::HashMap<Id, CstPath>)> {
+    pub fn canonize<L>(&self) -> Option<(SyntaxNode<L>, im::HashMap<Id, CstPath>)>
+    where
+        L: Language,
+    {
         // Preconditions.
         if self.green.len() != 1 || matches!(self.green[0], NodeOrToken::Token(_)) {
             return None;
@@ -107,13 +114,13 @@ impl<Id: Debug + Clone + Eq + Hash> CstOutput<Id> {
     }
     /// Canonizes `self` as a syntax tree using the given kind as the root node,
     /// returning the materialized red node and origin table as an [`im::HashMap`].
-    pub fn canonize_with<L: rowan::Language>(
-        self,
-        root_kind: SyntaxKind,
-    ) -> (SyntaxNode<L>, im::HashMap<Id, CstPath>) {
+    pub fn canonize_with<T>(self, root: T) -> (SyntaxNode<T>, im::HashMap<Id, CstPath>)
+    where
+        T: Language<Kind = T>,
+    {
         // It doesn't matter that the GreenInterner here is bogus.
         // We don't need to deduplicate the root node.
-        let rooted = self.attach_parent(root_kind, &mut GreenInterner::new());
+        let rooted = self.attach_parent(T::kind_to_raw(root), &mut GreenInterner::new());
         rooted.canonize().expect("Just appended root node!")
     }
 }

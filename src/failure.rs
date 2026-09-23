@@ -5,16 +5,25 @@
 use derive_more::From;
 use thiserror::Error;
 
-use crate::input::{Input, LineColumn};
+use crate::{
+    input::{Input, LineColumn},
+    parse::ParseHint,
+};
 use std::fmt::Debug;
 
 /// The trait required by parser failure types to implement.
 pub trait ParseFailure: Clone {
     /// Constructs the failure value given its location and error information.
-    fn failure_at<I: Input + ?Sized, E: std::error::Error>(
+    fn failure_at<I: Input + ?Sized>(
         input: &I,
         cursor: I::Cursor,
-        kind: FailureKind<I, E>,
+        kind: ParseFailureKind<I>,
+    ) -> Self;
+    /// Constructs the failure with a custom payload given its location and error information.
+    fn custom_failure_at<I: Input + ?Sized, E: std::error::Error>(
+        input: &I,
+        cursor: I::Cursor,
+        payload: E,
     ) -> Self;
     /// Constructs the composite failure at this location from the given failures from distinct branches.
     /// Branch failures may contain different locations than the one supplied in this call.
@@ -28,31 +37,30 @@ pub trait ParseFailure: Clone {
 
 /// The struct that carries information on what kind of failure is encountered by the parser,
 /// which is given to [`ParseFailure`] implementors for construction.
-pub enum FailureKind<I: Input + ?Sized, E: std::error::Error> {
+pub enum ParseFailureKind<I: Input + ?Sized> {
     /// Expected a certain pattern, failed to match.
     /// This may correspond to a cursor location in which the input diverges.
     ExpectedFound {
-        expected: String,
+        hint: ParseHint,
         difference_at: Option<I::Cursor>,
     },
-    /// Expected the end of the input, found an additional token.
-    ExpectedEnd { found: I::Token },
     /// Zero-progress left recursion.
     ZeroProgressRecursion { name: Option<String> },
     /// Failure caused by the [`Fail`] primitive combinator.
     FailPrimitive,
-    /// A custom error.
-    Custom { error: E },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
 #[error("Parser error encountered.")]
 pub struct ZeroSized;
 impl ParseFailure for ZeroSized {
-    fn failure_at<I: Input + ?Sized, E: std::error::Error>(
+    fn failure_at<I: Input + ?Sized>(_: &I, _: I::Cursor, _: ParseFailureKind<I>) -> Self {
+        ZeroSized
+    }
+    fn custom_failure_at<I: Input + ?Sized, E: std::error::Error>(
         _: &I,
         _: I::Cursor,
-        _: FailureKind<I, E>,
+        _: E,
     ) -> Self {
         ZeroSized
     }
@@ -77,15 +85,15 @@ pub struct Simple {
     pub messages: Vec<String>,
 }
 impl ParseFailure for Simple {
-    fn failure_at<I: Input + ?Sized, E: std::error::Error>(
+    fn failure_at<I: Input + ?Sized>(
         input: &I,
         cursor: I::Cursor,
-        kind: FailureKind<I, E>,
+        kind: ParseFailureKind<I>,
     ) -> Self {
         let line_col = input.to_line_col(cursor);
         let message: String = match kind {
-            FailureKind::ExpectedFound {
-                expected,
+            ParseFailureKind::ExpectedFound {
+                hint,
                 difference_at,
             } => match difference_at {
                 Some(difference_location) => {
@@ -93,22 +101,29 @@ impl ParseFailure for Simple {
                     let found = input
                         .peek(difference_location)
                         .map_or("end of input".into(), |item| I::describe_token(&item.token));
-                    format!("expected {expected}, found {found} at location {difference_line_col}")
+                    format!("expected {hint:?}, found {found} at location {difference_line_col}")
                 }
-                None => format!("expected {expected}"),
+                None => format!("expected {hint:?}"),
             },
-            FailureKind::ExpectedEnd { found } => {
-                format!("expected end-of-input, found {}", I::describe_token(&found))
-            }
-            FailureKind::ZeroProgressRecursion { name } => {
+            ParseFailureKind::ZeroProgressRecursion { name } => {
                 format!(
                     "zero-progress recursion detected{}",
                     name.map(|s| format!(" in '{s}'")).unwrap_or("".into())
                 )
             }
-            FailureKind::FailPrimitive => "'Fail' primitive combinator encountered".to_string(),
-            FailureKind::Custom { error } => error.to_string(),
+            ParseFailureKind::FailPrimitive => {
+                "'Fail' primitive combinator encountered".to_string()
+            }
         };
+        (line_col, vec![message]).into()
+    }
+    fn custom_failure_at<I: Input + ?Sized, E: std::error::Error>(
+        input: &I,
+        cursor: I::Cursor,
+        payload: E,
+    ) -> Self {
+        let line_col = input.to_line_col(cursor);
+        let message = payload.to_string();
         (line_col, vec![message]).into()
     }
     fn composite<I: Input + ?Sized>(

@@ -1,6 +1,6 @@
 use crate::{
     cst::CstOutput,
-    failure::{FailureKind, ParseFailure},
+    failure::{ParseFailure, ParseFailureKind},
     input::Input,
     parse::{
         Expectation, ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser,
@@ -63,11 +63,7 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
-        let failure = E::Failure::failure_at(
-            input,
-            state.cursor,
-            FailureKind::FailPrimitive::<I, E::Failure>,
-        );
+        let failure = E::Failure::failure_at(input, state.cursor, ParseFailureKind::FailPrimitive);
         (
             state,
             ParseOutput {
@@ -109,11 +105,14 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
         (
             state,
             ParseOutput {
-                ast: input.peek(cursor).map_or(ParseResult::Success(()), |item| {
-                    let failure = E::Failure::failure_at::<_, E::Failure>(
+                ast: input.peek(cursor).map_or(ParseResult::Success(()), |_| {
+                    let failure = E::Failure::failure_at(
                         input,
                         cursor,
-                        FailureKind::ExpectedEnd { found: item.token },
+                        ParseFailureKind::ExpectedFound {
+                            hint: <Self as Parser<'src, I, (), E>>::hint(self),
+                            difference_at: Some(cursor),
+                        },
                     );
                     ParseResult::Speculative(failure)
                 }),

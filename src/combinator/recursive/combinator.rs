@@ -11,7 +11,7 @@ use crate::{
         recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId},
     },
     cst::CstOutput,
-    failure::{FailureKind, ParseFailure},
+    failure::{ParseFailure, ParseFailureKind},
     input::Input,
     parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
 };
@@ -47,51 +47,57 @@ impl<P: ?Sized> Recursive<P> {
             .into_owned()
     }
 }
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'src, I, A, E>> {
+impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, 'src, I, A, E>>
+where
+    'p: 'src,
+{
     /// Creates a new self-recursive combinator.
-    pub fn new<'p, F, P>(closure: F) -> Self
+    /// The closure taken will be provided a reference to the created combinator (`self`).
+    pub fn new<F, P>(closure: F) -> Self
     where
-        F: FnOnce(Recursive<Direct<'src, I, A, E>>) -> P,
+        F: FnOnce(Recursive<Direct<'p, 'src, I, A, E>>) -> P,
         P: Parser<'src, I, A, E> + 'p,
-        'p: 'src,
     {
         let rc: Rc<P> = Rc::new_cyclic(|weak| {
-            let this: Recursive<Direct<'src, I, A, E>> = Recursive {
-                inner: RecursiveInner::Unowned(weak.clone() as Weak<Direct<'src, I, A, E>>),
+            let this: Recursive<Direct<'p, 'src, I, A, E>> = Recursive {
+                inner: RecursiveInner::Unowned(weak.clone() as Weak<Direct<'p, 'src, I, A, E>>),
                 description: None,
             };
             closure(this)
         });
         Recursive {
-            inner: RecursiveInner::Owned(rc as Rc<Direct<'src, I, A, E>>),
+            inner: RecursiveInner::Owned(rc as Rc<Direct<'p, 'src, I, A, E>>),
             description: None,
         }
     }
 
     /// Creates a new self-recursive combinator with the given name.
     /// Combinator names are used for error reporting and better diagnostics.
-    pub fn new_as<'p, F, P>(s: impl Into<Cow<'static, str>>, closure: F) -> Self
+    /// The closure taken will be provided a reference to the created combinator (`self`).
+    pub fn new_as<F, P>(s: impl Into<Cow<'static, str>>, closure: F) -> Self
     where
-        F: FnOnce(Recursive<Direct<'src, I, A, E>>) -> P,
+        F: FnOnce(Recursive<Direct<'p, 'src, I, A, E>>) -> P,
         P: Parser<'src, I, A, E> + 'p,
-        'p: 'src,
     {
         let description = s.into();
         let rc: Rc<P> = Rc::new_cyclic(|weak| {
-            let this: Recursive<Direct<'src, I, A, E>> = Recursive {
-                inner: RecursiveInner::Unowned(weak.clone() as Weak<Direct<'src, I, A, E>>),
+            let this: Recursive<Direct<'p, 'src, I, A, E>> = Recursive {
+                inner: RecursiveInner::Unowned(weak.clone() as Weak<Direct<'p, 'src, I, A, E>>),
                 description: Some(description.clone()),
             };
             closure(this)
         });
         Recursive {
-            inner: RecursiveInner::Owned(rc as Rc<Direct<'src, I, A, E>>),
+            inner: RecursiveInner::Owned(rc as Rc<Direct<'p, 'src, I, A, E>>),
             description: Some(description),
         }
     }
 }
 
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I, A, E>> {
+impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p, 'src, I, A, E>>
+where
+    'p: 'src,
+{
     /// Declares a new recursive combinator.
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
@@ -131,10 +137,9 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'src, I
     /// In other words, the memory leak is bounded to the creation of a mutually-recursive combinator group.
     ///
     /// Future mitigation of this would entail a `RecursiveGroup`-like structure involving n-variadic type arguments.
-    pub fn define<'p, P>(&mut self, parser: P)
+    pub fn define<P>(&mut self, parser: P)
     where
         P: Parser<'src, I, A, E> + 'p,
-        'p: 'src,
     {
         match &mut self.inner {
             RecursiveInner::Owned(owned) => owned
@@ -189,19 +194,39 @@ impl<P: ?Sized> RecursiveInner<P> {
     fn recursive_id(&self) -> RecursiveId {
         RecursiveId(self.as_ptr() as *const ())
     }
+
+    fn as_weak(&self) -> Weak<P> {
+        match self {
+            RecursiveInner::Owned(rc) => Rc::downgrade(rc),
+            RecursiveInner::Unowned(weak) => weak.clone(),
+        }
+    }
+    fn as_rc(&self) -> Option<Rc<P>> {
+        match self {
+            RecursiveInner::Owned(rc) => Some(rc.clone()),
+            RecursiveInner::Unowned(weak) => weak.upgrade(),
+        }
+    }
 }
 
 // Regarding the lint: constraining I and E without these is impossible,
 // and in order to use this type alias to begin with, you need to fulfill them.
 /// Type alias of [`dyn Parser<'src, I, A, E>`](Parser) for use in [`Recursive`].
 #[allow(type_alias_bounds)]
-pub type Direct<'src, I: Input + ?Sized, A, E: ParseEnvironment> = dyn Parser<'src, I, A, E> + 'src;
+pub type Direct<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> =
+    dyn Parser<'src, I, A, E> + 'p;
 
 /// The inner type for mutually-recursive combinators formed via [`Recursive::declare`] and [`Recursive::define`].
-pub struct Indirect<'src, I: Input + ?Sized, A, E: ParseEnvironment> {
+pub struct Indirect<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> {
     description: Option<Cow<'static, str>>,
-    inner: OnceCell<Box<dyn Parser<'src, I, A, E> + 'src>>,
+    inner: OnceCell<Box<dyn Parser<'src, I, A, E> + 'p>>,
 }
+// impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Drop for Indirect<'src, I, A, E> {
+//     fn drop(&mut self) {
+//         // SAFETY: `self` is pinned till after dropped.
+//         unsafe { Drop::pin_drop(std::pin::Pin::new_unchecked(self)) }
+//     }
+// }
 
 /// # Internal Notes
 ///
@@ -226,20 +251,17 @@ macro_rules! recursive_growth {
         match state.recursive_state.get(this.recursive_id(), state.cursor) {
 
             Some(frame) => {
-                // check for stale-ness. This is only subject to non-active fixpoints.
+                // Check for stale-ness. This is only subject to non-active fixpoints.
                 if !frame.active_fixpoint && this.entry_is_stale_or_absent(state.cursor, &state.recursive_state) {
-                    // let Some(frame) = state.recursive_state.get_mut(this.recursive_id(), state.cursor)
-                    // else { unreachable!() };
-                    // frame.dependencies = im::Vector::new();
                     // println!("CACHE STALE!: {}@{:?}", &this.name(), state.cursor);
                     return recompute!(this, input, state, $method);
                 }
 
-                // encountered. check for seed?
+                // Encountered. check for seed?
                 match &frame.seed_result {
 
-                    // seed found.
-                    // clone seed value, restore its type and return.
+                    // Seed found.
+                    // Clone seed value, restore its type and return.
                     Some((seed_state, erased)) => {
                         assert_eq!(
                             typeid::of::<ParseOutput<$payload, E>>(),
@@ -281,14 +303,14 @@ macro_rules! recursive_growth {
                     None => {
                         // println!("NO SEED: {}@{:?}", &this.name(), state.cursor);
 
-                        // speculative error for left-recursion.
-                        // no need to record failure dependency, because either:
+                        // Speculative error for left-recursion.
+                        // No need to record failure dependency, because either:
                         // - speculative failure: replaced by alternative, or propagated.
                         // - committed failure: propagated, seed value not used.
-                        let failure = E::Failure::failure_at::<_, E::Failure>(
+                        let failure = E::Failure::failure_at(
                             input,
                             state.cursor,
-                            FailureKind::ZeroProgressRecursion {
+                            ParseFailureKind::ZeroProgressRecursion {
                                 name: this.description.as_ref().map(|s| s.clone().into_owned())
                             },
                         );
@@ -328,12 +350,13 @@ macro_rules! recompute {
         // # SAFETY
         //
         // Invariant regarding `RecursiveFrame` construction fulfilled;
-        // This is the only location where it is constructed, and subsequent modifications do not change `id`.
+        // This is the only location where it is constructed.
         let mut recursive_state = state.recursive_state.clone();
         recursive_state.push_to_top(this.recursive_id(), state.cursor,
             RecursiveFrame {
                 description: this.description.clone(),
                 diagnostic_name: this.diagnostic_name(),
+                allocation_store: Box::new(this.inner.as_weak()),
                 seed_result: None,
                 active_fixpoint: true,
                 dependencies: im::Vector::new(),
@@ -458,7 +481,7 @@ impl<P: ?Sized> Recursive<P> {
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I, A, E>
     for Recursive<P>
 where
-    P: Parser<'src, I, A, E>,
+    P: Parser<'src, I, A, E> + 'src,
     A: Clone + 'src,
 {
     fn parse(
@@ -534,8 +557,8 @@ where
         }
     }
 }
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E>
-    for Indirect<'src, I, A, E>
+impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E>
+    for Indirect<'p, 'src, I, A, E>
 where
     A: Clone + 'src,
 {
@@ -572,7 +595,7 @@ where
             .get()
             .unwrap_or_else(|| {
                 panic!(
-                    "Called Parser::parse on undefined combinator{}!",
+                    "Called Parser::check on undefined combinator{}!",
                     self.description
                         .as_ref()
                         .map(|s| format!(" '{s}'"))

@@ -18,6 +18,13 @@ use crate::parse::ParseHint;
 ///
 /// This trait describes a [`str`]-based input, indexed via a given cursor (which delineates each token item),
 /// and the byte offset corresponding to the underlying [`str`] source.
+///
+/// Two distinct modes are supported, corresponding to the return type of [`Input::skipped_trivia_kind`]:
+/// - [`None`]: Input tokens form gapless contiguous input. Missing spans are considered invariant violations.
+/// - [`Some(rowan::SyntaxKind)`](Some): Input containing gaps. Input tokens contain the "main" span,
+///   followed by a trailing span that is automatically skipped and not emitted as a token.
+///   It is the responsibility of [`Parser`](crate::parse::Parser) implementors to account for skipped trivia
+///   to enable lossless CST representation.
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
     type Cursor: Copy + Ord + Hash;

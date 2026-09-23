@@ -2,7 +2,9 @@
 
 mod str;
 
+mod cached_str;
+
+#[cfg(feature = "logos")]
+mod logos;
 #[cfg(feature = "regex")]
 mod regex;
-
-mod cached_str;
