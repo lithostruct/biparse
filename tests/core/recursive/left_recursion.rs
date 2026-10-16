@@ -19,7 +19,7 @@ fn left_recursive_a(s: String) -> String {
         });
     let (state, result) = combinator.parse(
         &s,
-        ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+        ParseState::<<str as Input>::Cursor, usize>::new(s.as_str()),
     );
     match result.ast {
         ParseOutcome::Success(header) => {

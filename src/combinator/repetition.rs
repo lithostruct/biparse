@@ -1,7 +1,7 @@
 use crate::{
     combinator::success,
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
 /// Parser combinator that executes a given parser zero or more times.
@@ -34,12 +34,12 @@ where
         let mut cst = success::<'src, I, E>().parse(input, state.clone()).1.cst;
         loop {
             let (new_state, new_result) = self.inner.parse(input, state.clone());
-            cst = cst.merge_with(new_result.cst);
             match new_result.ast {
                 ParseOutcome::Success(element) => {
                     // Combine and continue.
                     accumulative.push(element);
                     state = new_state;
+                    cst = cst.merge_with(new_result.cst);
                     continue;
                 }
                 ParseOutcome::Speculative(_) => {

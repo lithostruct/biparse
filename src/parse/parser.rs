@@ -10,7 +10,7 @@ use crate::{
     cst::{AssociatedCst, IdSupply},
     input::Input,
     parse::{
-        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState, ParseResult,
+        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState,
         diagnostics::ParseHint,
     },
 };
@@ -65,7 +65,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
             .1
             .into_result()
     }
-
     /// Checks from the start of input to the end, converting the output to a top-level result.
     fn check_all(&self, input: &'src I) -> ParseResult<(), E> {
         self.then_ignore(end())

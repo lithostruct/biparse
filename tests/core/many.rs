@@ -10,7 +10,8 @@ fn many_a(s: String) -> String {
     let parser = just::<'_, str, DefaultParseEnvironment, _>((SyntaxKind(0), 'a'))
         .many()
         .map(|vec| vec.join(""));
-    let (state, result) = parser.node(SyntaxKind(1))
+    let (state, result) = parser
+        .node(SyntaxKind(1))
         .parse(&s, ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
 
     match result.ast {

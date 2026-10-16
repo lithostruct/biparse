@@ -5,7 +5,7 @@ use rowan::SyntaxKind;
 use crate::{
     cst::IdSupply,
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -3,11 +3,11 @@ use std::{cmp::Ordering, fmt::Debug, marker::PhantomData};
 use rowan::SyntaxKind;
 
 use crate::{
-    cst::{Cst, AssociatedCst},
+    cst::{AssociatedCst, Cst},
     failure::{ParseFailure, ParseFailureKind},
     green::GreenElement,
     input::{Input, InputItem, Pattern},
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
 /// Parser combinator that matches on a pattern compatible with the input type.

@@ -16,7 +16,7 @@ fn char_a(s: String) -> Option<String> {
         just((SyntaxKind(0), 'a'));
     let (state, result) = combinator.parse(
         &s,
-        ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+        ParseState::<<str as Input>::Cursor, usize>::new(s.as_str()),
     );
     match result.ast {
         ParseOutcome::Success(matched) => {
@@ -43,7 +43,7 @@ fn str_a(s: String) -> Option<String> {
         just((SyntaxKind(0), "a"));
     let (state, result) = combinator.parse(
         &s,
-        ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+        ParseState::<<str as Input>::Cursor, usize>::new(s.as_str()),
     );
     match result.ast {
         ParseOutcome::Success(matched) => {

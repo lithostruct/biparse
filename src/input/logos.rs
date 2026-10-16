@@ -6,8 +6,10 @@ use rowan::SyntaxKind;
 
 use crate::{
     input::{
-        AllOf, AnyOf, Input, InputItem, LineColumn, Pattern, PatternMatch, PatternMatchResult, cached_str::CachedStr,
-    }, parse::{Expectation, ParseHint},
+        AllOf, AnyOf, Input, InputItem, LineColumn, Pattern, PatternMatch, PatternMatchResult,
+        cached_str::CachedStr,
+    },
+    parse::{Expectation, ParseHint},
 };
 
 /// Type alias for an iterator item returned by a [`logos::SpannedIter<'src, T>`].
@@ -255,7 +257,6 @@ where
     }
 }
 
-
 /// In addition to `Logos` token matching, attach the text associated with the match.
 ///
 /// Supported types include:
@@ -263,7 +264,7 @@ where
 /// - T where T : Pattern<LexerStream<...>> + Into<SyntaxKind>
 /// - AllOf<P> where P : Pattern<...>
 /// - AnyOf<P> where P : Pattern<...>
-/// 
+///
 /// Notably, `str`-based patterns are *not* supported, as they return text as their payloads.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Deref, DerefMut, AsRef, AsMut,
@@ -275,7 +276,8 @@ where
     K: Clone + Into<SyntaxKind>,
     T: Debug + Clone + Eq + Logos<'source, Source = str> + 'static,
 {
-    type Payload<'src> = (T, Cow<'src, str>)
+    type Payload<'src>
+        = (T, Cow<'src, str>)
     where
         LexerStream<'source, T>: 'src;
 
@@ -289,7 +291,7 @@ where
             let range = &matched.cst_spans.first().unwrap().1;
             PatternMatch::new(
                 (matched.payload, input.slice_bytes(range.start, range.end)),
-                matched.cst_spans, 
+                matched.cst_spans,
                 matched.next_cursor,
             )
         })
@@ -307,7 +309,8 @@ impl<'source, T> Pattern<LexerStream<'source, T>> for WithText<T>
 where
     T: Debug + Clone + Eq + Logos<'source, Source = str> + Into<SyntaxKind> + 'static,
 {
-    type Payload<'src> = (T, Cow<'src, str>)
+    type Payload<'src>
+        = (T, Cow<'src, str>)
     where
         LexerStream<'source, T>: 'src;
 
@@ -321,7 +324,7 @@ where
             let range = &matched.cst_spans.first().unwrap().1;
             PatternMatch::new(
                 (matched.payload, input.slice_bytes(range.start, range.end)),
-                matched.cst_spans, 
+                matched.cst_spans,
                 matched.next_cursor,
             )
         })
@@ -337,9 +340,10 @@ where
 
 impl<I: Input + ?Sized, P> Pattern<I> for WithText<AllOf<P>>
 where
-    P: Pattern<I>
+    P: Pattern<I>,
 {
-    type Payload<'src> = (P::Payload<'src>, Vec<Cow<'src, str>>)
+    type Payload<'src>
+        = (P::Payload<'src>, Vec<Cow<'src, str>>)
     where
         I: 'src;
 
@@ -349,7 +353,9 @@ where
         cursor: <I as Input>::Cursor,
     ) -> PatternMatchResult<'src, Self, I> {
         self.0.matches_at(input, cursor).map(|matched| {
-            let texts : Vec<Cow<'src, str>> = matched.cst_spans.iter()
+            let texts: Vec<Cow<'src, str>> = matched
+                .cst_spans
+                .iter()
                 .map(|elem| input.slice_bytes(elem.1.start, elem.1.end))
                 .collect();
             PatternMatch::new(
@@ -370,9 +376,10 @@ where
 
 impl<I: Input + ?Sized, P> Pattern<I> for WithText<AnyOf<P>>
 where
-    P: Pattern<I>
+    P: Pattern<I>,
 {
-    type Payload<'src> = (P::Payload<'src>, Vec<Cow<'src, str>>)
+    type Payload<'src>
+        = (P::Payload<'src>, Vec<Cow<'src, str>>)
     where
         I: 'src;
 
@@ -382,7 +389,9 @@ where
         cursor: <I as Input>::Cursor,
     ) -> PatternMatchResult<'src, Self, I> {
         self.0.matches_at(input, cursor).map(|matched| {
-            let texts : Vec<Cow<'src, str>> = matched.cst_spans.iter()
+            let texts: Vec<Cow<'src, str>> = matched
+                .cst_spans
+                .iter()
                 .map(|elem| input.slice_bytes(elem.1.start, elem.1.end))
                 .collect();
             PatternMatch::new(

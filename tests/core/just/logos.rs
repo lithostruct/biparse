@@ -288,9 +288,7 @@ fn add_mult_1() {
     let source = r"1 * 2";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
     let parser = make_add_mult_parser();
-    let (ast, cst) = parser.parse_all(&stream)
-        .expect("success!")
-        .into_parts();
+    let (ast, cst) = parser.parse_all(&stream).expect("success!").into_parts();
 
     expect![[r#"
         Binary {
@@ -325,9 +323,7 @@ fn add_mult_2() {
     .assert_debug_eq(&tokens);
 
     let parser = make_add_mult_parser();
-    let (ast, cst) = parser.parse_all(&stream)
-        .expect("success!")
-        .into_parts();
+    let (ast, cst) = parser.parse_all(&stream).expect("success!").into_parts();
 
     expect![[r#"
         Binary {
@@ -362,9 +358,7 @@ fn add_mult_3() {
     let source = r"4 + 5 + 6 + 7";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
     let parser = make_add_mult_parser();
-    let (ast, cst) = parser.parse_all(&stream)
-        .expect("success!")
-        .into_parts();
+    let (ast, cst) = parser.parse_all(&stream).expect("success!").into_parts();
 
     expect![[r#"
         Binary {
@@ -401,9 +395,7 @@ fn add_mult_grouping() {
     let source = r"(1 + 2) * 3 + ((4 + 5) * 6)";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
     let parser = make_add_mult_parser();
-    let (ast, cst) = parser.parse_all(&stream)
-        .expect("success!")
-        .into_parts();
+    let (ast, cst) = parser.parse_all(&stream).expect("success!").into_parts();
 
     expect![[r#"
         Binary {

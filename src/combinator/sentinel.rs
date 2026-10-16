@@ -3,7 +3,7 @@ use crate::{
     failure::{ParseFailure, ParseFailureKind},
     input::Input,
     parse::{
-        Expectation, ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser,
+        Expectation, ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser,
     },
 };
 use std::fmt::Debug;

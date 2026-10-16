@@ -1,12 +1,12 @@
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 /// A protocol for supplying unique `Id`'s to a parser combinator.
-/// 
+///
 /// # Implementor Invariants
 /// - Production of `Id` should be infallible barring exceptional circumstances (eg. out-of-memory).
 /// - All `Id` values produced *must* be distinct.
 /// - Clones of a [`IdSupply`] implementor must produce the same values as the original supply.
-/// 
+///
 /// Failure to adhere to the above may cause the `biparse` parser ecosystem to panic.
 pub trait IdSupply: Clone + Default {
     /// The type of the Id this object produces.

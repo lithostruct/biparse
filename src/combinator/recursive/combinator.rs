@@ -13,7 +13,7 @@ use crate::{
     cst::AssociatedCst,
     failure::{ParseFailure, ParseFailureKind},
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.

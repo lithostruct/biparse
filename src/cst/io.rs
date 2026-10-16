@@ -3,7 +3,7 @@ use std::{fmt::Debug, hash::Hash};
 use rowan::{Language, NodeOrToken, SyntaxKind, SyntaxNode};
 
 use crate::{
-    cst::{Cst, AssociationTable, CstPath},
+    cst::{AssociationTable, Cst, CstPath},
     green::{GreenElement, GreenInterner},
 };
 
@@ -53,7 +53,9 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedCst<Id> {
     /// Panics if the [`IdSupply`](crate::cst::supply::IdSupply) protocol is violated,
     /// such that there exists overlapping entries in both origin tables.
     pub fn merge_with(self, rhs: Self) -> Self {
-        let merged_origin = self.associations.merge_with(rhs.associations, self.cst.len());
+        let merged_origin = self
+            .associations
+            .merge_with(rhs.associations, self.cst.len());
         let merged_forest = self.cst + rhs.cst;
         AssociatedCst {
             cst: merged_forest,
@@ -107,10 +109,7 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedCst<Id> {
             return None;
         }
 
-        let root = self.cst[0]
-            .as_node()
-            .cloned()
-            .expect("Preconditions met!");
+        let root = self.cst[0].as_node().cloned().expect("Preconditions met!");
         let red_tree = SyntaxNode::<L>::new_root(root);
         Some((red_tree, self.associations.inner().clone()))
     }
@@ -122,7 +121,9 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedCst<Id> {
     {
         // It doesn't matter that the GreenInterner here is bogus.
         // We don't need to deduplicate the root node.
-        let rooted = self.clone().attach_parent(T::kind_to_raw(root), &mut GreenInterner::new());
+        let rooted = self
+            .clone()
+            .attach_parent(T::kind_to_raw(root), &mut GreenInterner::new());
         rooted.canonize().expect("Just appended root node!")
     }
 }

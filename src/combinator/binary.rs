@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use crate::{
     failure::ParseFailure,
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 use either::Either;
 

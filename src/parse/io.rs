@@ -132,28 +132,27 @@ where
 {
 }
 
-pub type ParseResult<A, E> = Result<
-    ParseReport<A, E>,
-    <E as ParseEnvironment>::Failure,
->;
+pub type ParseResult<A, E> = Result<ParseArtifact<A, E>, <E as ParseEnvironment>::Failure>;
 impl<A, E: ParseEnvironment> ParseOutput<A, E> {
     /// Converts self into a [`Result`], erasing the parser-internal distinction between speculative and committed failure.
     ///
     /// This is typically used for top-level parser output.
     pub fn into_result(self) -> ParseResult<A, E> {
-        self.ast.into_result().map(|ast| ParseReport { ast, cst: self.cst })
+        self.ast
+            .into_result()
+            .map(|ast| ParseArtifact { ast, cst: self.cst })
     }
 }
 
 /// The top-level payload of a successful parse.
 /// Converted from and has the same parse information as `ParseOutput`,
 /// with accessor functions for end-use.
-pub struct ParseReport<A, E : ParseEnvironment> {
+pub struct ParseArtifact<A, E: ParseEnvironment> {
     ast: A,
     cst: AssociatedCst<<E::Supply as IdSupply>::Id>,
 }
 
-impl<A, E: ParseEnvironment> Debug for ParseReport<A, E>
+impl<A, E: ParseEnvironment> Debug for ParseArtifact<A, E>
 where
     A: Debug,
 {
@@ -164,18 +163,18 @@ where
             .finish()
     }
 }
-impl<A, E: ParseEnvironment> Clone for ParseReport<A, E>
+impl<A, E: ParseEnvironment> Clone for ParseArtifact<A, E>
 where
     A: Clone,
 {
     fn clone(&self) -> Self {
-        ParseReport {
+        ParseArtifact {
             ast: self.ast.clone(),
             cst: self.cst.clone(),
         }
     }
 }
-impl<A, E: ParseEnvironment> PartialEq for ParseReport<A, E>
+impl<A, E: ParseEnvironment> PartialEq for ParseArtifact<A, E>
 where
     A: PartialEq,
     E::Failure: PartialEq,
@@ -184,21 +183,21 @@ where
         self.ast == other.ast && self.cst == other.cst
     }
 }
-impl<A, E: ParseEnvironment> Eq for ParseReport<A, E>
+impl<A, E: ParseEnvironment> Eq for ParseArtifact<A, E>
 where
     A: Eq,
     E::Failure: Eq,
 {
 }
 
-impl<A, E: ParseEnvironment> ParseReport<A, E> {
+impl<A, E: ParseEnvironment> ParseArtifact<A, E> {
     /// Provides an immutable view into the AST payload only.
     pub fn ast_only(&self) -> &A {
         &self.ast
     }
     /// Consumes `self` into the AST payload only.
-    /// 
-    /// To access both AST and CST components, use [`Self::into_parts`].
+    ///
+    /// To obtain both AST and CST components, use [`Self::into_parts`].
     pub fn into_ast_only(self) -> A {
         self.ast
     }
@@ -207,13 +206,13 @@ impl<A, E: ParseEnvironment> ParseReport<A, E> {
         &self.cst
     }
     /// Consumes `self` into the CST payload.
-    /// 
-    /// To access both AST and CST components, use [`Self::into_parts`].
+    ///
+    /// To obtain both AST and CST components, use [`Self::into_parts`].
     pub fn into_cst(self) -> AssociatedCst<<E::Supply as IdSupply>::Id> {
         self.cst
     }
     /// Consumes `self` and returns its constituent parts.
-    /// 
+    ///
     /// Note that diagnostic information is contained within the CST component
     /// due to coupling with CST path-based finding and resolution.
     pub fn into_parts(self) -> (A, AssociatedCst<<E::Supply as IdSupply>::Id>) {
