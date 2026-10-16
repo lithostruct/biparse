@@ -28,10 +28,7 @@ where
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,
-    ) -> PatternMatchResult<'src, Self, I>
-    where
-        I: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, I> {
         let mut success = PatternMatch::new(Vec::new(), Vec::new(), cursor);
         for child in self.0.iter() {
             match child.matches_at(input, success.next_cursor) {
@@ -75,10 +72,7 @@ where
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,
-    ) -> PatternMatchResult<'src, Self, I>
-    where
-        I: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, I> {
         let mut success = PatternMatch::new(Vec::new(), Vec::new(), cursor);
         for child in self.0.iter() {
             match child.matches_at(input, success.next_cursor) {
@@ -140,10 +134,7 @@ where
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,
-    ) -> PatternMatchResult<'src, Self, I>
-    where
-        I: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, I> {
         for child in self.0.iter() {
             match child.matches_at(input, cursor) {
                 Ok(matched) => return Ok(matched),
@@ -183,10 +174,7 @@ where
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,
-    ) -> PatternMatchResult<'src, Self, I>
-    where
-        I: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, I> {
         for child in self.0.iter() {
             match child.matches_at(input, cursor) {
                 Ok(matched) => return Ok(matched),

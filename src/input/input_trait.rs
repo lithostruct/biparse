@@ -112,10 +112,8 @@ pub trait Pattern<I: Input + ?Sized> {
     fn matches_at<'src>(
         &self,
         input: &'src I,
-        cursor: I::Cursor,
-    ) -> PatternMatchResult<'src, Self, I>
-    where
-        I: 'src;
+        cursor: <I as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, I>;
 
     /// Writes a description of what is expected by `self` as a string.
     /// Omit [`rowan::SyntaxKind`] information.

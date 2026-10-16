@@ -12,8 +12,11 @@ proptest! {
             Recursive::new(
                 |this| this.or(success()).map(|_| ())
             );
-        let (state, result) = combinator.parse_from_start(&s);
-        assert!(matches!(result.ast, ParseResult::Success(_)));
+        let (state, result) = combinator.parse(
+            &s,
+            ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+        );
+        assert!(matches!(result.ast, ParseOutcome::Success(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 
@@ -23,8 +26,11 @@ proptest! {
             Recursive::new(
                 |this| success().or(this).map(|_| ())
             );
-        let (state, result) = combinator.parse_from_start(&s);
-        assert!(matches!(result.ast, ParseResult::Success(_)));
+        let (state, result) = combinator.parse(
+            &s,
+            ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+        );
+        assert!(matches!(result.ast, ParseOutcome::Success(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 
@@ -34,8 +40,12 @@ proptest! {
             Recursive::new(
                 |this| this
             );
-        let (state, result) = combinator.parse_from_start(&s);
-        assert!(matches!(result.ast, ParseResult::Speculative(_)));
+
+        let (state, result) = combinator.parse(
+            &s,
+            ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+        );
+        assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 
@@ -47,8 +57,11 @@ proptest! {
         rec_a.define(rec_b.clone());
         rec_b.define(rec_a.clone());
 
-        let (state, result) = rec_a.parse_from_start(&s);
-        assert!(matches!(result.ast, ParseResult::Speculative(_)));
+        let (state, result) = rec_a.parse(
+            &s,
+            ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+        );
+        assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 }

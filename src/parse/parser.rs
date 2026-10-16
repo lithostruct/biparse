@@ -7,10 +7,10 @@ use crate::{
     combinator::{
         AsParser, Associate, IntoOwned, Many, Map, Node, Or, Success, Then, WithEnv, end, success,
     },
-    cst::{CstOutput, IdSupply},
+    cst::{AssociatedCst, IdSupply},
     input::Input,
     parse::{
-        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState, TopLevelResult,
+        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseState, ParseResult,
         diagnostics::ParseHint,
     },
 };
@@ -36,7 +36,7 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
         let (new_state, output) = <Self as Parser<'src, I, A, E>>::parse(self, input, state);
         let erased_output = ParseOutput {
             ast: output.ast.map(|_| ()),
-            cst: CstOutput::new(),
+            cst: AssociatedCst::new(),
         };
         (new_state, erased_output)
     }
@@ -58,34 +58,16 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
 pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment>:
     Parser<'src, I, A, E>
 {
-    /// Parses from the start of input, returning the end state and output.
-    ///
-    /// This parse may succeed without fully consuming the input.
-    fn parse_from_start(
-        &self,
-        input: &'src I,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
-        self.parse(input, ParseState::<'_, I::Cursor, E::Supply>::new(input))
-    }
     /// Parses from the start of input to the end, converting the output to a top-level result.
-    fn parse_all(&self, input: &'src I) -> TopLevelResult<A, E> {
+    fn parse_all(&self, input: &'src I) -> ParseResult<A, E> {
         self.then_ignore(end())
             .parse(input, ParseState::<'_, I::Cursor, E::Supply>::new(input))
             .1
             .into_result()
     }
 
-    /// Checks from the start of input, returning the end state and output.
-    ///
-    /// This check may succeed without fully consuming the input.
-    fn check_from_start(
-        &self,
-        input: &'src I,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
-        self.check(input, ParseState::<'_, I::Cursor, E::Supply>::new(input))
-    }
     /// Checks from the start of input to the end, converting the output to a top-level result.
-    fn check_all(&self, input: &'src I) -> TopLevelResult<(), E> {
+    fn check_all(&self, input: &'src I) -> ParseResult<(), E> {
         self.then_ignore(end())
             .check(input, ParseState::<'_, I::Cursor, E::Supply>::new(input))
             .1
@@ -132,20 +114,22 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         WithEnv::new(Map::new(self, closure))
     }
     /// Chains `self` to add a new parent to the current CST forest.
-    fn node(self, kind: SyntaxKind) -> WithEnv<E, Node<Self>>
+    fn node<K>(self, kind: K) -> WithEnv<E, Node<Self>>
     where
+        K: Into<SyntaxKind>,
         Self: Sized,
     {
-        WithEnv::new(Node::new(kind, self))
+        WithEnv::new(Node::new(kind.into(), self))
     }
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
-    fn associate<F, B>(self, kind: SyntaxKind, closure: F) -> WithEnv<E, Associate<Self, F, A>>
+    fn associate<K, F, B>(self, kind: K, closure: F) -> WithEnv<E, Associate<Self, F, A>>
     where
+        K: Into<SyntaxKind>,
         F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
         Self: Sized,
     {
-        WithEnv::new(Associate::new(self, kind, closure))
+        WithEnv::new(Associate::new(self, kind.into(), closure))
     }
 
     /// Chains `self` to repeat zero or more times, returning [`Vec<A>`].

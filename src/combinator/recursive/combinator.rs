@@ -10,10 +10,10 @@ use crate::{
         RecursiveState,
         recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId},
     },
-    cst::CstOutput,
+    cst::AssociatedCst,
     failure::{ParseFailure, ParseFailureKind},
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
 };
 
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.
@@ -41,16 +41,13 @@ impl<P: ?Sized> Recursive<P> {
         format!("<{:p}>", self.inner.as_ptr() as *const ())
     }
     fn name(&self) -> String {
-        self.description
-            .clone()
-            .unwrap_or_else(|| self.diagnostic_name().into())
-            .into_owned()
+        self.description.as_ref().map_or_else(
+            || self.diagnostic_name(),
+            |inner| inner.clone().into_owned(),
+        )
     }
 }
-impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, 'src, I, A, E>>
-where
-    'p: 'src,
-{
+impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, 'src, I, A, E>> {
     /// Creates a new self-recursive combinator.
     /// The closure taken will be provided a reference to the created combinator (`self`).
     pub fn new<F, P>(closure: F) -> Self
@@ -94,10 +91,7 @@ where
     }
 }
 
-impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p, 'src, I, A, E>>
-where
-    'p: 'src,
-{
+impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p, 'src, I, A, E>> {
     /// Declares a new recursive combinator.
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
@@ -117,12 +111,13 @@ where
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
     /// and a named object is required to define mutual recursion between related combinators.
     pub fn declare_as(s: impl Into<Cow<'static, str>>) -> Self {
+        let name: Cow<'static, str> = s.into();
         Recursive {
             inner: RecursiveInner::Owned(Rc::new(Indirect {
-                description: Some(s.into()),
+                description: Some(name.clone()),
                 inner: OnceCell::new(),
             })),
-            description: None,
+            description: Some(name),
         }
     }
     /// Defines a parser to use the following inner definition.
@@ -221,12 +216,16 @@ pub struct Indirect<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> {
     description: Option<Cow<'static, str>>,
     inner: OnceCell<Box<dyn Parser<'src, I, A, E> + 'p>>,
 }
-// impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Drop for Indirect<'src, I, A, E> {
-//     fn drop(&mut self) {
-//         // SAFETY: `self` is pinned till after dropped.
-//         unsafe { Drop::pin_drop(std::pin::Pin::new_unchecked(self)) }
-//     }
-// }
+
+/// Debug log enabler. Writes to stderr.
+const PRINT_DEBUG_LOGS: bool = false;
+macro_rules! debug_log {
+    ($($arg:expr),*) => {
+        if PRINT_DEBUG_LOGS {
+            eprintln!($($arg,)*)
+        }
+    };
+}
 
 /// # Internal Notes
 ///
@@ -245,7 +244,7 @@ macro_rules! recursive_growth {
         let input = ($input);
         let state = ($state);
 
-        // println!("ENTER: {}@{:?}", &this.name(), state.cursor);
+        debug_log!("ENTER: {} @ {:?}", &this.name(), input.byte_offset(state.cursor));
 
         // Check the recursive state on whether or not this recursive function has been entered.
         match state.recursive_state.get(this.recursive_id(), state.cursor) {
@@ -253,7 +252,6 @@ macro_rules! recursive_growth {
             Some(frame) => {
                 // Check for stale-ness. This is only subject to non-active fixpoints.
                 if !frame.active_fixpoint && this.entry_is_stale_or_absent(state.cursor, &state.recursive_state) {
-                    // println!("CACHE STALE!: {}@{:?}", &this.name(), state.cursor);
                     return recompute!(this, input, state, $method);
                 }
 
@@ -269,7 +267,11 @@ macro_rules! recursive_growth {
                             "recursive output has different expected type!"
                         );
 
-                        // println!("CACHED SEED: {}@{:?}", &this.name(), state.cursor);
+                        debug_log!("CACHED SEED: {} @ {:?} -> {:?}",
+                            &this.name(),
+                            input.byte_offset(state.cursor),
+                            input.byte_offset(seed_state.cursor)
+                        );
 
                         // # SAFETY:
                         // 1. Every `RecursiveFrame` is associated with exactly one `RecursiveId`,
@@ -301,7 +303,7 @@ macro_rules! recursive_growth {
                     }
 
                     None => {
-                        // println!("NO SEED: {}@{:?}", &this.name(), state.cursor);
+                        debug_log!("NO SEED: {} @ {:?}", &this.name(), input.byte_offset(state.cursor));
 
                         // Speculative error for left-recursion.
                         // No need to record failure dependency, because either:
@@ -320,8 +322,8 @@ macro_rules! recursive_growth {
                         (
                             return_state,
                             ParseOutput {
-                                ast: ParseResult::Speculative(failure),
-                                cst: CstOutput::new(),
+                                ast: ParseOutcome::Speculative(failure),
+                                cst: AssociatedCst::new(),
                             },
                         )
                     }
@@ -329,7 +331,7 @@ macro_rules! recursive_growth {
             }
 
             None => {
-                // println!("FIRST ENTRY!: {}@{:?}", &this.name(), state.cursor);
+                debug_log!("FIRST ENTRY!: {} @ {:?}", &this.name(), input.byte_offset(state.cursor));
                 recompute!(this, input, state, $method)
             }
         }
@@ -373,7 +375,7 @@ macro_rules! recompute {
         // If yes, there is no point in seed growing, and the failure should be propagated.
         let (mut sprout_state, sprout_result) = parser.$method(input, seed_state);
         match &sprout_result.ast {
-            ParseResult::Speculative(_) | ParseResult::Committed(_) => {
+            ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => {
                 // failure to sprout.
                 sprout_state.recursive_state.current_enclosing = outer_enclosure;
                 sprout_state.recursive_state.current_dependencies = outer_dependencies;
@@ -382,7 +384,7 @@ macro_rules! recompute {
             // Succcessful seed.
             // Any speculative errors now would be an indication to halt.
             // Committed errors should still be propagated though.
-            ParseResult::Success(_) => (),
+            ParseOutcome::Success(_) => (),
         }
 
         let (mut rec_seed_state, mut rec_seed_result) = (sprout_state, sprout_result);
@@ -396,7 +398,8 @@ macro_rules! recompute {
             frame.seed_result = Some((rec_seed_state.clone(), rec_seed_result.clone_erased()));
             frame.dependencies = rec_seed_state.recursive_state.current_dependencies.clone();
             frame.generation += 1;
-            // println!("GENERATION {}: {}@{:?}", frame.generation, &this.name(), state.cursor);
+
+            debug_log!("GENERATION {}: {} @ {:?}", frame.generation, &this.name(), input.byte_offset(state.cursor));
             rec_seed_state.recursive_state.push_to_top(this.recursive_id(), state.cursor, frame);
 
             // Subsequent iteration
@@ -409,9 +412,15 @@ macro_rules! recompute {
                 parser.$method(input, current_state);
 
             match &next_sprout_result.ast {
-                ParseResult::Success(_) => {
+                ParseOutcome::Success(_) => {
                     // Grow the seed and continue, if not zero-progress.
-                    // println!("Best: {:?}\nCandidate: {:?}", current_best_cursor, next_sprout_state.cursor);
+                    debug_log!("{} @ {:?}: Best: {:?}; Candidate: {:?}",
+                        &this.name(),
+                        input.byte_offset(state.cursor),
+                        input.byte_offset(current_best_cursor),
+                        input.byte_offset(next_sprout_state.cursor)
+                    );
+
                     if next_sprout_state.cursor > current_best_cursor {
                         // Assign to the recursive seed state.
                         rec_seed_state = next_sprout_state;
@@ -424,12 +433,12 @@ macro_rules! recompute {
                         break (rec_seed_state, rec_seed_result);
                     }
                 }
-                ParseResult::Speculative(_) => {
+                ParseOutcome::Speculative(_) => {
                     // The previous iteration has consumed as much as we can without speculative failure.
                     // It's time to stop.
                     break (rec_seed_state, rec_seed_result);
                 }
-                ParseResult::Committed(_) => {
+                ParseOutcome::Committed(_) => {
                     // Propagate failure.
                     break (next_sprout_state, next_sprout_result);
                 }
@@ -487,9 +496,9 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<A, E>,
     ) {
         recursive_growth!(self, input, state, parse, A)
@@ -497,9 +506,9 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
         recursive_growth!(self, input, state, check, ())
@@ -527,9 +536,9 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<A, E>,
     ) {
         match self {
@@ -543,9 +552,9 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
         match self {
@@ -565,9 +574,9 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<A, E>,
     ) {
         self.inner
@@ -586,9 +595,9 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
         self.inner

@@ -1,7 +1,7 @@
 use crate::{
     combinator::success,
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
 };
 
 /// Parser combinator that executes a given parser zero or more times.
@@ -25,9 +25,9 @@ where
     fn parse(
         &self,
         input: &'src I,
-        mut state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        mut state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<Vec<A>, E>,
     ) {
         let mut accumulative = Vec::new();
@@ -36,29 +36,29 @@ where
             let (new_state, new_result) = self.inner.parse(input, state.clone());
             cst = cst.merge_with(new_result.cst);
             match new_result.ast {
-                ParseResult::Success(element) => {
+                ParseOutcome::Success(element) => {
                     // Combine and continue.
                     accumulative.push(element);
                     state = new_state;
                     continue;
                 }
-                ParseResult::Speculative(_) => {
+                ParseOutcome::Speculative(_) => {
                     // We've reached the end.
                     // Construct and return.
                     return (
                         state,
                         ParseOutput {
-                            ast: ParseResult::Success(accumulative),
+                            ast: ParseOutcome::Success(accumulative),
                             cst,
                         },
                     );
                 }
-                ParseResult::Committed(failure) => {
+                ParseOutcome::Committed(failure) => {
                     // Propagate committed failure.
                     return (
                         new_state,
                         ParseOutput {
-                            ast: ParseResult::Committed(failure),
+                            ast: ParseOutcome::Committed(failure),
                             cst,
                         },
                     );
@@ -69,9 +69,9 @@ where
     fn check(
         &self,
         input: &'src I,
-        mut state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        mut state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
         let mut cst = success::<'src, I, E>().check(input, state.clone()).1.cst;
@@ -79,27 +79,27 @@ where
             let (new_state, new_result) = self.inner.check(input, state.clone());
             cst = cst.merge_with(new_result.cst);
             match new_result.ast {
-                ParseResult::Success(()) => {
+                ParseOutcome::Success(()) => {
                     state = new_state;
                     continue;
                 }
-                ParseResult::Speculative(_) => {
+                ParseOutcome::Speculative(_) => {
                     // We've reached the end.
                     // Construct and return.
                     return (
                         state,
                         ParseOutput {
-                            ast: ParseResult::Success(()),
+                            ast: ParseOutcome::Success(()),
                             cst,
                         },
                     );
                 }
-                ParseResult::Committed(failure) => {
+                ParseOutcome::Committed(failure) => {
                     // Propagate committed failure.
                     return (
                         new_state,
                         ParseOutput {
-                            ast: ParseResult::Committed(failure),
+                            ast: ParseOutcome::Committed(failure),
                             cst,
                         },
                     );

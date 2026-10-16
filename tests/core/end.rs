@@ -5,23 +5,33 @@ use rowan::SyntaxKind;
 
 #[test]
 fn single_end() {
-    let no_input: ParseOutput<(), DefaultParseEnvironment> = end().parse_from_start("").1;
-    assert!(matches!(no_input.ast, ParseResult::Success(_)));
+    const NO_TEXT : &str = "";
+    let no_input: ParseOutput<(), DefaultParseEnvironment> = end().parse(
+            NO_TEXT,
+            ParseState::<<str as Input>::Cursor, usize>::new(NO_TEXT)
+        ).1;
+    assert!(matches!(no_input.ast, ParseOutcome::Success(_)));
+
+    const SOME_TEXT : &str = "lorem ipsum dolor sit amet";
     let (state, some_input): (_, ParseOutput<(), DefaultParseEnvironment>) =
-        end().parse_from_start("lorem ipsum dolor sit amet");
-    assert!(matches!(some_input.ast, ParseResult::Speculative(_)));
+        end().parse(
+            SOME_TEXT,
+            ParseState::<<str as Input>::Cursor, usize>::new(SOME_TEXT)
+        );
+    assert!(matches!(some_input.ast, ParseOutcome::Speculative(_)));
     assert_eq!(state.cursor.into_usize(), 0);
 }
 
 #[test]
 fn just_then_end() {
-    let combinator: WithEnv<DefaultParseEnvironment, _> = just((SyntaxKind(0), "a")).then(end());
+    let combinator: WithEnv<DefaultParseEnvironment, _> =
+        just((SyntaxKind(0), "a")).then(end());
 
-    let not_enough = combinator.parse_from_start("").1;
-    let just_right = combinator.parse_from_start("a").1;
-    let too_much = combinator.parse_from_start("ab").1;
+    let not_enough = combinator.parse_all("");
+    let just_right = combinator.parse_all("a");
+    let too_much = combinator.parse_all("ab");
 
-    assert!(matches!(not_enough.ast, ParseResult::Speculative(_)));
-    assert_eq!(just_right.ast, ParseResult::Success(("a", ())));
-    assert!(matches!(too_much.ast, ParseResult::Speculative(_)));
+    assert!(not_enough.is_err());
+    assert_eq!(just_right.expect("success!").into_ast_only(), ("a", ()));
+    assert!(too_much.is_err());
 }

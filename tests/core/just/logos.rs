@@ -1,10 +1,14 @@
 #![cfg(feature = "logos")]
 
+//! This file tests functionalities related to Logos integration.
+//! Including token matching, general parser usability (see also `'source / 'src Distinction`),
+//! and general parsing correctness.
+
 use std::rc::Rc;
 
 use biparse::prelude::*;
 use expect_test::expect;
-use logos::{Lexer, Logos};
+use logos::Logos;
 use num_bigint::BigUint;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -19,14 +23,12 @@ enum Kind {
     LeftParen,
     #[token(")")]
     RightParen,
+
     #[token("+")]
     Plus,
-    #[token("-")]
-    Minus,
     #[token("*")]
     Asterisk,
-    #[token("/")]
-    Slash,
+
     #[regex("[0-9]+")]
     Number,
 
@@ -56,7 +58,6 @@ impl From<Kind> for SyntaxKind {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Expression {
     Number(BigUint),
-
     Binary {
         left: Box<Expression>,
         operator: Operator,
@@ -66,12 +67,27 @@ enum Expression {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Operator {
     Add,
-    Sub,
     Mult,
-    Div,
+}
+
+impl Expression {
+    fn evaluate(&self) -> BigUint {
+        match self {
+            Expression::Number(uint) => uint.clone(),
+            Expression::Binary {
+                left,
+                operator,
+                right,
+            } => match operator {
+                Operator::Add => left.evaluate() + right.evaluate(),
+                Operator::Mult => left.evaluate() * right.evaluate(),
+            },
+        }
+    }
 }
 
 /// Assertion that the CST constructed is total.
+/// Panicking.
 fn cst_is_total<L: Language>(source: &str, tree: &SyntaxNode<L>) {
     assert_eq!(tree.text(), source);
 
@@ -82,6 +98,7 @@ fn cst_is_total<L: Language>(source: &str, tree: &SyntaxNode<L>) {
     assert_eq!(raw_range, (0..source.len()));
 }
 
+/// Lexer trivia recovery: restore skipped whitespace to `Kind::Trivia`.
 #[test]
 fn lexer_trivia_recovery() {
     let source = "(   )";
@@ -91,9 +108,9 @@ fn lexer_trivia_recovery() {
         just(Kind::LeftParen).then(just(Kind::RightParen)).shared();
 
     match parser.parse_all(&stream) {
-        Ok((ast, cst)) => {
-            assert_eq!(ast, (Kind::LeftParen, Kind::RightParen));
-            let (tree, _) = cst.canonize_with(Kind::Root);
+        Ok(report) => {
+            assert_eq!(report.ast_only(), &(Kind::LeftParen, Kind::RightParen));
+            let (tree, _) = report.cst().canonize_with(Kind::Root);
 
             assert_eq!(tree.kind(), Kind::Root);
             cst_is_total(source, &tree);
@@ -114,70 +131,321 @@ fn lexer_trivia_recovery() {
     }
 }
 
-fn make_add_mult_parser<'src>()
--> impl Parser<'src, LexerStream<'src, Kind>, Box<Expression>, DefaultParseEnvironment> {
+// Tests relating to `Pattern` matching of tokens.
+#[test]
+fn token_plus() {
+    let source = "+";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Operator, DefaultParseEnvironment>> =
+        just(Kind::Plus).map(|_| Operator::Add).boxed();
+
+    let result = parser.parse_all(&stream);
+    expect![[r#"
+        Add
+    "#]]
+    .assert_debug_eq(result.unwrap().ast_only());
+}
+#[test]
+fn token_asterisk() {
+    let source = "*";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Operator, DefaultParseEnvironment>> =
+        just(Kind::Asterisk).map(|_| Operator::Mult).boxed();
+
+    let result = parser.parse_all(&stream);
+    expect![[r#"
+        Mult
+    "#]]
+    .assert_debug_eq(result.unwrap().ast_only());
+}
+/// Regression:
+/// Erroneous unconditional matching on ANY present token, regardless of type.
+#[test]
+fn mismatched_token() {
+    let source = "+";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Kind, DefaultParseEnvironment>> =
+        just(Kind::Root).boxed();
+    let result = parser.parse_all(&stream);
+    assert!(result.is_err());
+    expect![[r#"
+        Simple {
+            position: LineColumn {
+                line: 1,
+                column: 1,
+            },
+            messages: [
+                "expected Expectation(Pattern { kind: \"token\", kind_plural: \"tokens\", data: \"Root\" }), found token 'Ok(Plus)' at location (1, 1)",
+            ],
+        }
+    "#]].assert_debug_eq(&result.unwrap_err());
+}
+#[test]
+fn unrecognized_token() {
+    let source = "?";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Kind, DefaultParseEnvironment>> =
+        just(Kind::Root).boxed();
+    let result = parser.parse_all(&stream);
+    assert!(result.is_err());
+    expect![[r#"
+        Simple {
+            position: LineColumn {
+                line: 1,
+                column: 1,
+            },
+            messages: [
+                "expected Expectation(Pattern { kind: \"token\", kind_plural: \"tokens\", data: \"Root\" }), found token 'Err(())' at location (1, 1)",
+            ],
+        }
+    "#]].assert_debug_eq(&result.unwrap_err());
+}
+
+/// Parser that parses an arithmatic equation involving parentheses, addition and multipliciation.
+/// Note on Usage:
+/// - The parser constructor *must* be made *after* the stream is constructed due to drop order.
+/// - `'source : 'src` and that `LexerStream<'source>` must *not* be `LexerStream<'src, _>`.
+fn make_add_mult_parser<'src, 'source>()
+-> impl Parser<'src, LexerStream<'source, Kind>, Box<Expression>, DefaultParseEnvironment>
+where
+    'source: 'src,
+{
     let mut expr: Recursive<
         Indirect<'_, '_, LexerStream<'_, Kind>, Box<Expression>, DefaultParseEnvironment>,
-    > = Recursive::declare_as("addition or multiplication expression");
+    > = Recursive::declare_as("addmult expression");
 
     let num = satisfies(
         Kind::Number.into(),
         |input: &LexerStream<'_, Kind>, item| match item.token {
-            Ok(Kind::Number) => Ok(input
+            Ok(Kind::Number) => input
                 .slice_bytes(item.span.start, item.span.end)
                 .parse::<BigUint>()
-                .unwrap()),
+                .map_err(|error| Box::new(std::io::Error::other(error))),
             _ => Err(Box::new(std::io::Error::other("expected number"))),
         },
     )
-    .map(|uint| Box::new(Expression::Number(uint)));
+    .map(|uint| Box::new(Expression::Number(uint)))
+    .shared();
 
-    let add = expr
+    let terminal = num
         .clone()
-        .then(just(Kind::Asterisk).map(|_| Operator::Mult))
-        .then(expr.clone())
-        .map(|((left, operator), right)| {
-            Box::new(Expression::Binary {
-                left,
-                operator,
-                right,
-            })
-        })
-        .shared();
-    let mult = add
-        .clone()
-        .then(just(Kind::Asterisk).map(|_| Operator::Mult))
-        .then(add.clone())
-        .map(|((left, operator), right)| {
-            Box::new(Expression::Binary {
-                left,
-                operator,
-                right,
-            })
-        })
+        .or_same(
+            just(Kind::LeftParen)
+                .ignore_then(expr.clone())
+                .then_ignore(just(Kind::RightParen)),
+        )
         .shared();
 
-    expr.define(
-        // Parenthesized expression.
-        just(Kind::LeftParen)
-            .ignore_then(expr.clone())
-            .then_ignore(just(Kind::RightParen))
-            // Mult expression.
+    let mult = Recursive::new_as("multiplication", |this| {
+        this.then(just(Kind::Asterisk).map(|_| Operator::Mult))
+            .then(terminal.clone())
+            .map(|((left, operator), right)| {
+                Box::new(Expression::Binary {
+                    left,
+                    operator,
+                    right,
+                })
+            })
+            .or_same(terminal)
+    });
+
+    let add = Recursive::new_as("addition", |this| {
+        this.then(just(Kind::Plus).map(|_| Operator::Add))
+            .then(mult.clone())
+            .map(|((left, operator), right)| {
+                Box::new(Expression::Binary {
+                    left,
+                    operator,
+                    right,
+                })
+            })
             .or_same(mult)
-            // Add expression.
-            .or_same(add)
-            // Literal number.
-            .or_same(num),
-    );
+    });
+
+    expr.define(add);
     expr
 }
 
 #[test]
-fn add_mult_1() {
-    let stream1: LexerStream<'_, Kind> = LexerStream::new("1 + 2 * 3", Kind::Trivia);
-    let result1 = make_add_mult_parser().parse_all(&stream1);
-    expect![].assert_debug_eq(&result1.unwrap().0);
+fn add_mult_number() {
+    let source = r"42";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let parser = make_add_mult_parser();
+    let result = parser.parse_all(&stream);
+    expect![[r#"
+        Number(
+            42,
+        )
+    "#]]
+    .assert_debug_eq(&result.as_ref().unwrap().ast_only());
 
-    // let result2 = make_add_mult_parser().parse_all(&stream2);
-    // expect![].assert_debug_eq(&result2.unwrap().0);
+    let cst = result.unwrap().cst().canonize_with(Kind::Root).0;
+    cst_is_total(source, &cst);
+}
+
+#[test]
+fn add_mult_1() {
+    let source = r"1 * 2";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let parser = make_add_mult_parser();
+    let (ast, cst) = parser.parse_all(&stream)
+        .expect("success!")
+        .into_parts();
+
+    expect![[r#"
+        Binary {
+            left: Number(
+                1,
+            ),
+            operator: Mult,
+            right: Number(
+                2,
+            ),
+        }
+    "#]]
+    .assert_debug_eq(&ast);
+
+    let cst = cst.canonize_with(Kind::Root).0;
+    cst_is_total(source, &cst);
+}
+#[test]
+fn add_mult_2() {
+    let source = r"3 + 5 * 2";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let tokens: Vec<Kind> = logos::Lexer::new(source).map(Result::unwrap).collect();
+    expect![[r#"
+        [
+            Number,
+            Plus,
+            Number,
+            Asterisk,
+            Number,
+        ]
+    "#]]
+    .assert_debug_eq(&tokens);
+
+    let parser = make_add_mult_parser();
+    let (ast, cst) = parser.parse_all(&stream)
+        .expect("success!")
+        .into_parts();
+
+    expect![[r#"
+        Binary {
+            left: Number(
+                3,
+            ),
+            operator: Add,
+            right: Binary {
+                left: Number(
+                    5,
+                ),
+                operator: Mult,
+                right: Number(
+                    2,
+                ),
+            },
+        }
+    "#]]
+    .assert_debug_eq(&ast);
+
+    let evaluation = ast.evaluate();
+    let answer = BigUint::from(13_usize);
+    assert_eq!(evaluation, answer);
+
+    let cst = cst.canonize_with(Kind::Root).0;
+    cst_is_total(source, &cst);
+}
+
+/// Demonstrate left-association (which is how `make_add_mult_parser` is constructed).
+#[test]
+fn add_mult_3() {
+    let source = r"4 + 5 + 6 + 7";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let parser = make_add_mult_parser();
+    let (ast, cst) = parser.parse_all(&stream)
+        .expect("success!")
+        .into_parts();
+
+    expect![[r#"
+        Binary {
+            left: Binary {
+                left: Binary {
+                    left: Number(
+                        4,
+                    ),
+                    operator: Add,
+                    right: Number(
+                        5,
+                    ),
+                },
+                operator: Add,
+                right: Number(
+                    6,
+                ),
+            },
+            operator: Add,
+            right: Number(
+                7,
+            ),
+        }
+    "#]]
+    .assert_debug_eq(&ast);
+
+    let cst = cst.canonize_with(Kind::Root).0;
+    cst_is_total(source, &cst);
+}
+
+/// Test grouping.
+#[test]
+fn add_mult_grouping() {
+    let source = r"(1 + 2) * 3 + ((4 + 5) * 6)";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+    let parser = make_add_mult_parser();
+    let (ast, cst) = parser.parse_all(&stream)
+        .expect("success!")
+        .into_parts();
+
+    expect![[r#"
+        Binary {
+            left: Binary {
+                left: Binary {
+                    left: Number(
+                        1,
+                    ),
+                    operator: Add,
+                    right: Number(
+                        2,
+                    ),
+                },
+                operator: Mult,
+                right: Number(
+                    3,
+                ),
+            },
+            operator: Add,
+            right: Binary {
+                left: Binary {
+                    left: Number(
+                        4,
+                    ),
+                    operator: Add,
+                    right: Number(
+                        5,
+                    ),
+                },
+                operator: Mult,
+                right: Number(
+                    6,
+                ),
+            },
+        }
+    "#]]
+    .assert_debug_eq(&ast);
+
+    let evaluation = ast.evaluate();
+    let answer = BigUint::from(63_usize);
+    assert_eq!(evaluation, answer);
+
+    let cst = cst.canonize_with(Kind::Root).0;
+    cst_is_total(source, &cst);
 }

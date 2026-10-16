@@ -1,9 +1,9 @@
 use crate::{
-    cst::CstOutput,
+    cst::AssociatedCst,
     failure::{ParseFailure, ParseFailureKind},
     input::Input,
     parse::{
-        Expectation, ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser,
+        Expectation, ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser,
     },
 };
 use std::fmt::Debug;
@@ -27,8 +27,8 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Su
         (
             state,
             ParseOutput {
-                ast: ParseResult::Success(()),
-                cst: CstOutput::new(),
+                ast: ParseOutcome::Success(()),
+                cst: AssociatedCst::new(),
             },
         )
     }
@@ -67,8 +67,8 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
         (
             state,
             ParseOutput {
-                ast: ParseResult::Speculative(failure),
-                cst: CstOutput::new(),
+                ast: ParseOutcome::Speculative(failure),
+                cst: AssociatedCst::new(),
             },
         )
     }
@@ -105,7 +105,7 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
         (
             state,
             ParseOutput {
-                ast: input.peek(cursor).map_or(ParseResult::Success(()), |_| {
+                ast: input.peek(cursor).map_or(ParseOutcome::Success(()), |_| {
                     let failure = E::Failure::failure_at(
                         input,
                         cursor,
@@ -114,9 +114,9 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
                             difference_at: Some(cursor),
                         },
                     );
-                    ParseResult::Speculative(failure)
+                    ParseOutcome::Speculative(failure)
                 }),
-                cst: CstOutput::new(),
+                cst: AssociatedCst::new(),
             },
         )
     }

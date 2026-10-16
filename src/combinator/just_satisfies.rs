@@ -3,13 +3,11 @@ use std::{cmp::Ordering, fmt::Debug, marker::PhantomData};
 use rowan::SyntaxKind;
 
 use crate::{
-    cst::{Cst, CstAssociation, CstOutput},
+    cst::{Cst, AssociatedCst},
     failure::{ParseFailure, ParseFailureKind},
     green::GreenElement,
     input::{Input, InputItem, Pattern},
-    parse::{
-        ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser, composite::Some,
-    },
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
 };
 
 /// Parser combinator that matches on a pattern compatible with the input type.
@@ -114,8 +112,8 @@ where
                 (
                     new_state,
                     ParseOutput {
-                        ast: ParseResult::Success(matched.payload),
-                        cst: CstOutput::leaves(leaf_cst),
+                        ast: ParseOutcome::Success(matched.payload),
+                        cst: AssociatedCst::leaves(leaf_cst),
                     },
                 )
             }
@@ -131,8 +129,8 @@ where
                 (
                     state,
                     ParseOutput {
-                        ast: ParseResult::Speculative(failure),
-                        cst: CstOutput::new(),
+                        ast: ParseOutcome::Speculative(failure),
+                        cst: AssociatedCst::new(),
                     },
                 )
             }
@@ -153,8 +151,8 @@ where
                 (
                     new_state,
                     ParseOutput {
-                        ast: ParseResult::Success(()),
-                        cst: CstOutput::new(),
+                        ast: ParseOutcome::Success(()),
+                        cst: AssociatedCst::new(),
                     },
                 )
             }
@@ -170,8 +168,8 @@ where
                 (
                     state,
                     ParseOutput {
-                        ast: ParseResult::Speculative(failure),
-                        cst: CstOutput::new(),
+                        ast: ParseOutcome::Speculative(failure),
+                        cst: AssociatedCst::new(),
                     },
                 )
             }
@@ -212,9 +210,9 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<Success, E>,
     ) {
         match input.peek(state.cursor) {
@@ -263,8 +261,8 @@ where
                         (
                             new_state,
                             ParseOutput {
-                                ast: ParseResult::Success(payload),
-                                cst: CstOutput::leaves(leaf_cst),
+                                ast: ParseOutcome::Success(payload),
+                                cst: AssociatedCst::leaves(leaf_cst),
                             },
                         )
                     }
@@ -273,8 +271,8 @@ where
                         (
                             state,
                             ParseOutput {
-                                ast: ParseResult::Speculative(failure),
-                                cst: CstOutput::new(),
+                                ast: ParseOutcome::Speculative(failure),
+                                cst: AssociatedCst::new(),
                             },
                         )
                     }
@@ -292,8 +290,8 @@ where
                 (
                     state,
                     ParseOutput {
-                        ast: ParseResult::Speculative(failure),
-                        cst: CstOutput::new(),
+                        ast: ParseOutcome::Speculative(failure),
+                        cst: AssociatedCst::new(),
                     },
                 )
             }
@@ -305,15 +303,15 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
         let (new_state, output) = <Self as Parser<'src, I, _, E>>::parse(self, input, state);
         let erased_output = ParseOutput {
             ast: output.ast.map(|_| ()),
-            cst: CstOutput::new(),
+            cst: AssociatedCst::new(),
         };
         (new_state, erased_output)
     }

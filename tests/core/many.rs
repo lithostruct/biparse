@@ -10,9 +10,11 @@ fn many_a(s: String) -> String {
     let parser = just::<'_, str, DefaultParseEnvironment, _>((SyntaxKind(0), 'a'))
         .many()
         .map(|vec| vec.join(""));
-    let (state, result) = parser.node(SyntaxKind(1)).parse_from_start(&s);
+    let (state, result) = parser.node(SyntaxKind(1))
+        .parse(&s, ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+
     match result.ast {
-        ParseResult::Success(header) => {
+        ParseOutcome::Success(header) => {
             if state.cursor.into_usize() == 0 {
                 assert_eq!(&header, "");
             } else {
@@ -20,7 +22,7 @@ fn many_a(s: String) -> String {
             }
             header
         }
-        ParseResult::Speculative(_) | ParseResult::Committed(_) => unreachable!(),
+        ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => unreachable!(),
     }
 }
 

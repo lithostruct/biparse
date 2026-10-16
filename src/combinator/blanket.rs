@@ -1,7 +1,5 @@
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, rc::Rc, sync::Arc};
 
-use derive_more::{From, Into};
-
 use crate::{
     input::Input,
     parse::{ParseEnvironment, ParseHint, ParseOutput, ParseState, Parser},
@@ -230,9 +228,9 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<A, E>,
     ) {
         self.inner.parse(input, state)
@@ -240,9 +238,9 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
         self.inner.check(input, state)

@@ -6,30 +6,30 @@ use crate::cst::path::CstPath;
 
 /// Association table between an `Id` type and a CstOutput containing GreenNodes.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Into)]
-pub struct CstAssociation<Id>
+pub struct AssociationTable<Id>
 where
     Id: Eq + Hash,
 {
     #[into]
     pub(super) inner: im::HashMap<Id, CstPath>,
 }
-impl<Id> Default for CstAssociation<Id>
+impl<Id> Default for AssociationTable<Id>
 where
     Id: Eq + Hash,
 {
     fn default() -> Self {
-        CstAssociation {
+        AssociationTable {
             inner: im::HashMap::new(),
         }
     }
 }
-impl<Id> CstAssociation<Id>
+impl<Id> AssociationTable<Id>
 where
     Id: Debug + Clone + Eq + Hash,
 {
     /// Creates an empty association table.
     pub fn new() -> Self {
-        CstAssociation::default()
+        AssociationTable::default()
     }
 
     /// Associatively merges with `self` as the left-hand-side, and a given right-hand-side.
@@ -50,7 +50,7 @@ where
         let merged = left_pair.union_with_key(right_pair, |key, _, _| {
             panic!("Non-unique key {key:?} found in merge operation!")
         });
-        CstAssociation { inner: merged }
+        AssociationTable { inner: merged }
     }
     /// Updates all paths to be prepended by a new parent, which takes the whole forest as children.
     pub fn with_new_parent(mut self, at_index: usize) -> Self {

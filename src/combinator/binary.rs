@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use crate::{
     failure::ParseFailure,
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
 };
 use either::Either;
 
@@ -41,7 +41,7 @@ where
     ) {
         let (state, first_result) = self.first.parse(input, state);
         let payload_a = match first_result.ast {
-            ast @ ParseResult::Speculative(_) | ast @ ParseResult::Committed(_) => {
+            ast @ ParseOutcome::Speculative(_) | ast @ ParseOutcome::Committed(_) => {
                 // Do not continue, exit with error.
                 let typed_result = ast.map(|_| unreachable!("In failure!") as (A, B));
                 return (
@@ -52,13 +52,13 @@ where
                     },
                 );
             }
-            ParseResult::Success(payload_a) => payload_a,
+            ParseOutcome::Success(payload_a) => payload_a,
         };
 
         let (state, second_result) = self.second.parse(input, state);
         let cst_union = first_result.cst.merge_with(second_result.cst);
         match second_result.ast {
-            ast @ ParseResult::Speculative(_) | ast @ ParseResult::Committed(_) => {
+            ast @ ParseOutcome::Speculative(_) | ast @ ParseOutcome::Committed(_) => {
                 // Discard payload_a, exit with error.
                 let typed_result = ast.map(|_| unreachable!("In failure!") as (A, B));
                 (
@@ -69,12 +69,12 @@ where
                     },
                 )
             }
-            ParseResult::Success(payload_b) => {
+            ParseOutcome::Success(payload_b) => {
                 // Complete success!
                 (
                     state,
                     ParseOutput {
-                        ast: ParseResult::Success((payload_a, payload_b)),
+                        ast: ParseOutcome::Success((payload_a, payload_b)),
                         cst: cst_union,
                     },
                 )
@@ -88,10 +88,10 @@ where
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         let (state, first_result) = self.first.check(input, state);
         match &first_result.ast {
-            ParseResult::Speculative(_) | ParseResult::Committed(_) => {
+            ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => {
                 return (state, first_result);
             }
-            ParseResult::Success(()) => (),
+            ParseOutcome::Success(()) => (),
         }
         let (state, second_result) = self.second.check(input, state);
         (state, second_result)
@@ -135,7 +135,7 @@ where
     ) {
         let (first_state, first_result) = self.first.parse(input, state.clone());
         let first_speculative_error = match first_result.ast {
-            ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {
+            ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
                 // Early termination.
                 return (
                     first_state,
@@ -146,12 +146,12 @@ where
                 );
             }
             // Continue.
-            ParseResult::Speculative(error) => error,
+            ParseOutcome::Speculative(error) => error,
         };
 
         let (second_state, second_result) = self.second.parse(input, state.clone());
         let second_speculative_error = match second_result.ast {
-            ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {
+            ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
                 // Termination, discard first speculative error.
                 return (
                     second_state,
@@ -162,7 +162,7 @@ where
                 );
             }
             // Continue.
-            ParseResult::Speculative(error) => error,
+            ParseOutcome::Speculative(error) => error,
         };
 
         let overall_speculation = E::Failure::composite(
@@ -173,7 +173,7 @@ where
         (
             second_state,
             ParseOutput {
-                ast: ParseResult::Speculative(overall_speculation),
+                ast: ParseOutcome::Speculative(overall_speculation),
                 cst: second_result.cst,
             },
         )
@@ -185,24 +185,24 @@ where
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         let (first_state, mut first_result) = self.first.check(input, state.clone());
         let first_speculative_error = match first_result.ast {
-            ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {
+            ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
                 // Early termination.
                 first_result.ast = ast;
                 return (first_state, first_result);
             }
             // Continue.
-            ParseResult::Speculative(error) => error,
+            ParseOutcome::Speculative(error) => error,
         };
 
         let (second_state, mut second_result) = self.second.check(input, state.clone());
         let second_speculative_error = match second_result.ast {
-            ast @ ParseResult::Success(_) | ast @ ParseResult::Committed(_) => {
+            ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
                 // Termination, discard first speculative error.
                 second_result.ast = ast;
                 return (second_state, second_result);
             }
             // Continue.
-            ParseResult::Speculative(error) => error,
+            ParseOutcome::Speculative(error) => error,
         };
 
         let overall_speculation = E::Failure::composite(
@@ -213,7 +213,7 @@ where
         (
             second_state,
             ParseOutput {
-                ast: ParseResult::Speculative(overall_speculation),
+                ast: ParseOutcome::Speculative(overall_speculation),
                 cst: second_result.cst,
             },
         )

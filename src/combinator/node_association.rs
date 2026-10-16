@@ -5,7 +5,7 @@ use rowan::SyntaxKind;
 use crate::{
     cst::IdSupply,
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseResult, ParseState, Parser},
+    parse::{ParseEnvironment, ParseHint, ParseOutput, ParseOutcome, ParseState, Parser},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -32,7 +32,7 @@ where
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
         let (state, output) = self.inner.parse(input, state);
         match &output.ast {
-            ParseResult::Success(_) => {
+            ParseOutcome::Success(_) => {
                 // Take the CST forest and prepend the new predecessor.
                 let new_cst = {
                     // Danger zone.
@@ -102,7 +102,7 @@ where
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<B, E>) {
         let (mut state, output) = self.inner.parse(input, state);
         match output.ast {
-            ParseResult::Success(payload) => {
+            ParseOutcome::Success(payload) => {
                 // Take the CST forest and prepend the new predecessor.
                 let new_cst = {
                     // Danger zone.
@@ -118,7 +118,7 @@ where
                 (
                     state,
                     ParseOutput {
-                        ast: ParseResult::Success(new_payload),
+                        ast: ParseOutcome::Success(new_payload),
                         cst: linked_cst,
                     },
                 )
@@ -138,9 +138,9 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
     ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
+        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
         ParseOutput<(), E>,
     ) {
         self.inner.check(input, state)

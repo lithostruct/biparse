@@ -1,18 +1,19 @@
 use std::{borrow::Cow, cell::RefCell, fmt::Debug, ops::Range, rc::Rc};
 
-use derive_more::Into;
+use derive_more::{AsMut, AsRef, Deref, DerefMut, From, Into};
 use logos::{Lexer, Logos, SpannedIter};
 use rowan::SyntaxKind;
 
 use crate::{
-    input::{CachedStr, Input, InputItem, LineColumn, Pattern, PatternMatch},
-    parse::{Expectation, ParseHint},
+    input::{
+        AllOf, AnyOf, Input, InputItem, LineColumn, Pattern, PatternMatch, PatternMatchResult, cached_str::CachedStr,
+    }, parse::{Expectation, ParseHint},
 };
 
 /// Type alias for an iterator item returned by a [`logos::SpannedIter<'src, T>`].
 pub type LexerItem<'src, Token> = (Result<Token, <Token as Logos<'src>>::Error>, Range<usize>);
 
-/// The index newtype for a lexer
+/// The index newtype for a lexer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Into)]
 pub struct LexerIndex(#[into] usize);
 
@@ -36,8 +37,9 @@ where
     Token: Logos<'src, Source = str>,
 {
     /// Creates a new `LexerStream` with a specified [`rowan::SyntaxKind`] for skipped source spans.
-    pub fn new(source: &'src Token::Source, skipped_kind: impl Into<SyntaxKind>) -> Self
+    pub fn new<'root>(source: &'root Token::Source, skipped_kind: impl Into<SyntaxKind>) -> Self
     where
+        'root: 'src,
         Token: Clone,
         Token::Extras: Default,
     {
@@ -50,13 +52,14 @@ where
 
     /// Creates a new `LexerStream` that assumes the lexer produces contiguous output.
     ///
-    /// # Caller Invariant
+    /// # Caller Precondition
     ///
     /// This constructor assumes the caller has asserted that
     /// the Lexer created from this `Token` type produces gapless input coverage.
     /// Biparse may panic during parsing if this invariant is not upheld.
-    pub fn assume_contiguous(source: &'src Token::Source) -> Self
+    pub fn assume_contiguous<'root>(source: &'root Token::Source) -> Self
     where
+        'root: 'src,
         Token: Clone,
         Token::Extras: Default,
     {
@@ -85,8 +88,9 @@ where
     }
 }
 impl<'src, Token: Logos<'src>> LexerStreamInner<'src, Token> {
-    pub fn new(source: &'src Token::Source) -> Self
+    pub fn new<'root>(source: &'root Token::Source) -> Self
     where
+        'root: 'src,
         Token: Clone,
         Token::Extras: Default,
     {
@@ -120,13 +124,12 @@ impl<'src, Token: Logos<'src>> LexerStreamInner<'src, Token> {
     }
 }
 
-impl<'src, Token> Input for LexerStream<'src, Token>
+impl<'source, Token> Input for LexerStream<'source, Token>
 where
-    Token: Debug + Clone,
-    Token: Logos<'src, Source = str>,
+    Token: Debug + Clone + 'static + Logos<'source, Source = str>,
 {
     type Cursor = LexerIndex;
-    type Token = Result<Token, <Token as Logos<'src>>::Error>;
+    type Token = Result<Token, <Token as Logos<'source>>::Error>;
 
     fn start(&self) -> Self::Cursor {
         LexerIndex(0)
@@ -169,37 +172,74 @@ where
     }
 }
 
-impl<'src, T> Pattern<LexerStream<'src, T>> for (SyntaxKind, T)
+impl<'source, K, T> Pattern<LexerStream<'source, T>> for (K, T)
 where
-    T: Debug + Clone + Logos<'src, Source = str>,
+    K: Clone + Into<SyntaxKind>,
+    T: Debug + Clone + Eq + Logos<'source, Source = str> + 'static,
 {
-    type Payload<'p>
+    type Payload<'src>
         = T
     where
-        LexerStream<'src, T>: 'p;
+        LexerStream<'source, T>: Input + 'src;
 
-    fn matches_at<'p>(
+    fn matches_at<'src>(
         &self,
-        input: &'p LexerStream<'src, T>,
-        cursor: <LexerStream<'src, T> as Input>::Cursor,
-    ) -> Result<
-        PatternMatch<'p, Self::Payload<'p>, <LexerStream<'src, T> as Input>::Cursor>,
-        Option<<LexerStream<'src, T> as Input>::Cursor>,
-    >
-    where
-        LexerStream<'src, T>: 'p,
-    {
+        input: &'src LexerStream<'source, T>,
+        cursor: <LexerStream<'source, T> as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, LexerStream<'source, T>> {
         match input.peek(cursor) {
-            Some(item) => item.token.map_or_else(
-                |_error| Err(None),
-                |token| {
+            Some(item) => {
+                if item.token.as_ref().is_ok_and(|token| *token == self.1) {
                     Ok(PatternMatch::new(
-                        token,
-                        vec![(self.0, item.span)],
+                        item.token.expect("item.token is not Err!"),
+                        vec![(self.0.clone().into(), item.span)],
                         item.next_cursor,
                     ))
-                },
-            ),
+                } else {
+                    Err(Some(cursor))
+                }
+            }
+            None => Err(Some(cursor)),
+        }
+    }
+    fn describe(&self) -> String {
+        format!("token {:?}", self.1)
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Expectation(Expectation::Pattern {
+            kind: "token".into(),
+            kind_plural: "tokens".into(),
+            data: format!("{:?}", self.1),
+        })
+    }
+}
+
+impl<'source, T> Pattern<LexerStream<'source, T>> for T
+where
+    T: Debug + Clone + Eq + Logos<'source, Source = str> + Into<SyntaxKind> + 'static,
+{
+    type Payload<'src>
+        = T
+    where
+        LexerStream<'source, T>: Input + 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src LexerStream<'source, T>,
+        cursor: <LexerStream<'source, T> as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, LexerStream<'source, T>> {
+        match input.peek(cursor) {
+            Some(item) => {
+                if item.token.as_ref().is_ok_and(|token| token == self) {
+                    Ok(PatternMatch::new(
+                        item.token.expect("item.token is not Err!"),
+                        vec![(self.clone().into(), item.span)],
+                        item.next_cursor,
+                    ))
+                } else {
+                    Err(Some(cursor))
+                }
+            }
             None => Err(Some(cursor)),
         }
     }
@@ -215,48 +255,148 @@ where
     }
 }
 
-impl<'src, T> Pattern<LexerStream<'src, T>> for T
-where
-    T: Debug + Logos<'src, Source = str> + rowan::Language<Kind = T>,
-{
-    type Payload<'p>
-        = T
-    where
-        LexerStream<'src, T>: 'p;
 
-    fn matches_at<'p>(
-        &self,
-        input: &'p LexerStream<'src, T>,
-        cursor: <LexerStream<'src, T> as Input>::Cursor,
-    ) -> Result<
-        PatternMatch<'p, Self::Payload<'p>, <LexerStream<'src, T> as Input>::Cursor>,
-        Option<<LexerStream<'src, T> as Input>::Cursor>,
-    >
+/// In addition to `Logos` token matching, attach the text associated with the match.
+///
+/// Supported types include:
+/// - (K, T) where K : Into<SyntaxKind>, T : Pattern<LexerStream<...>>
+/// - T where T : Pattern<LexerStream<...>> + Into<SyntaxKind>
+/// - AllOf<P> where P : Pattern<...>
+/// - AnyOf<P> where P : Pattern<...>
+/// 
+/// Notably, `str`-based patterns are *not* supported, as they return text as their payloads.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Deref, DerefMut, AsRef, AsMut,
+)]
+pub struct WithText<P>(#[from] pub P);
+
+impl<'source, K, T> Pattern<LexerStream<'source, T>> for WithText<(K, T)>
+where
+    K: Clone + Into<SyntaxKind>,
+    T: Debug + Clone + Eq + Logos<'source, Source = str> + 'static,
+{
+    type Payload<'src> = (T, Cow<'src, str>)
     where
-        LexerStream<'src, T>: 'p,
-    {
-        match input.peek(cursor) {
-            Some(item) => item.token.map_or_else(
-                |_error| Err(None),
-                |token| {
-                    Ok(PatternMatch::new(
-                        token,
-                        vec![(Self::kind_to_raw(*self), item.span)],
-                        item.next_cursor,
-                    ))
-                },
-            ),
-            None => Err(Some(cursor)),
-        }
+        LexerStream<'source, T>: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src LexerStream<'source, T>,
+        cursor: <LexerStream<'source, T> as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, LexerStream<'source, T>> {
+        self.0.matches_at(input, cursor).map(|matched| {
+            // INVARIANT: `matched.cst_spans` is a singleton vector.
+            let range = &matched.cst_spans.first().unwrap().1;
+            PatternMatch::new(
+                (matched.payload, input.slice_bytes(range.start, range.end)),
+                matched.cst_spans, 
+                matched.next_cursor,
+            )
+        })
     }
+
     fn describe(&self) -> String {
-        format!("token {self:?}")
+        self.0.describe()
     }
     fn hint(&self) -> ParseHint {
-        ParseHint::Expectation(Expectation::Pattern {
-            kind: "token".into(),
-            kind_plural: "tokens".into(),
-            data: format!("{self:?}"),
+        self.0.hint()
+    }
+}
+
+impl<'source, T> Pattern<LexerStream<'source, T>> for WithText<T>
+where
+    T: Debug + Clone + Eq + Logos<'source, Source = str> + Into<SyntaxKind> + 'static,
+{
+    type Payload<'src> = (T, Cow<'src, str>)
+    where
+        LexerStream<'source, T>: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src LexerStream<'source, T>,
+        cursor: <LexerStream<'source, T> as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, LexerStream<'source, T>> {
+        self.0.matches_at(input, cursor).map(|matched| {
+            // INVARIANT: `matched.cst_spans` is a singleton vector.
+            let range = &matched.cst_spans.first().unwrap().1;
+            PatternMatch::new(
+                (matched.payload, input.slice_bytes(range.start, range.end)),
+                matched.cst_spans, 
+                matched.next_cursor,
+            )
         })
+    }
+
+    fn describe(&self) -> String {
+        self.0.describe()
+    }
+    fn hint(&self) -> ParseHint {
+        self.0.hint()
+    }
+}
+
+impl<I: Input + ?Sized, P> Pattern<I> for WithText<AllOf<P>>
+where
+    P: Pattern<I>
+{
+    type Payload<'src> = (P::Payload<'src>, Vec<Cow<'src, str>>)
+    where
+        I: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src I,
+        cursor: <I as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, I> {
+        self.0.matches_at(input, cursor).map(|matched| {
+            let texts : Vec<Cow<'src, str>> = matched.cst_spans.iter()
+                .map(|elem| input.slice_bytes(elem.1.start, elem.1.end))
+                .collect();
+            PatternMatch::new(
+                (matched.payload, texts),
+                matched.cst_spans,
+                matched.next_cursor,
+            )
+        })
+    }
+
+    fn describe(&self) -> String {
+        self.0.describe()
+    }
+    fn hint(&self) -> ParseHint {
+        self.0.hint()
+    }
+}
+
+impl<I: Input + ?Sized, P> Pattern<I> for WithText<AnyOf<P>>
+where
+    P: Pattern<I>
+{
+    type Payload<'src> = (P::Payload<'src>, Vec<Cow<'src, str>>)
+    where
+        I: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src I,
+        cursor: <I as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, I> {
+        self.0.matches_at(input, cursor).map(|matched| {
+            let texts : Vec<Cow<'src, str>> = matched.cst_spans.iter()
+                .map(|elem| input.slice_bytes(elem.1.start, elem.1.end))
+                .collect();
+            PatternMatch::new(
+                (matched.payload, texts),
+                matched.cst_spans,
+                matched.next_cursor,
+            )
+        })
+    }
+
+    fn describe(&self) -> String {
+        self.0.describe()
+    }
+    fn hint(&self) -> ParseHint {
+        self.0.hint()
     }
 }

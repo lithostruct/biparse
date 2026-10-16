@@ -138,7 +138,7 @@ pub(super) struct RecursiveFrame<'src, C, S: IdSupply> {
     // PAYLOAD INFORMATION
     /// The seed result of this recursion. [`None`] represents an unevaluated recursion (or unbounded recursion),
     /// [`Some`] means that there exists a seed state that can be recovered.
-    /// Payload reased via [`ErasedOutput`], which is recovered via unsafe code in [`Recursive`](crate::combinator::Recursive).
+    /// Payload erased via [`ErasedOutput`], which is recovered via unsafe code in [`Recursive`](crate::combinator::Recursive).
     pub(super) seed_result: Option<(ParseState<'src, C, S>, Rc<dyn ErasedOutput<'src> + 'src>)>,
 
     /// Informs whether this frame is currently involved in fixpoint seed growing.

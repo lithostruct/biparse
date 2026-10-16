@@ -4,7 +4,7 @@ use derive_more::Into;
 use rowan::SyntaxKind;
 
 use crate::{
-    input::{Input, InputItem, LineColumn, Pattern, PatternMatch},
+    input::{Input, InputItem, LineColumn, Pattern, PatternMatch, PatternMatchResult},
     parse::{Expectation, ParseHint},
 };
 
@@ -87,13 +87,7 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<
-        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
-        Option<<str as Input>::Cursor>,
-    >
-    where
-        str: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, str> {
         if cursor.0 >= input.len() {
             return Err(Some(cursor));
         }
@@ -135,13 +129,8 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<
-        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
-        Option<<str as Input>::Cursor>,
-    >
-    where
-        str: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, str>
+where {
         if cursor.0 >= input.len() {
             return Err(Some(cursor));
         }
@@ -200,13 +189,8 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<
-        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
-        Option<<str as Input>::Cursor>,
-    >
-    where
-        str: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, str>
+where {
         (self.0.clone(), self.1.as_str()).matches_at(input, cursor)
     }
     fn describe(&self) -> String {

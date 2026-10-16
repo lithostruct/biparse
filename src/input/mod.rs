@@ -5,9 +5,9 @@ mod composite_patterns;
 mod str;
 
 pub use self::{
-    cached_str::CachedStr,
     composite_patterns::{AllOf, AnyOf},
     input_trait::*,
+    str::StrIndex,
 };
 
 #[cfg(feature = "regex")]
@@ -16,4 +16,4 @@ mod regex;
 #[cfg(feature = "logos")]
 mod logos;
 #[cfg(feature = "logos")]
-pub use logos::{LexerIndex, LexerStream};
+pub use logos::{LexerIndex, LexerStream, WithText};

@@ -3,7 +3,7 @@
 use rowan::SyntaxKind;
 
 use crate::{
-    input::{Input, Pattern, PatternMatch, str::StrIndex},
+    input::{Input, Pattern, PatternMatch, PatternMatchResult, str::StrIndex},
     parse::{Expectation, ParseHint},
 };
 
@@ -17,13 +17,7 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<
-        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
-        Option<<str as Input>::Cursor>,
-    >
-    where
-        str: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, str> {
         match self.1.find_at(input, cursor.into_usize()) {
             Some(matched) => {
                 if matched.start() == cursor.into_usize() {
@@ -63,13 +57,7 @@ where
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
-    ) -> Result<
-        PatternMatch<'src, Self::Payload<'src>, <str as Input>::Cursor>,
-        Option<<str as Input>::Cursor>,
-    >
-    where
-        str: 'src,
-    {
+    ) -> PatternMatchResult<'src, Self, str> {
         match self.1.find_at(input, cursor.into_usize()) {
             Some(matched) => {
                 if matched.start() == cursor.into_usize() {
