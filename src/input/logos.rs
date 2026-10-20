@@ -71,6 +71,10 @@ where
             source: CachedStr::new(source),
         }
     }
+
+    pub fn source(&self) -> &str {
+        &self.source
+    }
 }
 
 struct LexerStreamInner<'src, Token: Logos<'src>> {

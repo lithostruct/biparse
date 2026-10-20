@@ -134,9 +134,12 @@ where
 
 pub type ParseResult<A, E> = Result<ParseArtifact<A, E>, <E as ParseEnvironment>::Failure>;
 impl<A, E: ParseEnvironment> ParseOutput<A, E> {
-    /// Converts self into a [`Result`], erasing the parser-internal distinction between speculative and committed failure.
+    /// Converts self into a [`Result<ParseArtifact<A, E>, ...>`],
+    /// erasing the distinction between speculative and committed failure.
     ///
-    /// This is typically used for top-level parser output.
+    /// This is typically used for top-level parser output;
+    /// see [`ParserExt::parse_all`](crate::parse::ParserExt::parse_all)
+    /// and [`ParserExt::check_all`](crate::parse::ParserExt::check_all).
     pub fn into_result(self) -> ParseResult<A, E> {
         self.ast
             .into_result()
@@ -223,7 +226,7 @@ impl<A, E: ParseEnvironment> ParseArtifact<A, E> {
 /// Status of parse result of the AST payload.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ParseOutcome<A, F> {
-    /// A successful AST parse.
+    /// A successful parse producing an AST payload.
     Success(A),
     /// Speculative failure.
     /// The combinator system is free to try out parsing alternatives,
@@ -235,7 +238,7 @@ pub enum ParseOutcome<A, F> {
     Committed(F),
 }
 impl<A, F> ParseOutcome<A, F> {
-    /// Converts self into a [`Result`], erasing the parser-internal distinction between speculative and committed failure.
+    /// Converts `self` into a [`Result`], erasing the parser-internal distinction between speculative and committed failure.
     ///
     /// This is typically used for top-level parser output.
     pub fn into_result(self) -> Result<A, F> {

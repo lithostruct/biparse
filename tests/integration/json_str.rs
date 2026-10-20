@@ -68,23 +68,27 @@ enum Kind {
     Null = 0,
     True,
     False,
-    RawText,
-    DoubleQuote,
     LeftBracket,
     RightBracket,
     LeftBrace,
     RightBrace,
     Colon,
     Comma,
+
+    Number,
+    RawText,
+
     Whitespace,
 
     // Nodes
-    Number,
     String,
     Array,
     Pair,
     Object,
     Root,
+
+    /// Divergence from `logos`-based implementation:
+    DoubleQuote,
 }
 impl Language for Kind {
     type Kind = Kind;
@@ -195,7 +199,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
         .many();
 
     // Corresponds to object ::= '{' (pair (',' pair)*)? '}'
-    let object = (just((Kind::LeftBracket, '{')).then(optional_whitespace.clone()))
+    let object = (just((Kind::LeftBrace, '{')).then(optional_whitespace.clone()))
         .ignore_then(
             key_value
                 .clone()
@@ -211,7 +215,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
         .then_ignore(
             optional_whitespace
                 .clone()
-                .then(just((Kind::RightBracket, '}'))),
+                .then(just((Kind::RightBrace, '}'))),
         )
         .map(Json::Object)
         .node(Kind::Object);
@@ -325,7 +329,7 @@ fn json_num() {
 /// Array.
 #[test]
 fn json_array() {
-    let data = r#"[ "a", "b", "c", 1,2,3 ]"#;
+    let data = r#"[ "a", "b", "c", [1,2,3] ]"#;
     let parser = json_parser::<DefaultParseEnvironment>();
     let result = parser.parse_all(data).unwrap();
     expect![[r#"
@@ -340,14 +344,18 @@ fn json_array() {
                 String(
                     "c",
                 ),
-                Number(
-                    1,
-                ),
-                Number(
-                    2,
-                ),
-                Number(
-                    3,
+                Array(
+                    [
+                        Number(
+                            1,
+                        ),
+                        Number(
+                            2,
+                        ),
+                        Number(
+                            3,
+                        ),
+                    ],
                 ),
             ],
         )
@@ -356,6 +364,42 @@ fn json_array() {
 
     let tree: rowan::SyntaxNode<Kind> = result.cst().canonize_with(Kind::Root).0;
     assert_eq!(tree.text(), data);
+    expect![[r#"
+        Root@0..26
+          Array@0..26
+            LeftBracket@0..1 "["
+            Whitespace@1..2 " "
+            String@2..5
+              DoubleQuote@2..3 "\""
+              RawText@3..4 "a"
+              DoubleQuote@4..5 "\""
+            Comma@5..6 ","
+            Whitespace@6..7 " "
+            String@7..10
+              DoubleQuote@7..8 "\""
+              RawText@8..9 "b"
+              DoubleQuote@9..10 "\""
+            Comma@10..11 ","
+            Whitespace@11..12 " "
+            String@12..15
+              DoubleQuote@12..13 "\""
+              RawText@13..14 "c"
+              DoubleQuote@14..15 "\""
+            Comma@15..16 ","
+            Whitespace@16..17 " "
+            Array@17..24
+              LeftBracket@17..18 "["
+              Number@18..19 "1"
+              Comma@19..20 ","
+              Number@20..21 "2"
+              Comma@21..22 ","
+              Number@22..23 "3"
+              RightBracket@23..24 "]"
+            Whitespace@24..25 " "
+            RightBracket@25..26 "]"
+
+    "#]]
+    .assert_debug_eq(&tree);
 }
 
 /// Representative data of this crate!
@@ -425,7 +469,7 @@ fn package_data() {
     expect![[r#"
         Root@0..143
           Object@0..142
-            LeftBracket@0..1 "{"
+            LeftBrace@0..1 "{"
             Whitespace@1..6 "\n    "
             Pair@6..23
               String@6..12
@@ -473,7 +517,7 @@ fn package_data() {
                 Comma@98..99 ","
                 Whitespace@99..108 "\n        "
                 Object@108..134
-                  LeftBracket@108..109 "{"
+                  LeftBrace@108..109 "{"
                   Whitespace@109..110 " "
                   Pair@110..132
                     String@110..126
@@ -484,11 +528,11 @@ fn package_data() {
                     Whitespace@127..128 " "
                     True@128..132 "true"
                   Whitespace@132..133 " "
-                  RightBracket@133..134 "}"
+                  RightBrace@133..134 "}"
                 Whitespace@134..139 "\n    "
                 RightBracket@139..140 "]"
             Whitespace@140..141 "\n"
-            RightBracket@141..142 "}"
+            RightBrace@141..142 "}"
           Whitespace@142..143 "\n"
 
     "#]]

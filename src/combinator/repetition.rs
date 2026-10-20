@@ -1,10 +1,11 @@
 use crate::{
     combinator::success,
+    cst::AssociatedCst,
     input::Input,
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
-/// Parser combinator that executes a given parser zero or more times.
+/// Parser combinator that executes a given parser zero, one or more than one times.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Many<P> {
     inner: P,
@@ -31,7 +32,7 @@ where
         ParseOutput<Vec<A>, E>,
     ) {
         let mut accumulative = Vec::new();
-        let mut cst = success::<'src, I, E>().parse(input, state.clone()).1.cst;
+        let mut cst = AssociatedCst::new();
         loop {
             let (new_state, new_result) = self.inner.parse(input, state.clone());
             match new_result.ast {
@@ -59,7 +60,7 @@ where
                         new_state,
                         ParseOutput {
                             ast: ParseOutcome::Committed(failure),
-                            cst,
+                            cst: new_result.cst,
                         },
                     );
                 }
