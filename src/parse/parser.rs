@@ -7,7 +7,7 @@ use crate::{
     combinator::{
         AsParser, Associate, IntoOwned, Many, Map, Node, Or, Success, Then, WithEnv, end, success,
     },
-    cst::{AssociatedCst, IdSupply},
+    cst::{AssociatedGreenCst, IdSupply},
     input::Input,
     parse::{
         DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState,
@@ -36,7 +36,7 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
         let (new_state, output) = <Self as Parser<'src, I, A, E>>::parse(self, input, state);
         let erased_output = ParseOutput {
             ast: output.ast.map(|_| ()),
-            cst: AssociatedCst::new(),
+            cst: AssociatedGreenCst::new(),
         };
         (new_state, erased_output)
     }
@@ -155,6 +155,14 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         self.or(success()).map(Either::left)
     }
+    /// Chains `self` to match on zero or one occurence. Returns the default value if not present.
+    fn optional_with_default(self) -> composite::OptionalWithDefault<'src, I, A, E, Self>
+    where
+        Self: Sized,
+        A: Default,
+    {
+        self.or(success()).map(Either::left_or_default)
+    }
 
     /// Discards the current AST payload.
     fn ignore(self) -> composite::Ignore<E, Self, A>
@@ -214,6 +222,14 @@ pub mod composite {
         Map<
             WithEnv<E, Or<P, AsParser<'src, I, (), E, Success>>>,
             fn(Either<A, ()>) -> Option<A>,
+            Either<A, ()>,
+        >,
+    >;
+    pub type OptionalWithDefault<'src, I, A, E, P> = WithEnv<
+        E,
+        Map<
+            WithEnv<E, Or<P, AsParser<'src, I, (), E, Success>>>,
+            fn(Either<A, ()>) -> A,
             Either<A, ()>,
         >,
     >;

@@ -91,7 +91,7 @@ enum Kind {
     #[regex(r#""[a-zA-Z0-9_ ]+""#)]
     RawText,
 
-    #[regex(r"[ \t\n]+", logos::skip)]
+    #[regex(r"[ \t\r\n]+", logos::skip)]
     Whitespace,
 
     // Nodes
@@ -130,10 +130,7 @@ where
     let null = just(Kind::Null).map(|_| Json::Null);
     let boolean = just(Kind::True)
         .or(just(Kind::False))
-        .map(|either| match either {
-            Either::Left(_) => Json::Boolean(true),
-            Either::Right(_) => Json::Boolean(false),
-        });
+        .map(|either| Json::Boolean(either.is_left()));
 
     // Simplifying assumption:
     // Strings consist of characters matching the following `Regex`, with no regard for escape characters.
@@ -174,8 +171,7 @@ where
                     rest.insert(0, first);
                     rest
                 })
-                .or(success())
-                .map(Either::left_or_default),
+                .optional_with_default(),
         )
         .then_ignore(just(Kind::RightBracket))
         .map(Json::Array)
@@ -201,14 +197,12 @@ where
                     rest.insert(0, first);
                     rest
                 })
-                .or(success())
-                .map(Either::left_or_default),
+                .optional_with_default(),
         )
         .then_ignore(just(Kind::RightBrace))
         .map(Json::Object)
         .node(Kind::Object);
 
-    // Finally!
     value.define(
         null.or_same(boolean)
             .or_same(string.map(Json::String))

@@ -4,7 +4,7 @@
 //! Including token matching, general parser usability (see also `'source / 'src Distinction`),
 //! and general parsing correctness.
 
-use std::rc::Rc;
+use std::{rc::Rc, str::FromStr};
 
 use biparse::prelude::*;
 use expect_test::expect;
@@ -100,7 +100,7 @@ fn cst_is_total<L: Language>(source: &str, tree: &SyntaxNode<L>) {
 
 /// Lexer trivia recovery: restore skipped whitespace to `Kind::Trivia`.
 #[test]
-fn lexer_trivia_recovery() {
+fn trivia_recovery() {
     let source = "(   )";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
 
@@ -125,9 +125,37 @@ fn lexer_trivia_recovery() {
             "#]]
             .assert_debug_eq(&tree);
         }
-        Err(e) => {
-            unreachable!("{e}")
+        Err(e) => unreachable!("{e}"),
+    }
+}
+/// Lexer trivia recovery: restore skipped whitespace to `Kind::Trivia`.
+#[test]
+fn leading_trivia_recovery() {
+    let source = "   +   ";
+    let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
+
+    let parser: Rc<dyn Parser<'_, LexerStream<Kind>, _, DefaultParseEnvironment>> =
+        just(Kind::Plus).shared();
+
+    match parser.parse_all(&stream) {
+        Ok(report) => {
+            assert_eq!(report.ast_only(), &Kind::Plus);
+            let (tree, _) = report.cst().canonize_with(Kind::Root);
+
+            assert_eq!(tree.kind(), Kind::Root);
+            cst_is_total(source, &tree);
+
+            assert_eq!(tree.children_with_tokens().count(), 3);
+            expect![[r#"
+                Root@0..7
+                  Trivia@0..3 "   "
+                  Plus@3..4 "+"
+                  Trivia@4..7 "   "
+
+            "#]]
+            .assert_debug_eq(&tree);
         }
+        Err(e) => unreachable!("{e}"),
     }
 }
 
@@ -158,6 +186,7 @@ fn token_asterisk() {
     "#]]
     .assert_debug_eq(result.unwrap().ast_only());
 }
+
 /// Regression:
 /// Erroneous unconditional matching on ANY present token, regardless of type.
 #[test]
@@ -214,18 +243,9 @@ where
         Indirect<'_, '_, LexerStream<'_, Kind>, Box<Expression>, DefaultParseEnvironment>,
     > = Recursive::declare_as("addmult expression");
 
-    let num = satisfies(
-        Kind::Number.into(),
-        |input: &LexerStream<'_, Kind>, item| match item.token {
-            Ok(Kind::Number) => input
-                .slice_bytes(item.span.start, item.span.end)
-                .parse::<BigUint>()
-                .map_err(|error| Box::new(std::io::Error::other(error))),
-            _ => Err(Box::new(std::io::Error::other("expected number"))),
-        },
-    )
-    .map(|uint| Box::new(Expression::Number(uint)))
-    .shared();
+    let num = just(WithText(Kind::Number))
+        .map(|(_, s)| Box::new(Expression::Number(BigUint::from_str(&s).unwrap())))
+        .shared();
 
     let terminal = num
         .clone()

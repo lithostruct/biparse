@@ -1,5 +1,7 @@
 //! Optional implementation of [`Pattern`] for [`regex::Regex`] and [`regex_lite::Regex`].
 
+#![cfg(feature = "regex")]
+
 use rowan::SyntaxKind;
 
 use crate::{
@@ -7,6 +9,7 @@ use crate::{
     parse::{Expectation, ParseHint},
 };
 
+/// `regex` support.
 impl<K> Pattern<str> for (K, regex::Regex)
 where
     K: Clone + Into<SyntaxKind>,
@@ -47,6 +50,7 @@ where
     }
 }
 
+/// `regex_lite` support.
 impl<K> Pattern<str> for (K, regex_lite::Regex)
 where
     K: Clone + Into<SyntaxKind>,

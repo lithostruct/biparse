@@ -19,7 +19,7 @@ use crate::{
 pub use self::{
     binary::{Or, Then},
     blanket::{AsParser, WithEnv},
-    just_satisfies::{Just, Satisfies},
+    just_satisfies::Just,
     map_into_owned::{IntoOwned, Map},
     node_association::{Associate, Node},
     recursive::{
@@ -47,14 +47,4 @@ pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<I> + 'src>(
     pattern: P,
 ) -> AsParser<'src, I, P::Payload<'src>, E, Just<P>> {
     AsParser::from(Just::new(pattern))
-}
-pub fn satisfies<'src, I: Input + ?Sized, E: ParseEnvironment, F, Success, Failure>(
-    kind: rowan::SyntaxKind,
-    predicate: F,
-) -> AsParser<'src, I, Success, E, Satisfies<F, Success, Failure>>
-where
-    F: Fn(&I, &InputItem<I::Token, I::Cursor>) -> Result<Success, Failure>,
-    Failure: std::error::Error,
-{
-    AsParser::from(Satisfies::new::<I>(kind, predicate))
 }

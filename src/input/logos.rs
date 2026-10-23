@@ -166,7 +166,7 @@ where
     }
 
     fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
-        self.source.byte_to_line_col(at_offset)
+        self.source.to_line_col(at_offset)
     }
 
     fn describe_token(token: &Self::Token) -> String {

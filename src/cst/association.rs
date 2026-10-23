@@ -4,9 +4,9 @@ use derive_more::Into;
 
 use crate::cst::path::CstPath;
 
-/// Association table between an `Id` type and a CstOutput containing GreenNodes.
+/// Association table between an `Id` type and paths to a coupled green forest.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Into)]
-pub struct AssociationTable<Id>
+pub(super) struct AssociationTable<Id>
 where
     Id: Eq + Hash,
 {
@@ -18,20 +18,34 @@ where
     Id: Eq + Hash,
 {
     fn default() -> Self {
-        AssociationTable {
-            inner: im::HashMap::new(),
-        }
+        AssociationTable::new()
     }
 }
 impl<Id> AssociationTable<Id>
 where
-    Id: Debug + Clone + Eq + Hash,
+    Id: Eq + Hash,
 {
     /// Creates an empty association table.
     pub fn new() -> Self {
-        AssociationTable::default()
+        AssociationTable {
+            inner: im::HashMap::new(),
+        }
     }
 
+    /// Immutably borrows the inner [`im::HashMap`].
+    pub const fn inner(&self) -> &im::HashMap<Id, CstPath> {
+        &self.inner
+    }
+    /// Converts self into the inner [`im::HashMap`].
+    pub fn into_inner(self) -> im::HashMap<Id, CstPath> {
+        self.inner
+    }
+}
+
+impl<Id> AssociationTable<Id>
+where
+    Id: Debug + Clone + Eq + Hash,
+{
     /// Associatively merges with `self` as the left-hand-side, and a given right-hand-side.
     ///
     /// # Panics
@@ -61,14 +75,5 @@ where
             })
             .for_each(drop);
         self
-    }
-
-    /// Immutably borrows the inner [`im::HashMap`].
-    pub fn inner(&self) -> &im::HashMap<Id, CstPath> {
-        &self.inner
-    }
-    /// Converts self into the inner [`im::HashMap`].
-    pub fn into_inner(self) -> im::HashMap<Id, CstPath> {
-        self.inner
     }
 }

@@ -10,6 +10,13 @@ use crate::{
 /// Supported collections include:
 /// - [`Vec<T>`]
 /// - [`[T; N]`](std::array)
+///
+/// # Notes on [`Pattern`] Atomicity
+///
+/// The [`Pattern`] implementation on [`AllOf`] is non-atomic; it defers to the inner patterns for matching,
+/// and chains the output of the previous element to the next.  
+/// This may have unintended interactions with [`SkippingStr`](crate::input::SkippingStr).
+/// Refer to [`SkippingStr`](crate::input::SkippingStr) "Notes on Trivia Matching and Pattern Atomicity" for more information.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Deref, DerefMut, AsRef, AsMut,
 )]
@@ -116,6 +123,11 @@ where
 /// Supported collections include:
 /// - [`Vec<T>`]
 /// - [`[T; N]`](std::array)
+///
+/// # Notes on [`Pattern`] Atomicity
+///
+/// The [`Pattern`] implementation on [`AllOf`] is non-atomic; it defers to the inner patterns for matching,
+/// and chains the output of the previous element to the next.  
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Deref, DerefMut, AsRef, AsMut,
 )]

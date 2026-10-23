@@ -1,33 +1,61 @@
+use std::borrow::Cow;
+
 use derive_more::{AsRef, Deref};
+use rowan::SyntaxKind;
+
+use crate::{
+    input::{Input, InputItem, LineColumn, Pattern, PatternMatchResult, StrIndex},
+    parse::ParseHint,
+};
 
 /// A string structure that caches line start information of its source.
 /// Line starts are defined as the character following a newline sequence of
 /// either LF `\n` or CRLF `\r\n` only.
 ///
 /// This performs the non-essential optimization for calculating line starts,
-/// thus taking O(N) time on construction and O(lg N) on subsequent lookup.
+/// thus taking `O(N)` time on construction and `O(lg N)` on subsequent lookup.
+/// Hence, this input type might be beneficial for wide speculative parsing branches compared to [`str`].
 ///
-/// # Note on `Input` Implementation
+/// # Note on [`Pattern`] Implementors
 ///
-/// Originally, this was intended to be exposed as a public `Input` implementor,
-/// but the way that the `Input<'src>` and `Cursor` traits were interacting was *really* not working well,
-/// particularly with how `Pattern` methods can be used over any `'src` where `I: Input<'src>` is implemented,
-/// and that the most natural way to implement for `CachedStr` is to delegate to the inner `str` representation.
-/// This was running into limitations surrounding shadowed trait implementations.
-/// See also Rust tracking issue #152409: https://github.com/rust-lang/rust/issues/152409
+/// Due to trait coherence, [`Pattern<str>`] implementors do not blanket implement [`Pattern<CachedStr<'_>>`].
+/// Implementors should use the following snippet to defer to the inner [`str`] implementation:
+/// ```ignore
+/// // Given an existing implementation of T : Pattern<str> where (...)
+/// impl<'source> Pattern<CachedStr<'source>> for T
+/// where
+///     // (...)
+/// {
+///     type Payload<'src>
+///         = <Self as Pattern<str>>::Payload<'src>
+///     where
+///         CachedStr<'source>: 'src;
 ///
-/// It was more trouble than it was worth, frankly.
-/// [`LexerStream`](crate::input::LexerStream) still uses it internally though so I'll be keeping this type around.
+///     fn matches_at<'src>(
+///         &self,
+///         input: &'src CachedStr<'source>,
+///         cursor: <CachedStr<'source> as Input>::Cursor,
+///     ) -> super::PatternMatchResult<'src, Self, CachedStr<'source>> {
+///         self.matches_at(input.source(), cursor)
+///     }
+///     fn describe(&self) -> String {
+///         <Self as Pattern<str>>::describe(self)
+///     }
+///     fn hint(&self) -> ParseHint {
+///         <Self as Pattern<str>>::hint(self)
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, AsRef)]
-pub(super) struct CachedStr<'src> {
+pub struct CachedStr<'source> {
     #[deref]
     #[as_ref]
-    source: &'src str,
+    source: &'source str,
     linestarts: Vec<usize>,
 }
-impl<'src> CachedStr<'src> {
+impl<'source> CachedStr<'source> {
     /// Constructs a string with cached line start positions.
-    pub fn new(source: &'src str) -> Self {
+    pub fn new(source: &'source str) -> Self {
         let mut linestarts = vec![0];
         let mut current_offset = 0;
 
@@ -53,6 +81,30 @@ impl<'src> CachedStr<'src> {
 
         CachedStr { source, linestarts }
     }
+    /// View the underlying source string of `self`.
+    pub const fn source(&self) -> &str {
+        self.source
+    }
+    /// Uses cached linestart information to calculate the line and column of a byte offset in `O(lg N)` average time.
+    pub fn to_line_col(&self, at_offset: usize) -> LineColumn {
+        let line_index = self
+            .linestarts
+            .partition_point(|&start| start <= at_offset)
+            .saturating_sub(1);
+        let linestart = self.linestarts[line_index];
+
+        let mut column_index = 0;
+        for (char_offset, _) in self.source[linestart..].char_indices() {
+            if char_offset >= at_offset {
+                break;
+            }
+            column_index += 1;
+        }
+        LineColumn {
+            line: line_index + 1,
+            column: column_index + 1,
+        }
+    }
 }
 impl<'src> From<&'src str> for CachedStr<'src> {
     fn from(value: &'src str) -> Self {
@@ -62,5 +114,169 @@ impl<'src> From<&'src str> for CachedStr<'src> {
 impl<'src> From<CachedStr<'src>> for &'src str {
     fn from(value: CachedStr<'src>) -> Self {
         value.source
+    }
+}
+
+impl<'src> Input for CachedStr<'src> {
+    type Cursor = StrIndex;
+    type Token = char;
+
+    fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
+        self.to_line_col(at_offset)
+    }
+
+    // Delegate to `str`.
+
+    fn start(&self) -> Self::Cursor {
+        self.source.start()
+    }
+    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token, Self::Cursor>> {
+        self.source.peek(at)
+    }
+    fn skipped_trivia_kind(&self) -> Option<SyntaxKind> {
+        self.source.skipped_trivia_kind()
+    }
+    fn byte_offset(&self, at: Self::Cursor) -> usize {
+        self.source.byte_offset(at)
+    }
+    fn slice_bytes(&self, start: usize, end: usize) -> Cow<'_, str> {
+        self.source.slice_bytes(start, end)
+    }
+    fn describe_token(token: &Self::Token) -> String {
+        <str as Input>::describe_token(token)
+    }
+}
+
+// Pattern delegation to inner `str`.
+
+/// Single matching on `str` for `char`.
+impl<'source, K> Pattern<CachedStr<'source>> for (K, char)
+where
+    K: Clone + Into<SyntaxKind>,
+{
+    type Payload<'src>
+        = <Self as Pattern<str>>::Payload<'src>
+    where
+        CachedStr<'source>: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src CachedStr<'source>,
+        cursor: <CachedStr<'source> as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, CachedStr<'source>> {
+        self.matches_at(input.source(), cursor)
+    }
+
+    fn describe(&self) -> String {
+        <Self as Pattern<str>>::describe(self)
+    }
+    fn hint(&self) -> ParseHint {
+        <Self as Pattern<str>>::hint(self)
+    }
+}
+
+/// Contigious matching on [`str`] for [`&str`].
+impl<'source, K> Pattern<CachedStr<'source>> for (K, &str)
+where
+    K: Clone + Into<SyntaxKind>,
+{
+    type Payload<'src>
+        = <Self as Pattern<str>>::Payload<'src>
+    where
+        CachedStr<'source>: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src CachedStr<'source>,
+        cursor: <CachedStr<'source> as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, CachedStr<'source>> {
+        self.matches_at(input.source(), cursor)
+    }
+
+    fn describe(&self) -> String {
+        <Self as Pattern<str>>::describe(self)
+    }
+    fn hint(&self) -> ParseHint {
+        <Self as Pattern<str>>::hint(self)
+    }
+}
+
+/// Contiguous matching on [`str`] for [`String`], deferring to the inner [`&str`] implementation.
+impl<'source, K> Pattern<CachedStr<'source>> for (K, String)
+where
+    K: Clone + Into<SyntaxKind>,
+{
+    type Payload<'src>
+        = <Self as Pattern<str>>::Payload<'src>
+    where
+        CachedStr<'source>: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src CachedStr<'source>,
+        cursor: <CachedStr<'source> as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, CachedStr<'source>> {
+        self.matches_at(input.source(), cursor)
+    }
+
+    fn describe(&self) -> String {
+        <Self as Pattern<str>>::describe(self)
+    }
+    fn hint(&self) -> ParseHint {
+        <Self as Pattern<str>>::hint(self)
+    }
+}
+
+#[cfg(feature = "regex")]
+/// `regex` support.
+impl<'source, K> Pattern<CachedStr<'source>> for (K, regex::Regex)
+where
+    K: Clone + Into<SyntaxKind>,
+{
+    type Payload<'src>
+        = <Self as Pattern<str>>::Payload<'src>
+    where
+        CachedStr<'source>: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src CachedStr<'source>,
+        cursor: <CachedStr<'source> as Input>::Cursor,
+    ) -> super::PatternMatchResult<'src, Self, CachedStr<'source>> {
+        self.matches_at(input.source(), cursor)
+    }
+
+    fn describe(&self) -> String {
+        <Self as Pattern<str>>::describe(self)
+    }
+    fn hint(&self) -> ParseHint {
+        <Self as Pattern<str>>::hint(self)
+    }
+}
+
+#[cfg(feature = "regex")]
+/// `regex_lite` support.
+impl<'source, K> Pattern<CachedStr<'source>> for (K, regex_lite::Regex)
+where
+    K: Clone + Into<SyntaxKind>,
+{
+    type Payload<'src>
+        = <Self as Pattern<str>>::Payload<'src>
+    where
+        CachedStr<'source>: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src CachedStr<'source>,
+        cursor: <CachedStr<'source> as Input>::Cursor,
+    ) -> super::PatternMatchResult<'src, Self, CachedStr<'source>> {
+        self.matches_at(input.source(), cursor)
+    }
+
+    fn describe(&self) -> String {
+        <Self as Pattern<str>>::describe(self)
+    }
+    fn hint(&self) -> ParseHint {
+        <Self as Pattern<str>>::hint(self)
     }
 }

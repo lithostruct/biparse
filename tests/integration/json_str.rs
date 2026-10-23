@@ -115,7 +115,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
     let mut value: Recursive<Indirect<'_, '_, str, Json, E>> = Recursive::declare_as("json");
 
     // Primitives.
-    let optional_whitespace = just((Kind::Whitespace, Regex::new(r"[ \t\n]+").unwrap()))
+    let optional_whitespace = just((Kind::Whitespace, Regex::new(r"[ \t\r\n]+").unwrap()))
         .optional()
         .ignore()
         .shared();
@@ -123,10 +123,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
     let null = just((Kind::Null, "null")).map(|_| Json::Null);
     let boolean = just((Kind::True, "true"))
         .or(just((Kind::False, "false")))
-        .map(|either| match either {
-            Either::Left(_) => Json::Boolean(true),
-            Either::Right(_) => Json::Boolean(false),
-        });
+        .map(|either: Either<&str, &str>| Json::Boolean(either.is_left()));
 
     // Simplifying assumption:
     // Strings consist of characters matching the following `Regex`, with no regard for escape characters.
@@ -167,8 +164,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                     rest.insert(0, first);
                     rest
                 })
-                .or(success())
-                .map(|either| either.map_right(|_| Vec::new()).into_inner()),
+                .optional_with_default(),
         )
         .then_ignore(
             optional_whitespace
@@ -209,8 +205,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                     rest.insert(0, first);
                     rest
                 })
-                .or(success())
-                .map(|either| either.map_right(|_| Vec::new()).into_inner()),
+                .optional_with_default(),
         )
         .then_ignore(
             optional_whitespace

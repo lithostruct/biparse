@@ -10,7 +10,7 @@ use crate::{
         RecursiveState,
         recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId},
     },
-    cst::AssociatedCst,
+    cst::AssociatedGreenCst,
     failure::{ParseFailure, ParseFailureKind},
     input::Input,
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
@@ -323,7 +323,7 @@ macro_rules! recursive_growth {
                             return_state,
                             ParseOutput {
                                 ast: ParseOutcome::Speculative(failure),
-                                cst: AssociatedCst::new(),
+                                cst: AssociatedGreenCst::new(),
                             },
                         )
                     }

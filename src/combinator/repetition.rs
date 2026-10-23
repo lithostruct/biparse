@@ -1,6 +1,6 @@
 use crate::{
     combinator::success,
-    cst::AssociatedCst,
+    cst::AssociatedGreenCst,
     input::Input,
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
@@ -32,7 +32,7 @@ where
         ParseOutput<Vec<A>, E>,
     ) {
         let mut accumulative = Vec::new();
-        let mut cst = AssociatedCst::new();
+        let mut cst = AssociatedGreenCst::new();
         loop {
             let (new_state, new_result) = self.inner.parse(input, state.clone());
             match new_result.ast {

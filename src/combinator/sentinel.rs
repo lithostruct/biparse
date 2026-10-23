@@ -1,7 +1,7 @@
 use crate::{
-    cst::AssociatedCst,
+    cst::AssociatedGreenCst,
     failure::{ParseFailure, ParseFailureKind},
-    input::Input,
+    input::{Input, PatternMatch},
     parse::{
         Expectation, ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser,
     },
@@ -28,7 +28,7 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Su
             state,
             ParseOutput {
                 ast: ParseOutcome::Success(()),
-                cst: AssociatedCst::new(),
+                cst: AssociatedGreenCst::new(),
             },
         )
     }
@@ -68,7 +68,7 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
             state,
             ParseOutput {
                 ast: ParseOutcome::Speculative(failure),
-                cst: AssociatedCst::new(),
+                cst: AssociatedGreenCst::new(),
             },
         )
     }
@@ -101,7 +101,15 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+
         let cursor = state.cursor;
+        let cst =
+            // Need to actualize for input that is *just* trivia.
+            AssociatedGreenCst::leaves(
+                PatternMatch::new((), Vec::new(), cursor)
+                    .actualize_leaves::<I, E>(input, &state),
+            );
+
         (
             state,
             ParseOutput {
@@ -116,7 +124,7 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
                     );
                     ParseOutcome::Speculative(failure)
                 }),
-                cst: AssociatedCst::new(),
+                cst,
             },
         )
     }

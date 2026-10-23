@@ -2,7 +2,7 @@ use rowan::{GreenNode, GreenToken, SyntaxKind};
 
 use crate::{
     combinator::RecursiveState,
-    cst::{AssociatedCst, IdSupply},
+    cst::{AssociatedGreenCst, IdSupply},
     green::{GreenElement, GreenInterner},
     input::Input,
     parse::ParseEnvironment,
@@ -92,7 +92,7 @@ impl<'src, C, S: IdSupply + Default> ParseState<'src, C, S> {
 /// Parse output produced by [`Parser`](crate::parse::Parser) implementors.
 pub struct ParseOutput<A, E: ParseEnvironment> {
     pub ast: ParseOutcome<A, E::Failure>,
-    pub cst: AssociatedCst<<E::Supply as IdSupply>::Id>,
+    pub cst: AssociatedGreenCst<<E::Supply as IdSupply>::Id>,
 }
 impl<A, E: ParseEnvironment> Debug for ParseOutput<A, E>
 where
@@ -152,7 +152,7 @@ impl<A, E: ParseEnvironment> ParseOutput<A, E> {
 /// with accessor functions for end-use.
 pub struct ParseArtifact<A, E: ParseEnvironment> {
     ast: A,
-    cst: AssociatedCst<<E::Supply as IdSupply>::Id>,
+    cst: AssociatedGreenCst<<E::Supply as IdSupply>::Id>,
 }
 
 impl<A, E: ParseEnvironment> Debug for ParseArtifact<A, E>
@@ -205,20 +205,20 @@ impl<A, E: ParseEnvironment> ParseArtifact<A, E> {
         self.ast
     }
     /// Provides an immutable view into the CST payload.
-    pub fn cst(&self) -> &AssociatedCst<<E::Supply as IdSupply>::Id> {
+    pub fn cst(&self) -> &AssociatedGreenCst<<E::Supply as IdSupply>::Id> {
         &self.cst
     }
     /// Consumes `self` into the CST payload.
     ///
     /// To obtain both AST and CST components, use [`Self::into_parts`].
-    pub fn into_cst(self) -> AssociatedCst<<E::Supply as IdSupply>::Id> {
+    pub fn into_cst(self) -> AssociatedGreenCst<<E::Supply as IdSupply>::Id> {
         self.cst
     }
     /// Consumes `self` and returns its constituent parts.
     ///
     /// Note that diagnostic information is contained within the CST component
     /// due to coupling with CST path-based finding and resolution.
-    pub fn into_parts(self) -> (A, AssociatedCst<<E::Supply as IdSupply>::Id>) {
+    pub fn into_parts(self) -> (A, AssociatedGreenCst<<E::Supply as IdSupply>::Id>) {
         (self.ast, self.cst)
     }
 }
