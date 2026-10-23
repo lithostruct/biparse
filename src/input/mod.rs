@@ -7,7 +7,7 @@ mod str;
 
 pub use self::{
     cached_str::CachedStr,
-    composite_patterns::{AllOf, AnyOf},
+    composite_patterns::{AllOf, AnyOf, Matches},
     input_trait::*,
     skipping_str::SkippingStr,
     str::StrIndex,

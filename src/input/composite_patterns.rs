@@ -1,9 +1,52 @@
 use derive_more::{AsMut, AsRef, Deref, DerefMut, From};
+use rowan::SyntaxKind;
 
 use crate::{
     input::{Input, Pattern, PatternMatch, PatternMatchResult},
     parse::ParseHint,
 };
+
+/// Token matching for any `Input` type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, AsRef, AsMut)]
+pub struct Matches<K, P>(
+    K,
+    #[as_ref]
+    #[as_mut]
+    pub P,
+);
+
+impl<K, F, I: Input + ?Sized> Pattern<I> for Matches<K, F>
+where
+    K: Clone + Into<SyntaxKind>,
+    F: Fn(&I::Token) -> bool,
+{
+    type Payload<'src>
+        = I::Token
+    where
+        I: 'src;
+
+    fn matches_at<'src>(
+        &self,
+        input: &'src I,
+        cursor: <I as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, I> {
+        let Some(item) = input.peek(cursor) else {
+            return Err(Some(cursor));
+        };
+        if (self.1)(&item.token) {
+            Ok(item.into_match_info(self.0.clone().into()))
+        } else {
+            Err(Some(cursor))
+        }
+    }
+
+    fn describe(&self) -> String {
+        "predicate-satisfying token".into()
+    }
+    fn hint(&self) -> ParseHint {
+        ParseHint::Opaque
+    }
+}
 
 /// Sequential matching of all inner patterns.
 ///

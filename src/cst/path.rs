@@ -1,4 +1,7 @@
-use std::{collections::{VecDeque, vec_deque}, iter::*};
+use std::{
+    collections::{VecDeque, vec_deque},
+    iter::*,
+};
 
 use rowan::{GreenNode, Language, api::SyntaxNode};
 use thiserror::Error;
@@ -6,7 +9,7 @@ use thiserror::Error;
 use crate::{cst::Cst, green::GreenElement};
 
 /// The path through a forest of CST nodes.
-/// 
+///
 /// Not recommended for direct use. Use [`AssociatedGreenCst`](crate::cst::AssociatedGreenCst)
 /// or [`AssociatedRedCst`](crate::cst::AssociatedRedCst) where possible instead.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -37,7 +40,6 @@ impl CstPath {
         self.0 += width;
     }
 
-    
     /// Borrows the components of `CstPath`.
     pub const fn as_parts(&self) -> (usize, &VecDeque<usize>) {
         (self.0, &self.1)
@@ -46,12 +48,20 @@ impl CstPath {
     pub fn into_parts(self) -> (usize, VecDeque<usize>) {
         (self.0, self.1)
     }
-    
-    /// Creates a non-consuming iterator for `self`.
+    /// Constructs and returns a `CstPath` from its components.
     /// 
+    /// This method bypasses the construction invariants that [`AssociatedGreenCst`](crate::cst::AssociatedGreenCst)
+    /// enforces and relies upon.
+    /// Direct use is not recommended.
+    pub fn from_parts(root_index: usize, subpath: VecDeque<usize>) -> Self {
+        CstPath(root_index, subpath)
+    }
+
+    /// Creates a non-consuming iterator for `self`.
+    ///
     /// You may use the consuming iterator produced by [`IntoIterator::into_iter`] instead if desired.
     pub fn iter(&self) -> impl Iterator<Item = usize> {
-        let deref: fn(&usize) -> usize = |u : &usize| *u;
+        let deref: fn(&usize) -> usize = |u: &usize| *u;
         std::iter::once(self.0).chain(self.1.iter().map(deref))
     }
 }
@@ -67,10 +77,7 @@ impl IntoIterator for CstPath {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum PathfindError {
     #[error("expected node, got token")]
-    TokenNotNode {
-        path: CstPath,
-        depth: usize,
-    },
+    TokenNotNode { path: CstPath, depth: usize },
     #[error("index of {indexed:} at {depth:} but got forest of width {got_width:}")]
     OutOfBounds {
         path: CstPath,
@@ -89,11 +96,11 @@ impl Pathfind for Cst<GreenElement> {
     type Output = GreenNode;
 
     fn search(&self, path: &CstPath) -> Result<Self::Output, PathfindError> {
-
         let (root_index, subpath) = path.as_parts();
 
         // First search is done separate because `Vector<...>` and `GreenNodeData` have distinct indexing mechanisms.
-        let mut node: &rowan::GreenNodeData = self.get(root_index)
+        let mut node: &rowan::GreenNodeData = self
+            .get(root_index)
             .ok_or_else(|| PathfindError::OutOfBounds {
                 path: path.clone(),
                 depth: 0,
@@ -107,14 +114,17 @@ impl Pathfind for Cst<GreenElement> {
             })?;
 
         for (depth, &index) in subpath.iter().enumerate() {
-            let child = node.children().nth(index)
+            let child = node
+                .children()
+                .nth(index)
                 .ok_or_else(|| PathfindError::OutOfBounds {
                     path: path.clone(),
                     depth: depth + 1,
                     indexed: index,
                     got_width: node.children().len(),
                 })?;
-            node = child.into_node()
+            node = child
+                .into_node()
                 .ok_or_else(|| PathfindError::TokenNotNode {
                     path: path.clone(),
                     depth: depth + 1,
@@ -124,21 +134,37 @@ impl Pathfind for Cst<GreenElement> {
     }
 }
 
-impl<L : Language> Pathfind for SyntaxNode<L> {
+impl<L: Language> Pathfind for SyntaxNode<L> {
     type Output = SyntaxNode<L>;
 
-    fn search<'a>(&'a self, path: &CstPath) -> Result<Self::Output, PathfindError> {
+    fn search(&self, path: &CstPath) -> Result<Self::Output, PathfindError> {
+        let (root_index, subpath) = path.as_parts();
+        // check that path does not describe forest (an actualized red tree is always single).
+        if root_index != 0 {
+            return Err(PathfindError::OutOfBounds {
+                path: path.clone(),
+                depth: 0,
+                indexed: root_index,
+                got_width: 1,
+            })
+        }
         // This clone is cheap.
         let mut node = self.clone();
-        for (depth, index) in path.iter().enumerate() {
-            let child = node.children_with_tokens().nth(index)
-                .ok_or_else(|| PathfindError::OutOfBounds {
-                    path: path.clone(),
-                    depth: depth + 1,
-                    indexed: index,
-                    got_width: node.children_with_tokens().count(),
+
+        for (depth, &index) in subpath.iter().enumerate() {
+            let child = node
+                .children_with_tokens()
+                .nth(index)
+                .ok_or_else(|| {
+                    PathfindError::OutOfBounds {
+                        path: path.clone(),
+                        depth: depth + 1,
+                        indexed: index,
+                        got_width: node.children_with_tokens().count(),
+                    }
                 })?;
-            node = child.into_node()
+            node = child
+                .into_node()
                 .ok_or_else(|| PathfindError::TokenNotNode {
                     path: path.clone(),
                     depth: depth + 1,

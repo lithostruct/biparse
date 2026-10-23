@@ -101,7 +101,6 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
         input: &'src I,
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
-
         let cursor = state.cursor;
         let cst =
             // Need to actualize for input that is *just* trivia.

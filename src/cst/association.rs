@@ -1,11 +1,11 @@
 use std::{fmt::Debug, hash::Hash};
 
-use derive_more::Into;
+use derive_more::{Deref, Into};
 
 use crate::cst::path::CstPath;
 
 /// Association table between an `Id` type and paths to a coupled green forest.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Into)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Into, Deref)]
 pub(super) struct AssociationTable<Id>
 where
     Id: Eq + Hash,

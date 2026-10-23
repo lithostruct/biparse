@@ -1,14 +1,13 @@
 use std::{fmt::Debug, hash::Hash};
 
-use rowan::{Language, NodeOrToken, SyntaxKind, SyntaxNode};
+use rowan::{GreenNode, Language, NodeOrToken, SyntaxKind, SyntaxNode};
 
 use crate::{
-    cst::{association::AssociationTable, Cst, CstPath},
-    green::{GreenElement, GreenInterner},
+    cst::{Cst, CstPath, Pathfind, association::AssociationTable}, green::{GreenElement, GreenInterner},
 };
 
 /// The mutable output of CST construction, representing a green CST forest and coupled associations.
-/// 
+///
 /// Associations contained are guaranteed to be valid for this CST forest.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AssociatedGreenCst<Id>
@@ -143,9 +142,12 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
             .attach_parent(T::kind_to_raw(root), &mut GreenInterner::new());
         rooted.canonize().expect("Just appended root node!")
     }
+
+    pub fn search(&self, id: &Id) -> Option<GreenNode> {
+        let path = self.associations.get(id)?;
+        Some(self.cst.search(path).expect("Association table contains invalid path!"))
+    }
 }
-
-
 
 /// The actualization of `AssociatedGreenCst` as a red syntax tree.
 pub struct AssociatedRedCst<Id, L>
@@ -166,7 +168,10 @@ where
     L: Language,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AssociatedRedCst").field("cst", &self.cst).field("associations", &self.associations).finish()
+        f.debug_struct("AssociatedRedCst")
+            .field("cst", &self.cst)
+            .field("associations", &self.associations)
+            .finish()
     }
 }
 impl<Id, L> Clone for AssociatedRedCst<Id, L>
@@ -175,7 +180,10 @@ where
     L: Language,
 {
     fn clone(&self) -> Self {
-        Self { cst: self.cst.clone(), associations: self.associations.clone() }
+        Self {
+            cst: self.cst.clone(),
+            associations: self.associations.clone(),
+        }
     }
 }
 impl<Id, L> PartialEq for AssociatedRedCst<Id, L>
@@ -191,7 +199,8 @@ impl<Id, L> Eq for AssociatedRedCst<Id, L>
 where
     Id: Eq + Hash,
     L: Language,
-{}
+{
+}
 impl<Id, L> Hash for AssociatedRedCst<Id, L>
 where
     Id: Eq + Hash,
@@ -212,9 +221,14 @@ where
         &self.cst
     }
     pub const fn associations(&self) -> &im::HashMap<Id, CstPath> {
-        &self.associations.inner()
+        self.associations.inner()
     }
     pub fn into_parts(self) -> (SyntaxNode<L>, im::HashMap<Id, CstPath>) {
         (self.cst, self.associations.into_inner())
+    }
+
+    pub fn search(&self, id: &Id) -> Option<SyntaxNode<L>> {
+        let path = self.associations.get(id)?;
+        Some(self.cst.search(path).expect("Association table contains invalid path!"))
     }
 }

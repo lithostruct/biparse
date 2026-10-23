@@ -1,7 +1,6 @@
 //! Tests for the `End` sentinel combinator.
 
 use biparse::{input::StrIndex, prelude::*};
-use num_derive::{FromPrimitive, ToPrimitive};
 use rowan::SyntaxKind;
 
 #[test]
@@ -39,7 +38,7 @@ fn just_then_end() {
 
 /// Specific to non-contiguous input:
 /// If a non-empty input produces no meaningful tokens, the CST actualized should still be complete.
-/// 
+///
 /// This relates to logos-based input and `SkippingStr<'_>`.
 #[test]
 fn all_trivia_end() {
@@ -60,8 +59,8 @@ fn all_trivia_end() {
         }
     }
 
-    let ends : AsParser<'_, SkippingStr<'_>, (), DefaultParseEnvironment, _> = end();
-    
+    let ends: AsParser<'_, SkippingStr<'_>, (), DefaultParseEnvironment, _> = end();
+
     const ALL_TRIVIA: &str = "     ";
     let input = SkippingStr::whitespace(ALL_TRIVIA, Kind(0));
     let (_, result) = ends.parse(&input, ParseState::<StrIndex, usize>::new(&input));

@@ -33,7 +33,7 @@ use crate::{
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
     type Cursor: Copy + Ord + Hash;
-    /// The type of a single input in this input.
+    /// The type of a single input in this input. May not borrow from the underlying input.
     type Token: Clone;
 
     /// Produces a cursor that points to the start of the input. Ideally has O(1) time complexity.
@@ -141,6 +141,16 @@ pub struct InputItem<T, C> {
     pub token: T,
     pub span: Range<usize>,
     pub next_cursor: C,
+}
+impl<T, C> InputItem<T, C> {
+    pub fn into_match_info<'src>(self, kind: SyntaxKind) -> PatternMatch<'src, T, C> {
+        PatternMatch {
+            payload: self.token,
+            cst_spans: vec![(kind, self.span)],
+            next_cursor: self.next_cursor,
+            _marker: PhantomData,
+        }
+    }
 }
 
 /// One-indexed line and column number.

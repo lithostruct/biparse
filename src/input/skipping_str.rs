@@ -52,10 +52,10 @@ use crate::{
 ///     }
 /// }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SkippingStr<'source> {
     cached: CachedStr<'source>,
-    policy: fn(char) -> bool,
+    predicate: fn(char) -> bool,
     skipped_kind: SyntaxKind,
     start_cursor: StrIndex,
 }
@@ -63,7 +63,7 @@ impl<'source> SkippingStr<'source> {
     /// Constructs an input that treats Unicode whitespace as trivia, identified via [`char::is_whitespace`].
     /// Trivia is implicitly skipped after pattern-matching constructs.
     ///
-    /// For ASCII-based whitespace, see [`TriviaStr::ascii_whitespace`].
+    /// For ASCII-based whitespace, see [`SkippingStr::ascii_whitespace`].
     pub fn whitespace<'root>(source: &'root str, kind: impl Into<SyntaxKind>) -> Self
     where
         'root: 'source,
@@ -73,7 +73,7 @@ impl<'source> SkippingStr<'source> {
     /// Constructs an input that treats ASCII whitespace as trivia, identified via [`char::is_ascii_whitespace`].
     /// Trivia is implicitly skipped after pattern-matching constructs.
     ///
-    /// For ASCII-based whitespace, see [`TriviaStr::whitespace`].
+    /// For ASCII-based whitespace, see [`SkippingStr::whitespace`].
     pub fn ascii_whitespace<'root>(source: &'root str, kind: impl Into<SyntaxKind>) -> Self
     where
         'root: 'source,
@@ -82,24 +82,43 @@ impl<'source> SkippingStr<'source> {
         Self::new(source, kind, |ch| ch.is_ascii_whitespace())
     }
 
-    /// Constructs an input that uses the given policy to determine whether a character is considered trivia.
+    /// Constructs an input that uses the given predicate to determine whether a character is considered trivia.
     /// Trivia is implicitly skipped after pattern-matching constructs.
     ///
     /// For the common cases of Unicode and ASCII whitespace respectively,
-    /// you may use [`TriviaStr::whitespace`] and [`TriviaStr::ascii_whitespace`].
+    /// you may use [`SkippingStr::whitespace`] and [`SkippingStr::ascii_whitespace`].
+    /// 
+    /// # Caller Precondition
+    /// - The predicate function provided must be deterministic and stateless.
+    /// 
+    /// Failure to abide will result in non-deterministic parsing, particularly in combination with speculative parsing branches.
     pub fn new<'root>(
         source: &'root str,
         kind: impl Into<SyntaxKind>,
-        policy: fn(char) -> bool,
+        predicate: fn(char) -> bool,
     ) -> Self
     where
         'root: 'source,
     {
-        let start_cursor = SkippingStr::starts_at(source, policy);
+        // This is only used on initialization and is conceptually similar to `self.next_non_trivia_character`,
+        // so here it is without pulling it into a separate function.
+        let start_cursor =  {
+            // Final value for if the subsequent for-loop never breaks (all-trivia input).
+            let mut cursor = StrIndex(source.len());
+            for (index, ch) in source.char_indices() {
+                if !(predicate)(ch) {
+                    // return first non-trivia character.
+                    cursor = StrIndex(index);
+                    break;
+                }
+            }
+            cursor
+        };
+
         SkippingStr {
             cached: CachedStr::new(source),
             skipped_kind: kind.into(),
-            policy,
+            predicate,
             start_cursor,
         }
     }
@@ -108,20 +127,10 @@ impl<'source> SkippingStr<'source> {
     pub const fn source(&self) -> &str {
         self.cached.source()
     }
-    fn starts_at(source: &str, policy: fn(char) -> bool) -> StrIndex {
-        for (index, ch) in source.char_indices() {
-            if !(policy)(ch) {
-                // return first non-trivia character.
-                return StrIndex(index);
-            }
-        }
-        // end of input. the entire input is *just* trivia.
-        StrIndex(source.len())
-    }
 
     /// Given a compatible [`Pattern`] implementor, match to this input while discarding leading and trailing trivia.
     ///
-    /// Intended for use by [`Pattern<SkippedStr<'_>>`] implementors.
+    /// Intended for use by [`Pattern<SkippedStr<'_>>`] implementors. Direct use is not recommended.
     pub fn match_with_skipping<P>(
         &self,
         pattern: &P,
@@ -132,13 +141,7 @@ impl<'source> SkippingStr<'source> {
         P: Pattern<str>,
     {
         // Leading trivia.
-        while let Some(inner) = self.peek(cursor) {
-            if (self.policy)(inner.token) {
-                cursor = inner.next_cursor;
-            } else {
-                break;
-            }
-        }
+        cursor = self.next_non_trivia_index(cursor);
 
         // Match.
         let result = pattern.matches_at(self.source(), cursor);
@@ -146,17 +149,23 @@ impl<'source> SkippingStr<'source> {
         match result {
             Ok(mut matched) => {
                 // Trailing trivia.
-                while let Some(inner) = self.peek(matched.next_cursor) {
-                    if (self.policy)(inner.token) {
-                        matched.next_cursor = inner.next_cursor;
-                    } else {
-                        break;
-                    }
-                }
+                matched.next_cursor = self.next_non_trivia_index(matched.next_cursor);
                 Ok(matched)
             }
             Err(e) => Err(e),
         }
+    }
+
+    /// Finds the next non-trivia index at or after the current index.
+    fn next_non_trivia_index(&self, curr: StrIndex) -> StrIndex {
+        let suboffset = curr.into_usize();
+        let chars = self.source()[suboffset..].char_indices();
+        for (char_offset, char) in chars {
+            if !(self.predicate)(char) {
+                return StrIndex(suboffset + char_offset);
+            }
+        }
+        StrIndex(self.source().len())
     }
 }
 
@@ -166,23 +175,28 @@ impl<'src> From<SkippingStr<'src>> for &'src str {
     }
 }
 
+/// As an [`Input`] implementor, [`SkippingStr`] aggressively strips leading and trailing whitespace.
 impl<'source> Input for SkippingStr<'source> {
     type Cursor = StrIndex;
     type Token = char;
 
-    /// O(1) with caching. This is done because [`PatternMatch::actualize_leaves`](crate::input::PatternMatch::actualize_leaves)
+    /// O(1) with caching.
+    /// This is done because [`PatternMatch::actualize_leaves`](crate::input::PatternMatch::actualize_leaves)
     /// calls this to check for leading trivia prior to the start cursor.
     fn start(&self) -> Self::Cursor {
         self.start_cursor
+    }
+    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token, Self::Cursor>> {
+        self.source().peek(at).map(|mut inner| {
+            inner.next_cursor = self.next_non_trivia_index(inner.next_cursor);
+            inner
+        })
     }
 
     fn skipped_trivia_kind(&self) -> Option<SyntaxKind> {
         Some(self.skipped_kind)
     }
 
-    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token, Self::Cursor>> {
-        self.source().peek(at)
-    }
     fn byte_offset(&self, at: Self::Cursor) -> usize {
         self.source().byte_offset(at)
     }

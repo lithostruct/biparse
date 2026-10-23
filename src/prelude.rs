@@ -7,7 +7,7 @@ pub use crate::{
     },
     cst::{AssociatedGreenCst, Cst, CstPath, IdSupply},
     failure::{ParseFailure, ParseFailureKind},
-    input::{Input, InputItem, LineColumn, SkippingStr},
+    input::{CachedStr, Input, LineColumn, Pattern, SkippingStr},
     parse::{
         DefaultParseEnvironment, ParseArtifact, ParseEnvironment, ParseOutcome, ParseOutput,
         ParseResult, ParseState, Parser, ParserExt, ParserOwnedExt, composite,
