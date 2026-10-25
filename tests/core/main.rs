@@ -8,3 +8,5 @@ mod then;
 
 mod many;
 mod recursive;
+
+mod associate;

@@ -49,5 +49,18 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
 
     // Additional chaining methods which delegate to combinator constructors...
 }
+
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E> for T where
+    T: Parser<'src, I, A, E>
+{ }
 ```
 `parse_all` and `check_all` are the top-level methods which are expected to be used by end users of the parser combinator ecosystem.
+
+Method chaining methods include but are not limited to:
+- Sequential and alternative composition: `.then(...)`, `.or(...)`.
+- Repetition or optional parsing: `.many()`, `.some()`, `.optional()`.
+- Mapping and CST node construction and association: `.map()`, `.node()`, `associate(...)`.
+- `dyn` object construction: `.boxed()`, `.shared()` which constructs `Rc<dyn ...>`.
+- Derived combinations of parsers: `.ignore()`, `or_same()`, `optional_with_default()`, etc.
+
+In other words, most non-leaf combinators are constructed via `ParserExt` method chaining, and is the preferred method of construction over direct usage of the corresponding combinator types. The combinator types themselves and their respective constructors methods remain available in the `biparse::combinator` module.

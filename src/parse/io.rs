@@ -1,9 +1,7 @@
-use rowan::{GreenNode, GreenToken, SyntaxKind};
-
 use crate::{
     combinator::RecursiveState,
     cst::{AssociatedGreenCst, IdSupply},
-    green::{GreenElement, GreenInterner},
+    green::GreenInterner,
     input::Input,
     parse::ParseEnvironment,
 };
@@ -17,14 +15,14 @@ pub struct ParseState<'src, C, S: IdSupply> {
     pub supply: S,
     /// A reference-counted shared interner, allowing for clones to access the same structure.
     ///
+    /// Direct usage is discouraged. The interning methods of [`GreenInterner`]
+    /// may be accessed via [`ParseState::with_interner`],
+    /// which holds the mutable borrow for as short as possible.
+    ///
     /// # Panics
     ///
     /// This field comes with the usual pitfalls of [`Rc<RefCell<...>>`];
-    /// if you hold a mutable borrow and attempt subsequent borrowing, Rust *will* panic.
-    ///
-    /// Direct usage is discouraged. The interning methods of [`GreenInterner`]
-    /// are re-exposed here as [`ParseState::intern_node`] and [`ParseState::intern_token`],
-    /// which holds the mutable borrow for as short as possible.
+    /// holding a mutable borrow and attempting subsequent borrowing will cause panicking.
     pub interner: Rc<RefCell<GreenInterner>>,
     /// The current recursive stack.
     ///
@@ -75,17 +73,16 @@ impl<'src, C, S: IdSupply + Default> ParseState<'src, C, S> {
             recursive_state: RecursiveState::new(),
         }
     }
-    pub fn intern_token(&self, kind: SyntaxKind, text: &str) -> GreenToken {
-        let mut interner = self.interner.borrow_mut();
-        interner.token(kind, text)
-    }
-    pub fn intern_node(
-        &self,
-        kind: SyntaxKind,
-        collection: impl IntoIterator<Item = GreenElement>,
-    ) -> GreenNode {
-        let mut interner = self.interner.borrow_mut();
-        interner.node(kind, collection)
+
+    /// Executes a closure in which the interner is borrowed mutably.
+    ///
+    /// Prefer this wherever you may write `self.interner.borrow_mut()` instead. This avoid runtime panics
+    /// caused by holding a mutable reference into [`Rc<RefCell<_>>`] while attempting subsequent borrowing.
+    pub fn with_interner<F, A>(&self, closure: F) -> A
+    where
+        F: FnOnce(&mut GreenInterner) -> A,
+    {
+        (closure)(&mut self.interner.borrow_mut())
     }
 }
 

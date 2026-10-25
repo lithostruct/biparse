@@ -82,8 +82,10 @@ impl GreenInterner {
     }
     /// Interns a node.
     ///
+    /// # Caller Precondition
+    ///
     /// This function relies on all children being interned and deduplicated for it to also deduplicate the parent.
-    /// Therefore, it is not sound to have any externally-constructed children to in the children list.
+    /// Therefore, callers should ensure there are no externally-constructed children to in the children list.
     pub fn node(
         &mut self,
         kind: SyntaxKind,

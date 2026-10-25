@@ -15,17 +15,18 @@ pub struct Matches<K, P>(
     pub P,
 );
 
-impl<K, F, I: Input + ?Sized> Pattern<I> for Matches<K, F>
+impl<'src, K, F, I: Input + ?Sized> Pattern<'src, I> for Matches<K, F>
 where
+    I: 'src,
     K: Clone + Into<SyntaxKind>,
-    F: Fn(&I::Token) -> bool,
+    F: Fn(&I::Token<'src>) -> bool,
 {
-    type Payload<'src>
-        = I::Token
+    type Payload
+        = I::Token<'src>
     where
         I: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,
@@ -65,34 +66,39 @@ where
 )]
 pub struct AllOf<P>(#[from] pub P);
 
-impl<P, I: Input + ?Sized> Pattern<I> for AllOf<Vec<P>>
+impl<'src, P, I: Input + ?Sized> Pattern<'src, I> for AllOf<Vec<P>>
 where
-    P: Pattern<I>,
+    I: 'src,
+    P: Pattern<'src, I>,
 {
-    type Payload<'src>
-        = Vec<P::Payload<'src>>
+    type Payload
+        = Vec<P::Payload>
     where
         I: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,
     ) -> PatternMatchResult<'src, Self, I> {
-        let mut success = PatternMatch::new(Vec::new(), Vec::new(), cursor);
+        let mut accumulative = PatternMatch {
+            payload: Vec::new(),
+            cst_spans: Vec::new(),
+            next_cursor: cursor,
+        };
         for child in self.0.iter() {
-            match child.matches_at(input, success.next_cursor) {
+            match child.matches_at(input, accumulative.next_cursor) {
                 Ok(mut matched) => {
-                    success.payload.push(matched.payload);
-                    success.cst_spans.append(&mut matched.cst_spans);
-                    success.next_cursor = matched.next_cursor;
+                    accumulative.payload.push(matched.payload);
+                    accumulative.cst_spans.append(&mut matched.cst_spans);
+                    accumulative.next_cursor = matched.next_cursor;
                 }
                 Err(maybe_cursor) => {
                     return Err(maybe_cursor);
                 }
             }
         }
-        Ok(success)
+        Ok(accumulative)
     }
 
     fn describe(&self) -> String {
@@ -109,41 +115,44 @@ where
         ParseHint::Sequence(self.0.iter().map(|child| child.hint()).collect())
     }
 }
-impl<P, I: Input + ?Sized, const N: usize> Pattern<I> for AllOf<[P; N]>
+impl<'src, P, I: Input + ?Sized, const N: usize> Pattern<'src, I> for AllOf<[P; N]>
 where
-    P: Pattern<I>,
+    I: 'src,
+    P: Pattern<'src, I>,
 {
-    type Payload<'src>
-        = [P::Payload<'src>; N]
+    type Payload
+        = [P::Payload; N]
     where
         I: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,
     ) -> PatternMatchResult<'src, Self, I> {
-        let mut success = PatternMatch::new(Vec::new(), Vec::new(), cursor);
+        let mut accumulative = PatternMatch {
+            payload: Vec::new(),
+            cst_spans: Vec::new(),
+            next_cursor: cursor,
+        };
         for child in self.0.iter() {
-            match child.matches_at(input, success.next_cursor) {
+            match child.matches_at(input, accumulative.next_cursor) {
                 Ok(mut matched) => {
-                    success.payload.push(matched.payload);
-                    success.cst_spans.append(&mut matched.cst_spans);
-                    success.next_cursor = matched.next_cursor;
+                    accumulative.payload.push(matched.payload);
+                    accumulative.cst_spans.append(&mut matched.cst_spans);
+                    accumulative.next_cursor = matched.next_cursor;
                 }
                 Err(maybe_cursor) => {
                     return Err(maybe_cursor);
                 }
             }
         }
-        Ok(PatternMatch::new(
-            success
-                .payload
-                .try_into()
+        Ok(PatternMatch {
+            payload: TryInto::<[P::Payload; N]>::try_into(accumulative.payload)
                 .unwrap_or_else(|_| unreachable!()),
-            success.cst_spans,
-            success.next_cursor,
-        ))
+            cst_spans: accumulative.cst_spans,
+            next_cursor: accumulative.next_cursor,
+        })
     }
 
     fn describe(&self) -> String {
@@ -176,16 +185,17 @@ where
 )]
 pub struct AnyOf<P>(#[from] pub P);
 
-impl<P, I: Input + ?Sized> Pattern<I> for AnyOf<Vec<P>>
+impl<'src, P, I: Input + ?Sized> Pattern<'src, I> for AnyOf<Vec<P>>
 where
-    P: Pattern<I>,
+    I: 'src,
+    P: Pattern<'src, I>,
 {
-    type Payload<'src>
-        = P::Payload<'src>
+    type Payload
+        = P::Payload
     where
         I: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,
@@ -216,16 +226,17 @@ where
         ParseHint::Choice(self.0.iter().map(|child| child.hint()).collect())
     }
 }
-impl<P, I: Input + ?Sized, const N: usize> Pattern<I> for AnyOf<[P; N]>
+impl<'src, P, I: Input + ?Sized, const N: usize> Pattern<'src, I> for AnyOf<[P; N]>
 where
-    P: Pattern<I>,
+    I: 'src,
+    P: Pattern<'src, I>,
 {
-    type Payload<'src>
-        = P::Payload<'src>
+    type Payload
+        = P::Payload
     where
         I: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src I,
         cursor: <I as Input>::Cursor,

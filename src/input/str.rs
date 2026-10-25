@@ -20,12 +20,12 @@ impl StrIndex {
 
 impl Input for str {
     type Cursor = StrIndex;
-    type Token = char;
+    type Token<'src> = char;
 
     fn start(&self) -> Self::Cursor {
         StrIndex(0)
     }
-    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token, Self::Cursor>> {
+    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token<'_>, Self::Cursor>> {
         self[at.0..].chars().next().map(|inner| {
             let end_cursor = StrIndex(at.0 + inner.len_utf8());
             InputItem {
@@ -69,7 +69,10 @@ impl Input for str {
         LineColumn { line, column }
     }
 
-    fn describe_token(token: &Self::Token) -> String {
+    fn describe_token<'src>(&self, token: &Self::Token<'src>) -> String
+    where
+        Self: 'src,
+    {
         format!("character '{token}'")
     }
     fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind> {
@@ -78,12 +81,12 @@ impl Input for str {
 }
 
 /// Single matching on `str` for `char`.
-impl<K> Pattern<str> for (K, char)
+impl<'src, K> Pattern<'src, str> for (K, char)
 where
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src> = &'src str;
-    fn matches_at<'src>(
+    type Payload = &'src str;
+    fn matches_at(
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
@@ -94,11 +97,11 @@ where
         match input.peek(cursor) {
             Some(item) => {
                 if item.token == self.1 {
-                    Ok(PatternMatch::new(
-                        &input[item.span.clone()],
-                        vec![(self.0.clone().into(), item.span)],
-                        item.next_cursor,
-                    ))
+                    Ok(PatternMatch {
+                        payload: &input[item.span.clone()],
+                        cst_spans: vec![(self.0.clone().into(), item.span)],
+                        next_cursor: item.next_cursor,
+                    })
                 } else {
                     Err(Some(cursor))
                 }
@@ -120,12 +123,12 @@ where
 }
 
 /// Contigious matching on [`str`] for [`&str`].
-impl<K> Pattern<str> for (K, &str)
+impl<'src, K> Pattern<'src, str> for (K, &str)
 where
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src> = &'src str;
-    fn matches_at<'src>(
+    type Payload = &'src str;
+    fn matches_at(
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
@@ -142,11 +145,11 @@ where {
             // when the whole pattern matches contiguously.
             // That's just extra work for the `Just` combinator.
             #[allow(clippy::single_range_in_vec_init)]
-            Ok(PatternMatch::new(
-                &input[cursor.0..new_byte_offset],
-                vec![(self.0.clone().into(), str_span)],
-                StrIndex(new_byte_offset),
-            ))
+            Ok(PatternMatch {
+                payload: &input[cursor.0..new_byte_offset],
+                cst_spans: vec![(self.0.clone().into(), str_span)],
+                next_cursor: StrIndex(new_byte_offset),
+            })
         } else {
             // Iterate character-by-character to find the mismatch.
             let mut cursor = cursor;
@@ -180,12 +183,12 @@ where {
 }
 
 /// Contiguous matching on [`str`] for [`String`], deferring to the inner [`&str`] implementation.
-impl<K> Pattern<str> for (K, String)
+impl<'src, K> Pattern<'src, str> for (K, String)
 where
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src> = &'src str;
-    fn matches_at<'src>(
+    type Payload = &'src str;
+    fn matches_at(
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,

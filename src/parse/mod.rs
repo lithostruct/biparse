@@ -2,10 +2,10 @@
 //!
 //! Refer to [`Parser`] for the central trait exported.
 
-mod parser;
+mod parser_trait;
 
 mod diagnostics;
 mod environment;
 mod io;
 
-pub use self::{diagnostics::*, environment::*, io::*, parser::*};
+pub use self::{diagnostics::*, environment::*, io::*, parser_trait::*};

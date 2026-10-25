@@ -100,7 +100,9 @@ impl ParseFailure for Simple {
                     let difference_line_col = input.to_line_col(difference_location);
                     let found = input
                         .peek(difference_location)
-                        .map_or("end of input".into(), |item| I::describe_token(&item.token));
+                        .map_or("end of input".into(), |item| {
+                            input.describe_token(&item.token)
+                        });
                     format!("expected {hint:?}, found {found} at location {difference_line_col}")
                 }
                 None => format!("expected {hint:?}"),

@@ -49,7 +49,7 @@ impl CstPath {
         (self.0, self.1)
     }
     /// Constructs and returns a `CstPath` from its components.
-    /// 
+    ///
     /// This method bypasses the construction invariants that [`AssociatedGreenCst`](crate::cst::AssociatedGreenCst)
     /// enforces and relies upon.
     /// Direct use is not recommended.
@@ -87,8 +87,11 @@ pub enum PathfindError {
     },
 }
 
+/// Implementation that allows for the index-based `CstPath` to identify a specific node within this forest.
 pub trait Pathfind {
+    /// The output type associated with the search operation.
     type Output;
+    /// Search within `self` with the given path, returning a successful match or a pathfinding error.
     fn search(&self, path: &CstPath) -> Result<Self::Output, PathfindError>;
 }
 
@@ -146,23 +149,20 @@ impl<L: Language> Pathfind for SyntaxNode<L> {
                 depth: 0,
                 indexed: root_index,
                 got_width: 1,
-            })
+            });
         }
-        // This clone is cheap.
+        // This clone is cheap. All `SyntaxNode`s are refcounted.
         let mut node = self.clone();
 
         for (depth, &index) in subpath.iter().enumerate() {
-            let child = node
-                .children_with_tokens()
-                .nth(index)
-                .ok_or_else(|| {
-                    PathfindError::OutOfBounds {
-                        path: path.clone(),
-                        depth: depth + 1,
-                        indexed: index,
-                        got_width: node.children_with_tokens().count(),
-                    }
-                })?;
+            let child = node.children_with_tokens().nth(index).ok_or_else(|| {
+                PathfindError::OutOfBounds {
+                    path: path.clone(),
+                    depth: depth + 1,
+                    indexed: index,
+                    got_width: node.children_with_tokens().count(),
+                }
+            })?;
             node = child
                 .into_node()
                 .ok_or_else(|| PathfindError::TokenNotNode {

@@ -53,3 +53,19 @@ impl IdSupply for usize {
         output
     }
 }
+impl IdSupply for u32 {
+    type Id = u32;
+    fn next_id(&mut self) -> Self::Id {
+        let output = *self;
+        *self += 1;
+        output
+    }
+}
+impl IdSupply for u64 {
+    type Id = u64;
+    fn next_id(&mut self) -> Self::Id {
+        let output = *self;
+        *self += 1;
+        output
+    }
+}

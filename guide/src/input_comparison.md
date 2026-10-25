@@ -10,9 +10,9 @@ Note that you may define your own input types, so long as you have a suitable `I
 
 A type implementing `Input` describes a conceptually contiguous UTF-8 `str` input, that may be indexed into using either an associated cursor type or a byte offset. Note that storage and actualization of the string itself need not be contiguous; you may use interior mutability to provide `Cow<'_, str>` substrings as exposed by slicing operations. This input is borrowed immutably for the entire parse operation.
 
-A type implementing `Pattern<I>` for some `I : Input` describes a predicate that checks whether an input at the specified location "matches" it. For example, `char` performs a character match against a `str` input, which may succeed if the location has the same `char` value or fail otherwise.
+A type implementing `Pattern<'src, I>` for some `I : Input` describes a predicate that checks whether an input, borrowed for lifetime `'src`, at the specified location "matches" it. For example, `char` performs a character match against a `str` input, which may succeed if the location has the same `char` value or fail otherwise, returning a `&str` borrowing from the input.
 
-All `Pattern<I>` implementors may use `AllOf` and `AnyOf` to compose sequential and alternative matching.
+All `Pattern<'_, I>` implementors may use `AllOf` and `AnyOf` to compose sequential and alternative matching. All `I : Input` implementors may use `Matches<impl Into<SyntaxKind>, impl Fn(&I::Token<'_>) -> bool>` as a `Pattern<'_, I>` implementor.
 
 ## Input `str`
 
@@ -73,28 +73,31 @@ Note the two distinct lifetimes: `'source` refers to the lifetime of the underly
 ```rs
 impl<'source, T> Input for LexerStream<'source, T>
 where
-    T: Debug + Clone + 'static + Logos<'source, Source = str>,
+    T: Debug + Clone + Logos<'source, Source = str>,
 {...}
 ```
 
 ### Supported Patterns
-`Pattern<LexerStream<'source, T>>` implementors include:
+`Pattern<'src, LexerStream<'source, T>>` implementors include:
 ```rs
 (K, T) where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
-    T: Debug + Clone + Eq + Logos<'source, Source = str> + 'static,
+    T: Debug + Clone + Eq + Logos<'source, Source = str> + 'src,
 ```
 ```rs
 T where
-    T: Debug + Clone + Eq + Logos<'source, Source = str> + Into<SyntaxKind> + 'static,
+    'source: 'src,
+    T: Debug + Clone + Eq + Logos<'source, Source = str> + Into<SyntaxKind> + 'src,
 ```
 
 ### Tradeoffs
 
 There are a few major limitations within `LexerStream` that does not cover the full feature set of `logos`:
-- The source supported for lexing grammar `T` must be a UTF-8 string.
-- The resulting type from lexing, `T`, must be `'static` and hence may *not* borrow from the underlying data. This notably excludes anything that takes a string reference `&str` into the underlying source.
-- The natively supported `Pattern` types require `T : Eq`.
+- The source supported for lexing grammar `T` *must* be a UTF-8 string.
+- Due to diagnostic generation and the inability to dispatch dynamically on trait implementation, `T : Debug`.
+- Due to internal implementation constraints, `T : Clone`.
+- The natively supported `Pattern` types typically require `T : Eq`.
 
 Furthermore, `logos` imposes the constraint that each token must be produced in a stateless manner. This means that lexing grammars must be globally unambiguous (eg. regex patterns `r"[a-zA-Z0-9_ ]+"` and `r"[ \t\r\n]+"` overlap, and hence must have a specified priority ordering or be rejected), whereas `str`-based parsing may disambugate between the two via control flow.
 
@@ -186,6 +189,6 @@ Examples, where whitespace is treated as trivia:
  - Non-atomic pattern `AnyOf([...])` behaves as expected via delegation into the inner patterns;
    trivia consumption has no effect on speculative parsing.
 
-Overall, this means that despite the relaxation on unambiguity requirements for lexing, `SkippingStr` may still be no more expressive than `LexerStream` compared to `str` regarding patterns containing trivia characters. This may be relevant for specific CST construction eg. separating the raw text of a string literal from the enclosing double quotes.
+Overall, this means that despite the relaxation on unambiguity requirements for lexing, `SkippingStr` may still be less expressive compared to a non-skipping input. This may be relevant for specific CST construction eg. separating the raw text of a string literal from the enclosing double quotes.
 
 Prefer the other `Input` options when a more sophisticated trivia skipping mechanism or explicit matching on trivia characters is desired.

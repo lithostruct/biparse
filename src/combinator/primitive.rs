@@ -102,12 +102,9 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
         let cursor = state.cursor;
-        let cst =
-            // Need to actualize for input that is *just* trivia.
-            AssociatedGreenCst::leaves(
-                PatternMatch::new((), Vec::new(), cursor)
-                    .actualize_leaves::<I, E>(input, &state),
-            );
+        let cst = state.with_interner(|interner| {
+            AssociatedGreenCst::leaves(&Vec::new(), cursor, cursor, input, interner)
+        });
 
         (
             state,

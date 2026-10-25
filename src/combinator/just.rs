@@ -1,12 +1,9 @@
-use std::{cmp::Ordering, fmt::Debug, marker::PhantomData};
-
-use rowan::SyntaxKind;
+use std::fmt::Debug;
 
 use crate::{
-    cst::{AssociatedGreenCst, Cst},
+    cst::AssociatedGreenCst,
     failure::{ParseFailure, ParseFailureKind},
-    green::GreenElement,
-    input::{Input, InputItem, Pattern},
+    input::{Input, Pattern},
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
@@ -17,18 +14,17 @@ pub struct Just<P> {
     pattern: P,
 }
 impl<P> Just<P> {
-    pub fn new<I>(pattern: P) -> Self
+    pub fn new<'src, I>(pattern: P) -> Self
     where
-        P: Pattern<I>,
-        I: Input + ?Sized,
+        P: Pattern<'src, I>,
+        I: Input + ?Sized + 'src,
     {
         Just { pattern }
     }
 }
-impl<'src, I: Input + ?Sized, P, E: ParseEnvironment> Parser<'src, I, P::Payload<'src>, E>
-    for Just<P>
+impl<'src, I: Input + ?Sized, P, E: ParseEnvironment> Parser<'src, I, P::Payload, E> for Just<P>
 where
-    P: Pattern<I> + 'src,
+    P: Pattern<'src, I> + 'src,
 {
     /// Actualizes skipped trivia up to the next cursor.
     fn parse(
@@ -37,20 +33,28 @@ where
         state: ParseState<'src, I::Cursor, E::Supply>,
     ) -> (
         ParseState<'src, I::Cursor, E::Supply>,
-        ParseOutput<P::Payload<'src>, E>,
+        ParseOutput<P::Payload, E>,
     ) {
         match self.pattern.matches_at(input, state.cursor) {
             Ok(matched) => {
-                let leaf_cst = matched.actualize_leaves::<I, E>(input, &state);
                 let new_state = ParseState {
                     cursor: matched.next_cursor,
                     ..state
                 };
+                let new_cst = new_state.with_interner(|interner| {
+                    AssociatedGreenCst::leaves(
+                        &matched.cst_spans,
+                        state.cursor,
+                        matched.next_cursor,
+                        input,
+                        interner,
+                    )
+                });
                 (
                     new_state,
                     ParseOutput {
                         ast: ParseOutcome::Success(matched.payload),
-                        cst: AssociatedGreenCst::leaves(leaf_cst),
+                        cst: new_cst,
                     },
                 )
             }

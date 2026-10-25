@@ -10,13 +10,13 @@ use crate::{
 };
 
 /// `regex` support.
-impl<K> Pattern<str> for (K, regex::Regex)
+impl<'src, K> Pattern<'src, str> for (K, regex::Regex)
 where
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src> = &'src str;
+    type Payload = &'src str;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
@@ -24,11 +24,11 @@ where
         match self.1.find_at(input, cursor.into_usize()) {
             Some(matched) => {
                 if matched.start() == cursor.into_usize() {
-                    Ok(PatternMatch::new(
-                        matched.as_str(),
-                        vec![(self.0.clone().into(), matched.range())],
-                        StrIndex(matched.range().end),
-                    ))
+                    Ok(PatternMatch {
+                        payload: matched.as_str(),
+                        cst_spans: vec![(self.0.clone().into(), matched.range())],
+                        next_cursor: StrIndex(matched.range().end),
+                    })
                 } else {
                     // There isn't really a meaningful "error at" cursor we can provide here.
                     Err(None)
@@ -51,13 +51,13 @@ where
 }
 
 /// `regex_lite` support.
-impl<K> Pattern<str> for (K, regex_lite::Regex)
+impl<'src, K> Pattern<'src, str> for (K, regex_lite::Regex)
 where
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src> = &'src str;
+    type Payload = &'src str;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src str,
         cursor: <str as Input>::Cursor,
@@ -65,11 +65,11 @@ where
         match self.1.find_at(input, cursor.into_usize()) {
             Some(matched) => {
                 if matched.start() == cursor.into_usize() {
-                    Ok(PatternMatch::new(
-                        matched.as_str(),
-                        vec![(self.0.clone().into(), matched.range())],
-                        StrIndex(matched.range().end),
-                    ))
+                    Ok(PatternMatch {
+                        payload: matched.as_str(),
+                        cst_spans: vec![(self.0.clone().into(), matched.range())],
+                        next_cursor: StrIndex(matched.range().end),
+                    })
                 } else {
                     // There isn't really a meaningful "error at" cursor we can provide here.
                     Err(None)

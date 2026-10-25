@@ -2,3 +2,6 @@
 title = "Biparse Documentation"
 authors = ["GiveMe30Dollars"]
 language = "en"
+
+[output.html]
+mathjax-support = true

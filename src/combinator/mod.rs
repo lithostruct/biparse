@@ -4,30 +4,30 @@
 mod blanket;
 
 mod binary;
-mod just_satisfies;
+mod just;
 mod map_into_owned;
 mod node_association;
+mod primitive;
 mod recursive;
 mod repetition;
-mod sentinel;
 
 use crate::{
-    input::{Input, InputItem, Pattern},
+    input::{Input, Pattern},
     parse::ParseEnvironment,
 };
 
 pub use self::{
     binary::{Or, Then},
     blanket::{AsParser, WithEnv},
-    just_satisfies::Just,
+    just::Just,
     map_into_owned::{IntoOwned, Map},
     node_association::{Associate, Node},
+    primitive::{End, Fail, Success},
     recursive::{
         combinator::{Direct, Indirect, Recursive},
         frame::RecursiveState,
     },
     repetition::Many,
-    sentinel::{End, Fail, Success},
 };
 
 // Constants and functions.
@@ -43,8 +43,8 @@ pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, 
     AsParser::from(End)
 }
 
-pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<I> + 'src>(
+pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<'src, I> + 'src>(
     pattern: P,
-) -> AsParser<'src, I, P::Payload<'src>, E, Just<P>> {
+) -> AsParser<'src, I, P::Payload, E, Just<P>> {
     AsParser::from(Just::new(pattern))
 }

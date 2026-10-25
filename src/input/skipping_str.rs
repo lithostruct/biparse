@@ -87,10 +87,10 @@ impl<'source> SkippingStr<'source> {
     ///
     /// For the common cases of Unicode and ASCII whitespace respectively,
     /// you may use [`SkippingStr::whitespace`] and [`SkippingStr::ascii_whitespace`].
-    /// 
+    ///
     /// # Caller Precondition
     /// - The predicate function provided must be deterministic and stateless.
-    /// 
+    ///
     /// Failure to abide will result in non-deterministic parsing, particularly in combination with speculative parsing branches.
     pub fn new<'root>(
         source: &'root str,
@@ -102,7 +102,7 @@ impl<'source> SkippingStr<'source> {
     {
         // This is only used on initialization and is conceptually similar to `self.next_non_trivia_character`,
         // so here it is without pulling it into a separate function.
-        let start_cursor =  {
+        let start_cursor = {
             // Final value for if the subsequent for-loop never breaks (all-trivia input).
             let mut cursor = StrIndex(source.len());
             for (index, ch) in source.char_indices() {
@@ -131,14 +131,14 @@ impl<'source> SkippingStr<'source> {
     /// Given a compatible [`Pattern`] implementor, match to this input while discarding leading and trailing trivia.
     ///
     /// Intended for use by [`Pattern<SkippedStr<'_>>`] implementors. Direct use is not recommended.
-    pub fn match_with_skipping<P>(
-        &self,
+    pub fn match_with_skipping<'src, P>(
+        &'src self,
         pattern: &P,
         mut cursor: StrIndex,
-    ) -> PatternMatchResult<'_, P, str>
+    ) -> PatternMatchResult<'src, P, str>
     where
-        Self: Input<Cursor = StrIndex, Token = char>,
-        P: Pattern<str>,
+        Self: Input<Cursor = StrIndex, Token<'src> = char>,
+        P: Pattern<'src, str>,
     {
         // Leading trivia.
         cursor = self.next_non_trivia_index(cursor);
@@ -178,7 +178,10 @@ impl<'src> From<SkippingStr<'src>> for &'src str {
 /// As an [`Input`] implementor, [`SkippingStr`] aggressively strips leading and trailing whitespace.
 impl<'source> Input for SkippingStr<'source> {
     type Cursor = StrIndex;
-    type Token = char;
+    type Token<'src>
+        = char
+    where
+        Self: 'src;
 
     /// O(1) with caching.
     /// This is done because [`PatternMatch::actualize_leaves`](crate::input::PatternMatch::actualize_leaves)
@@ -186,7 +189,7 @@ impl<'source> Input for SkippingStr<'source> {
     fn start(&self) -> Self::Cursor {
         self.start_cursor
     }
-    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token, Self::Cursor>> {
+    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token<'_>, Self::Cursor>> {
         self.source().peek(at).map(|mut inner| {
             inner.next_cursor = self.next_non_trivia_index(inner.next_cursor);
             inner
@@ -207,21 +210,25 @@ impl<'source> Input for SkippingStr<'source> {
         self.cached.to_line_col(at_offset)
     }
 
-    fn describe_token(token: &Self::Token) -> String {
-        <str as Input>::describe_token(token)
+    fn describe_token<'src>(&self, token: &Self::Token<'src>) -> String
+    where
+        Self: 'src,
+    {
+        self.source().describe_token(token)
     }
 }
 
-impl<'source, K> Pattern<SkippingStr<'source>> for (K, char)
+impl<'src, 'source, K> Pattern<'src, SkippingStr<'source>> for (K, char)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         SkippingStr<'source>: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src SkippingStr<'source>,
         cursor: <SkippingStr<'source> as Input>::Cursor,
@@ -236,16 +243,17 @@ where
     }
 }
 
-impl<'source, K> Pattern<SkippingStr<'source>> for (K, &str)
+impl<'src, 'source, K> Pattern<'src, SkippingStr<'source>> for (K, &str)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         SkippingStr<'source>: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src SkippingStr<'source>,
         cursor: <SkippingStr<'source> as Input>::Cursor,
@@ -260,41 +268,17 @@ where
     }
 }
 
-impl<'source, K> Pattern<SkippingStr<'source>> for (K, String)
+impl<'src, 'source, K> Pattern<'src, SkippingStr<'source>> for (K, String)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         SkippingStr<'source>: 'src;
 
-    fn matches_at<'src>(
-        &self,
-        input: &'src SkippingStr<'source>,
-        cursor: <SkippingStr<'source> as Input>::Cursor,
-    ) -> PatternMatchResult<'src, Self, SkippingStr<'source>> {
-        input.match_with_skipping(self, cursor)
-    }
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
-    fn hint(&self) -> ParseHint {
-        <Self as Pattern<str>>::hint(self)
-    }
-}
-
-#[cfg(feature = "regex")]
-impl<'source, K> Pattern<SkippingStr<'source>> for (K, regex::Regex)
-where
-    K: Clone + Into<SyntaxKind>,
-{
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
-    where
-        SkippingStr<'source>: 'src;
-
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src SkippingStr<'source>,
         cursor: <SkippingStr<'source> as Input>::Cursor,
@@ -310,16 +294,43 @@ where
 }
 
 #[cfg(feature = "regex")]
-impl<'source, K> Pattern<SkippingStr<'source>> for (K, regex_lite::Regex)
+impl<'src, 'source, K> Pattern<'src, SkippingStr<'source>> for (K, regex::Regex)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         SkippingStr<'source>: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
+        &self,
+        input: &'src SkippingStr<'source>,
+        cursor: <SkippingStr<'source> as Input>::Cursor,
+    ) -> PatternMatchResult<'src, Self, SkippingStr<'source>> {
+        input.match_with_skipping(self, cursor)
+    }
+    fn describe(&self) -> String {
+        <Self as Pattern<str>>::describe(self)
+    }
+    fn hint(&self) -> ParseHint {
+        <Self as Pattern<str>>::hint(self)
+    }
+}
+
+#[cfg(feature = "regex")]
+impl<'src, 'source, K> Pattern<'src, SkippingStr<'source>> for (K, regex_lite::Regex)
+where
+    'source: 'src,
+    K: Clone + Into<SyntaxKind>,
+{
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
+    where
+        SkippingStr<'source>: 'src;
+
+    fn matches_at(
         &self,
         input: &'src SkippingStr<'source>,
         cursor: <SkippingStr<'source> as Input>::Cursor,

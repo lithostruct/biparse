@@ -109,7 +109,7 @@ fn trivia_recovery() {
 
     match parser.parse_all(&stream) {
         Ok(report) => {
-            assert_eq!(report.ast_only(), &(Kind::LeftParen, Kind::RightParen));
+            assert_eq!(report.ast_only(), &(&Kind::LeftParen, &Kind::RightParen));
             let (tree, _) = report.cst().canonize_with(Kind::Root);
 
             assert_eq!(tree.kind(), Kind::Root);
@@ -135,7 +135,7 @@ fn leading_trivia_recovery() {
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
 
     let parser: Rc<dyn Parser<'_, LexerStream<Kind>, _, DefaultParseEnvironment>> =
-        just(Kind::Plus).shared();
+        just(Kind::Plus).into_owned().shared();
 
     match parser.parse_all(&stream) {
         Ok(report) => {
@@ -194,7 +194,7 @@ fn mismatched_token() {
     let source = "+";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
     let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Kind, DefaultParseEnvironment>> =
-        just(Kind::Root).boxed();
+        just(Kind::Root).into_owned().boxed();
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
     expect![[r#"
@@ -214,7 +214,7 @@ fn unrecognized_token() {
     let source = "?";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
     let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Kind, DefaultParseEnvironment>> =
-        just(Kind::Root).boxed();
+        just(Kind::Root).into_owned().boxed();
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
     expect![[r#"

@@ -106,20 +106,23 @@ impl<'source> CachedStr<'source> {
         }
     }
 }
-impl<'src> From<&'src str> for CachedStr<'src> {
-    fn from(value: &'src str) -> Self {
+impl<'source> From<&'source str> for CachedStr<'source> {
+    fn from(value: &'source str) -> Self {
         CachedStr::new(value)
     }
 }
-impl<'src> From<CachedStr<'src>> for &'src str {
-    fn from(value: CachedStr<'src>) -> Self {
+impl<'source> From<CachedStr<'source>> for &'source str {
+    fn from(value: CachedStr<'source>) -> Self {
         value.source
     }
 }
 
-impl<'src> Input for CachedStr<'src> {
+impl<'source> Input for CachedStr<'source> {
     type Cursor = StrIndex;
-    type Token = char;
+    type Token<'src>
+        = char
+    where
+        Self: 'src;
 
     fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
         self.to_line_col(at_offset)
@@ -130,7 +133,7 @@ impl<'src> Input for CachedStr<'src> {
     fn start(&self) -> Self::Cursor {
         self.source.start()
     }
-    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token, Self::Cursor>> {
+    fn peek(&self, at: Self::Cursor) -> Option<InputItem<Self::Token<'_>, Self::Cursor>> {
         self.source.peek(at)
     }
     fn skipped_trivia_kind(&self) -> Option<SyntaxKind> {
@@ -142,24 +145,28 @@ impl<'src> Input for CachedStr<'src> {
     fn slice_bytes(&self, start: usize, end: usize) -> Cow<'_, str> {
         self.source.slice_bytes(start, end)
     }
-    fn describe_token(token: &Self::Token) -> String {
-        <str as Input>::describe_token(token)
+    fn describe_token<'src>(&self, token: &Self::Token<'src>) -> String
+    where
+        Self: 'src,
+    {
+        self.source().describe_token(token)
     }
 }
 
 // Pattern delegation to inner `str`.
 
 /// Single matching on `str` for `char`.
-impl<'source, K> Pattern<CachedStr<'source>> for (K, char)
+impl<'src, 'source, K> Pattern<'src, CachedStr<'source>> for (K, char)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         CachedStr<'source>: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src CachedStr<'source>,
         cursor: <CachedStr<'source> as Input>::Cursor,
@@ -176,16 +183,17 @@ where
 }
 
 /// Contigious matching on [`str`] for [`&str`].
-impl<'source, K> Pattern<CachedStr<'source>> for (K, &str)
+impl<'src, 'source, K> Pattern<'src, CachedStr<'source>> for (K, &str)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         CachedStr<'source>: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src CachedStr<'source>,
         cursor: <CachedStr<'source> as Input>::Cursor,
@@ -202,16 +210,17 @@ where
 }
 
 /// Contiguous matching on [`str`] for [`String`], deferring to the inner [`&str`] implementation.
-impl<'source, K> Pattern<CachedStr<'source>> for (K, String)
+impl<'src, 'source, K> Pattern<'src, CachedStr<'source>> for (K, String)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         CachedStr<'source>: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src CachedStr<'source>,
         cursor: <CachedStr<'source> as Input>::Cursor,
@@ -229,16 +238,17 @@ where
 
 #[cfg(feature = "regex")]
 /// `regex` support.
-impl<'source, K> Pattern<CachedStr<'source>> for (K, regex::Regex)
+impl<'src, 'source, K> Pattern<'src, CachedStr<'source>> for (K, regex::Regex)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         CachedStr<'source>: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src CachedStr<'source>,
         cursor: <CachedStr<'source> as Input>::Cursor,
@@ -256,16 +266,17 @@ where
 
 #[cfg(feature = "regex")]
 /// `regex_lite` support.
-impl<'source, K> Pattern<CachedStr<'source>> for (K, regex_lite::Regex)
+impl<'src, 'source, K> Pattern<'src, CachedStr<'source>> for (K, regex_lite::Regex)
 where
+    'source: 'src,
     K: Clone + Into<SyntaxKind>,
 {
-    type Payload<'src>
-        = <Self as Pattern<str>>::Payload<'src>
+    type Payload
+        = <Self as Pattern<'src, str>>::Payload
     where
         CachedStr<'source>: 'src;
 
-    fn matches_at<'src>(
+    fn matches_at(
         &self,
         input: &'src CachedStr<'source>,
         cursor: <CachedStr<'source> as Input>::Cursor,

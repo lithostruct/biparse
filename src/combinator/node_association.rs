@@ -34,11 +34,8 @@ where
         match &output.ast {
             ParseOutcome::Success(_) => {
                 // Take the CST forest and prepend the new predecessor.
-                let new_cst = {
-                    // Danger zone.
-                    let mut interner = state.interner.borrow_mut();
-                    output.cst.attach_parent(self.kind, &mut interner)
-                };
+                let new_cst =
+                    state.with_interner(|interner| output.cst.attach_parent(self.kind, interner));
                 (
                     state,
                     ParseOutput {
@@ -103,23 +100,21 @@ where
         let (mut state, output) = self.inner.parse(input, state);
         match output.ast {
             ParseOutcome::Success(payload) => {
-                // Take the CST forest and prepend the new predecessor.
-                let new_cst = {
-                    // Danger zone.
-                    let mut interner = state.interner.borrow_mut();
-                    output.cst.attach_parent(self.kind, &mut interner)
-                };
-
-                // Associate the AST and CST payload via an `Id` taken from the result state.
                 let fresh_id = state.supply.next_id();
-                let linked_cst = new_cst.associate_root_at(0, fresh_id.clone());
+                // Take the CST forest and prepend + associate the new parent.
+                let new_cst = state.with_interner(|interner| {
+                    output
+                        .cst
+                        .associate_new_parent(self.kind, fresh_id.clone(), interner)
+                });
+
                 let new_payload = (self.closure)(fresh_id, payload);
 
                 (
                     state,
                     ParseOutput {
                         ast: ParseOutcome::Success(new_payload),
-                        cst: linked_cst,
+                        cst: new_cst,
                     },
                 )
             }
