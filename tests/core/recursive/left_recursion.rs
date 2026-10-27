@@ -19,7 +19,7 @@ fn left_recursive_a(s: String) -> String {
         });
     let (state, result) = combinator.parse(
         &s,
-        ParseState::<<str as Input>::Cursor, usize>::new(s.as_str()),
+        ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
     );
     match result.ast {
         ParseOutcome::Success(header) => {
@@ -73,4 +73,15 @@ proptest! {
     fn zero_or_more_a(s in some_amount_of_a()) {
         left_recursive_a(s);
     }
+}
+
+#[test]
+fn non_growing_termination() {
+    #[derive(Clone, Copy)]
+    struct OhNo;
+    let combinator: Recursive<dyn Parser<'_, str, Either<&str, OhNo>, DefaultParseEnvironment>> =
+        Recursive::new(|this| just((SyntaxKind(0), "a")).or(this.map(|_| OhNo)));
+
+    let artifact = combinator.parse_all("a").expect("Success!").into_ast_only();
+    assert!(artifact.is_left())
 }

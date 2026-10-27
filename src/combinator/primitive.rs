@@ -1,10 +1,8 @@
 use crate::{
     cst::AssociatedGreenCst,
-    failure::{ParseFailure, ParseFailureKind},
-    input::{Input, PatternMatch},
-    parse::{
-        Expectation, ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser,
-    },
+    failure::{Descriptor, FailureKind, ParseFailure},
+    input::Input,
+    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 use std::fmt::Debug;
 
@@ -22,8 +20,8 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Su
     fn parse(
         &self,
         _input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         (
             state,
             ParseOutput {
@@ -35,11 +33,8 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Su
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.parse(input, state)
     }
     fn hint(&self) -> ParseHint {
@@ -61,9 +56,9 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
-        let failure = E::Failure::failure_at(input, state.cursor, ParseFailureKind::FailPrimitive);
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
+        let failure = E::Failure::failure_at(input, state.cursor, FailureKind::FailPrimitive);
         (
             state,
             ParseOutput {
@@ -75,11 +70,8 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.parse(input, state)
     }
     fn hint(&self) -> ParseHint {
@@ -99,8 +91,8 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let cursor = state.cursor;
         let cst = state.with_interner(|interner| {
             AssociatedGreenCst::leaves(&Vec::new(), cursor, cursor, input, interner)
@@ -113,7 +105,7 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
                     let failure = E::Failure::failure_at(
                         input,
                         cursor,
-                        ParseFailureKind::ExpectedFound {
+                        FailureKind::ExpectedFound {
                             hint: <Self as Parser<'src, I, (), E>>::hint(self),
                             difference_at: Some(cursor),
                         },
@@ -127,14 +119,11 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, <I as Input>::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.parse(input, state)
     }
     fn hint(&self) -> ParseHint {
-        ParseHint::Expectation(Expectation::EndOfInput)
+        ParseHint::Expectation(Descriptor::EndOfInput)
     }
 }

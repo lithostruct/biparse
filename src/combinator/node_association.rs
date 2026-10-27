@@ -28,8 +28,8 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         let (state, output) = self.inner.parse(input, state);
         match &output.ast {
             ParseOutcome::Success(_) => {
@@ -53,8 +53,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.inner.check(input, state)
     }
     fn hint(&self) -> ParseHint {
@@ -95,8 +95,8 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<B, E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<B, E>) {
         let (mut state, output) = self.inner.parse(input, state);
         match output.ast {
             ParseOutcome::Success(payload) => {
@@ -133,11 +133,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.inner.check(input, state)
     }
     fn hint(&self) -> ParseHint {

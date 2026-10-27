@@ -5,11 +5,11 @@ use logos::{Lexer, Logos};
 use rowan::SyntaxKind;
 
 use crate::{
+    failure::{Descriptor, ParseHint},
     input::{
         AllOf, AnyOf, Input, InputItem, LineColumn, Pattern, PatternMatch, PatternMatchResult,
         cached_str::CachedStr,
     },
-    parse::{Expectation, ParseHint},
 };
 
 /// Type alias for an iterator item returned by a [`logos::SpannedIter<'src, T>`].
@@ -119,11 +119,15 @@ where
         self.source.to_line_col(at_offset)
     }
 
-    fn describe_token<'src>(&self, token: &Self::Token<'src>) -> String
+    fn describe<'src>(&self, token: &Self::Token<'src>) -> Descriptor
     where
         Self: 'src,
     {
-        format!("token '{token:?}'")
+        Descriptor::Pattern {
+            kind: "token".into(),
+            kind_plural: "tokens".into(),
+            data: format!("{token:?}"),
+        }
     }
 
     fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind> {
@@ -174,7 +178,7 @@ where
         format!("token {:?}", self.1)
     }
     fn hint(&self) -> ParseHint {
-        ParseHint::Expectation(Expectation::Pattern {
+        ParseHint::Expectation(Descriptor::Pattern {
             kind: "token".into(),
             kind_plural: "tokens".into(),
             data: format!("{:?}", self.1),
@@ -216,7 +220,7 @@ where
         format!("token {self:?}")
     }
     fn hint(&self) -> ParseHint {
-        ParseHint::Expectation(Expectation::Pattern {
+        ParseHint::Expectation(Descriptor::Pattern {
             kind: "token".into(),
             kind_plural: "tokens".into(),
             data: format!("{self:?}"),
@@ -227,10 +231,10 @@ where
 /// In addition to `Logos` token matching, attach the text associated with the match.
 ///
 /// Supported types include:
-/// - (K, T) where K : Into<SyntaxKind>, T : Pattern<LexerStream<...>>
-/// - T where T : Pattern<LexerStream<...>> + Into<SyntaxKind>
-/// - AllOf<P> where P : Pattern<...>
-/// - AnyOf<P> where P : Pattern<...>
+/// - `(K, T) where K : Into<SyntaxKind>, T : Pattern<LexerStream<...>>`
+/// - `T where T : Pattern<LexerStream<...>> + Into<SyntaxKind>`
+/// - `AllOf<P> where P : Pattern<...>`
+/// - `AnyOf<P> where P : Pattern<...>`
 ///
 /// Notably, `str`-based patterns are *not* supported, as they return text as their payloads.
 #[derive(

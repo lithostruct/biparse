@@ -1,15 +1,16 @@
 Biparse is a parser-combinator framework designed around dual AST + CST construction and correspondence.  
-Write an AST parser, get the CST for free! No more tree-walking over a `rowan` red tree!
-
-# Quick Start
+Write an AST parser, get the CST for free!
 
 # Motivation
 
-Writing a source to CST to AST parser by hand is fine only if you do it once only.
+Writing a source to CST to AST parser by hand is fine at most once.
 
-Tools like `rowan` are as useful as they are primitive, and one typically needs to write *two* parsing passes: once to convert a lexer stream to a CST, then another to turn a CST to an AST. The latter pass introduces a whole host of logical bugs and headaches, and the two passes tend to be closely interconnected, making iteration time-consuming and bug-prone. Most "move fast, break things" language exploration tends to ditch the CST altogether.
+Most language experiments simply don't bother with a source-to-CST parser, because using a parser generator or handwriting a `rowan` parser can be unintuitive and slow to iterate upon. This is despite the fact that a CST contains vital information for ergonomic error reporting and DSL support.
 
-Make no mistake, `rowan` is good! In fact, this crate uses it for its CST representation!  
-But surely we can do better than hand-written parsers, no?
+This project makes two contributions:
+- Despite being a parser combinator ecosystem comparable to `chumsky` in its intuitive use, all parser combinators natively support CST construction and do so automatically. You essentially get a CST without even trying.
+- `associate` combinators provide AST-CST correspondence through a configurable `Id` embedding, making it trivial to track which AST constructs correspond to the text and spans the CST node contains.
 
-With minimal bookkeeping, an otherwise source-to-AST parser can get a concrete syntax tree, and the correspondence mechanism allows for AST nodes to embed an identity value that can later be used to track down its CST equivalent.
+If you want top speed and incremental parsing for an industrial-grade compiler, you're probably better off learning how to use `rust_sitter` or any of the battle-tested parser generators.
+
+If you want something a bit friendlier that's quick to pick up and hack on? This crate may be just for you.

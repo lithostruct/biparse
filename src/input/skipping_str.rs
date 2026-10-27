@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use rowan::SyntaxKind;
 
 use crate::{
+    failure::{Descriptor, ParseHint},
     input::{CachedStr, Input, InputItem, LineColumn, Pattern, PatternMatchResult, StrIndex},
-    parse::ParseHint,
 };
 
 /// A [`str`]-based [`Input`] implementor that implicitly skips trivia at the character level after pattern-matching constructs.
@@ -184,7 +184,7 @@ impl<'source> Input for SkippingStr<'source> {
         Self: 'src;
 
     /// O(1) with caching.
-    /// This is done because [`PatternMatch::actualize_leaves`](crate::input::PatternMatch::actualize_leaves)
+    /// This is done because [`AssociatedGreenCst::leaves`](crate::cst::AssociatedGreenCst::leaves)
     /// calls this to check for leading trivia prior to the start cursor.
     fn start(&self) -> Self::Cursor {
         self.start_cursor
@@ -210,11 +210,11 @@ impl<'source> Input for SkippingStr<'source> {
         self.cached.to_line_col(at_offset)
     }
 
-    fn describe_token<'src>(&self, token: &Self::Token<'src>) -> String
+    fn describe<'src>(&self, token: &Self::Token<'src>) -> Descriptor
     where
         Self: 'src,
     {
-        self.source().describe_token(token)
+        self.source().describe(token)
     }
 }
 

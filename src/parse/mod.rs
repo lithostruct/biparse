@@ -4,8 +4,7 @@
 
 mod parser_trait;
 
-mod diagnostics;
 mod environment;
 mod io;
 
-pub use self::{diagnostics::*, environment::*, io::*, parser_trait::*};
+pub use self::{environment::*, io::*, parser_trait::*};

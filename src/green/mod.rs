@@ -1,5 +1,5 @@
-//! Module for an internal [`rowan::GreenNode`] and [`rowan::GreenToken`] interner, with other convenience type definitions.
-//! Spiritually similar to [`rowan::NodeCache`].
+//! Module for an internally-used [`GreenInterner`], which interns [`rowan::GreenNode`] and [`rowan::GreenToken`].
+//! Spiritually similar to [`rowan::NodeCache`] but with exposed methods.
 
 mod green_interner;
 mod tests;

@@ -5,5 +5,4 @@ mod io;
 mod path;
 mod supply;
 
-pub type Cst<T> = im::Vector<T>;
 pub use self::{io::*, path::*, supply::*};

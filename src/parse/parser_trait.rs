@@ -3,17 +3,27 @@ use std::rc::Rc;
 use either::Either;
 use rowan::SyntaxKind;
 
+pub use crate::failure::ParseHint;
 use crate::{
     combinator::{
-        AsParser, Associate, IntoOwned, Many, Map, Node, Or, Success, Then, WithEnv, end, success,
+        AsParser, Associate, Commit, IntoOwned, Many, Map, Node, Or, Recover, Success, Then,
+        TryMap, WithEnv, end, success,
     },
-    cst::{AssociatedGreenCst, IdSupply},
+    cst::IdSupply,
     input::Input,
     parse::{
-        DefaultParseEnvironment, ParseEnvironment, ParseOutput, ParseResult, ParseState,
-        diagnostics::ParseHint,
+        DefaultParseEnvironment, ParseArtifact, ParseEnvironment, ParseOutput, ParseStateData,
+        TerminalFailure,
     },
 };
+
+/// Type alias over [`ParseStateData`] which provides more straightforward type arguments for usage in [`Parser`] implementors.
+pub type ParseState<'src, I, E> = ParseStateData<
+    'src,
+    <I as Input>::Cursor,
+    <E as ParseEnvironment>::Supply,
+    <E as ParseEnvironment>::ErrorSupply,
+>;
 
 /// The central parsing trait, implemented by all combinators.
 pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment> {
@@ -21,22 +31,24 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>);
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>);
 
-    /// Checks the input for any errors from the given state.
-    /// AST, CST and origin information is discarded.
+    /// Checks the input for any errors/diagnostics from the given state.
+    /// AST, raw CST and association information may be opportunistically omitted or discarded.
     ///
-    /// Implementors are encouraged to override this default implementation.
+    /// Implementors are encouraged to override this default implementation;
+    /// an adherent implementation must preserve both overall parsing outcome
+    /// and the errors or diagnostics generated.
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let (new_state, output) = <Self as Parser<'src, I, A, E>>::parse(self, input, state);
         let erased_output = ParseOutput {
             ast: output.ast.map(|_| ()),
-            cst: AssociatedGreenCst::new(),
+            cst: output.cst,
         };
         (new_state, erased_output)
     }
@@ -54,23 +66,33 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
 /// This is separated from the main [`Parser`] to allow [`Parser`] to be dyn-compatible.
 ///
 /// Due to additional type restrictions on the payload type `A` (namely being a reference to a [`ToOwned`] implementor),
-/// the [.into_owned()](crate::parse::parser::ParserOwnedExt::into_owned) method is separated into trait [`ParserOwnedExt`].
+/// the chaining method for [`IntoOwned`] is separated into trait [`ParserOwnedExt`].
 pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment>:
     Parser<'src, I, A, E>
 {
     /// Parses from the start of input to the end, converting the output to a top-level result.
-    fn parse_all(&self, input: &'src I) -> ParseResult<A, E> {
+    ///
+    /// - [`Ok`] indicates a successful top-level parse, returning [`ParseArtifact`].
+    /// - [`Err`] indicates a terminal parse failure ([`TerminalFailure`]).
+    fn parse_all(
+        &self,
+        input: &'src I,
+    ) -> Result<ParseArtifact<A, E>, TerminalFailure<E::Failure>> {
         self.then_ignore(end())
-            .parse(input, ParseState::<'_, I::Cursor, E::Supply>::new(input))
+            .parse(input, ParseState::<I, E>::new(input))
             .1
-            .into_result()
+            .into_lifted()
     }
     /// Checks from the start of input to the end, converting the output to a top-level result.
-    fn check_all(&self, input: &'src I) -> ParseResult<(), E> {
+    ///
+    /// - [`Ok`] indicates a successful top-level parse, which may contain diagnostics generated from recovery.
+    /// - [`Err`] indicates a terminal parse failure ([`TerminalFailure`]).
+    fn check_all(&self, input: &'src I) -> Result<Vec<E::Failure>, TerminalFailure<E::Failure>> {
         self.then_ignore(end())
-            .check(input, ParseState::<'_, I::Cursor, E::Supply>::new(input))
+            .check(input, ParseState::<I, E>::new(input))
             .1
-            .into_result()
+            .into_lifted()
+            .map(|artifact| artifact.into_diagnostics())
     }
 
     /// Creates a type-erased [`Box`]-ed parser from `self`.
@@ -162,6 +184,47 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         A: Default,
     {
         self.or(success()).map(Either::left_or_default)
+    }
+
+    /// Chains `self` to attempt fallible mapping on the success payload,
+    /// signalling a committed failure if conversion fails.
+    fn try_map<F, B, Error>(self, closure: F) -> WithEnv<E, TryMap<Self, F, A>>
+    where
+        F: Fn(A) -> Result<B, Error>,
+        Error: std::error::Error,
+        Self: Sized,
+    {
+        WithEnv::new(TryMap::new(self, closure))
+    }
+    /// Chains `self` to commit, transforming speculative failure into committed failure.
+    fn commit(self) -> WithEnv<E, Commit<Self>>
+    where
+        Self: Sized,
+    {
+        WithEnv::new(Commit::new(self))
+    }
+    /// Chains `self` to a recovery strategy, transforming committed failure into an associated diagnostic upon success.
+    ///
+    /// Common recovery strategies include parsing up to a set of recognized "safe characters",
+    /// where regular parsing can then resume.
+    ///
+    /// # Note on Recovery Parser Failure
+    ///
+    /// Speculative or committed failure surfacing from the recovery parser will result in
+    /// propagation of the failure from the fallible `self` parser.
+    /// It is recommended to keep recovery simple relative to the fallible parser.
+    fn recover<R, B, C>(
+        self,
+        with: R,
+        closure: C,
+        kind: impl Into<SyntaxKind>,
+    ) -> WithEnv<E, Recover<Self, R, B, C>>
+    where
+        Self: Sized,
+        R: Parser<'src, I, B, E>,
+        C: Fn(<E::ErrorSupply as IdSupply>::Id, B) -> A,
+    {
+        WithEnv::new(Recover::new(self, with, closure, kind))
     }
 
     /// Discards the current AST payload.

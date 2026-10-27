@@ -125,7 +125,7 @@ fn trivia_recovery() {
             "#]]
             .assert_debug_eq(&tree);
         }
-        Err(e) => unreachable!("{e}"),
+        Err(e) => unreachable!("{e:?}"),
     }
 }
 /// Lexer trivia recovery: restore skipped whitespace to `Kind::Trivia`.
@@ -155,7 +155,7 @@ fn leading_trivia_recovery() {
             "#]]
             .assert_debug_eq(&tree);
         }
-        Err(e) => unreachable!("{e}"),
+        Err(e) => unreachable!("{e:?}"),
     }
 }
 
@@ -243,6 +243,7 @@ where
         Indirect<'_, '_, LexerStream<'_, Kind>, Box<Expression>, DefaultParseEnvironment>,
     > = Recursive::declare_as("addmult expression");
 
+    // Assumed `BigUint::from_str` is infallible for input following regex pattern "[0-9]+".
     let num = just(WithText(Kind::Number))
         .map(|(_, s)| Box::new(Expression::Number(BigUint::from_str(&s).unwrap())))
         .shared();

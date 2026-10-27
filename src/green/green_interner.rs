@@ -11,7 +11,7 @@ pub type GreenElement = NodeOrToken<GreenNode, GreenToken>;
 pub type GreenElementRef<'a> = NodeOrToken<&'a GreenNodeData, &'a GreenTokenData>;
 
 #[inline]
-pub fn borrow_element(item: &GreenElement) -> GreenElementRef<'_> {
+pub(super) fn borrow_element(item: &GreenElement) -> GreenElementRef<'_> {
     match item {
         NodeOrToken::Node(node) => NodeOrToken::Node(node),
         NodeOrToken::Token(token) => NodeOrToken::Token(token),

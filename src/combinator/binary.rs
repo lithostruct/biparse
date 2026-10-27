@@ -34,11 +34,8 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, E::Supply>,
-        ParseOutput<(A, B), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(A, B), E>) {
         let (state, first_result) = self.first.parse(input, state);
         let payload_a = match first_result.ast {
             ast @ ParseOutcome::Speculative(_) | ast @ ParseOutcome::Committed(_) => {
@@ -84,8 +81,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let (state, first_result) = self.first.check(input, state);
         match &first_result.ast {
             ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => {
@@ -128,11 +125,8 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, E::Supply>,
-        ParseOutput<Either<A, B>, E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<Either<A, B>, E>) {
         let (first_state, first_result) = self.first.parse(input, state.clone());
         let first_speculative_error = match first_result.ast {
             ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
@@ -181,8 +175,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let (first_state, mut first_result) = self.first.check(input, state.clone());
         let first_speculative_error = match first_result.ast {
             ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {

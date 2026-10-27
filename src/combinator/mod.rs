@@ -4,6 +4,7 @@
 mod blanket;
 
 mod binary;
+mod commit_recover;
 mod just;
 mod map_into_owned;
 mod node_association;
@@ -19,8 +20,9 @@ use crate::{
 pub use self::{
     binary::{Or, Then},
     blanket::{AsParser, WithEnv},
+    commit_recover::{Commit, Recover},
     just::Just,
-    map_into_owned::{IntoOwned, Map},
+    map_into_owned::{IntoOwned, Map, TryMap},
     node_association::{Associate, Node},
     primitive::{End, Fail, Success},
     recursive::{

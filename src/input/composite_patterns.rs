@@ -2,8 +2,8 @@ use derive_more::{AsMut, AsRef, Deref, DerefMut, From};
 use rowan::SyntaxKind;
 
 use crate::{
+    failure::ParseHint,
     input::{Input, Pattern, PatternMatch, PatternMatchResult},
-    parse::ParseHint,
 };
 
 /// Token matching for any `Input` type.

@@ -20,6 +20,7 @@ struct IdParseEnvironment;
 impl ParseEnvironment for IdParseEnvironment {
     type Failure = biparse::failure::Simple;
     type Supply = biparse::cst::NewtypeSupply<Id>;
+    type ErrorSupply = usize;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, FromPrimitive, ToPrimitive)]

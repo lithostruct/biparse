@@ -6,13 +6,12 @@ use std::{
     borrow::Cow,
     fmt::{Debug, Display},
     hash::Hash,
-    marker::PhantomData,
     ops::Range,
 };
 
 use rowan::SyntaxKind;
 
-use crate::parse::ParseHint;
+use crate::failure::{Descriptor, ParseHint};
 
 /// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
 ///
@@ -89,8 +88,10 @@ pub trait Input {
     /// Panics if `at_offset` is not at a UTF-8 character boundary.
     fn byte_to_line_col(&self, at_offset: usize) -> LineColumn;
 
-    /// Displays the description of a token.
-    fn describe_token<'src>(&self, token: &Self::Token<'src>) -> String
+    /// Displays the description of a token in the form of an [`Expectation::Pattern`] object.
+    ///
+    /// Used for diagnostic construction and error reporting.
+    fn describe<'src>(&self, token: &Self::Token<'src>) -> Descriptor
     where
         Self: 'src;
 }

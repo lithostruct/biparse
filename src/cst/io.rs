@@ -3,51 +3,92 @@ use std::{cmp::Ordering, fmt::Debug, hash::Hash, ops::Range};
 use rowan::{GreenNode, Language, NodeOrToken, SyntaxKind, SyntaxNode};
 
 use crate::{
-    cst::{Cst, CstPath, Pathfind, association::AssociationTable},
+    cst::{
+        CstPath, Pathfind,
+        association::{AssociationTable, DiagnosticsTable},
+    },
     green::{GreenElement, GreenInterner},
-    input::{Input, PatternMatch},
+    input::Input,
 };
 
 /// The mutable output of CST construction, representing a green CST forest and coupled associations.
 ///
 /// Associations contained are guaranteed to be valid for this CST forest.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AssociatedGreenCst<Id>
+pub struct AssociatedGreenCst<Id, EId, E>
 where
     Id: Eq + Hash,
+    EId: Eq + Hash,
 {
     /// The forest of green CST tokens/nodes.
-    cst: Cst<GreenElement>,
+    cst: im::Vector<GreenElement>,
     /// The association table between `Id` and paths into `self.cst` to get those nodes.
     associations: AssociationTable<Id>,
+    /// The diagnostics table between `Id` and paths into `self.cst` to get those nodes.
+    diagnostics: DiagnosticsTable<EId, E>,
 }
-impl<Id: Debug + Clone + Eq + Hash> Default for AssociatedGreenCst<Id> {
+impl<Id, EId, E> Default for AssociatedGreenCst<Id, EId, E>
+where
+    Id: Eq + Hash,
+    EId: Eq + Hash,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Id: Eq + Hash> AssociatedGreenCst<Id> {
+impl<Id, EId, E> AssociatedGreenCst<Id, EId, E>
+where
+    Id: Eq + Hash,
+    EId: Eq + Hash,
+{
     /// Returns an immutable view into the green CST forest.
-    pub const fn cst(&self) -> &Cst<GreenElement> {
+    pub const fn cst(&self) -> &im::Vector<GreenElement> {
         &self.cst
     }
     /// Returns an immutable view into the associations table.
     pub const fn associations(&self) -> &im::HashMap<Id, CstPath> {
         self.associations.inner()
     }
-    /// Deconstructs and returns the components of `self`.
-    pub fn into_parts(self) -> (Cst<GreenElement>, im::HashMap<Id, CstPath>) {
-        (self.cst, self.associations.into_inner())
+    /// Returns an immutable view into the associations table.
+    pub const fn diagnostics(&self) -> &im::HashMap<EId, (E, CstPath)> {
+        self.diagnostics.inner()
     }
-}
+    /// Deconstructs and returns the components of `self`.
+    #[allow(clippy::type_complexity)]
+    pub fn into_parts(
+        self,
+    ) -> (
+        im::Vector<GreenElement>,
+        im::HashMap<Id, CstPath>,
+        im::HashMap<EId, (E, CstPath)>,
+    ) {
+        (
+            self.cst,
+            self.associations.into_inner(),
+            self.diagnostics.into_inner(),
+        )
+    }
 
-impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
+    /// Deconstructs and transforms `self` into raw diagnostics, discarding all `EId` embeddings and path information.
+    pub fn into_raw_diagnostics(self) -> Vec<E>
+    where
+        EId: Clone,
+        E: Clone,
+    {
+        self.diagnostics
+            .into_inner()
+            .into_iter()
+            .map(|(_, (e, _))| e)
+            .collect()
+    }
+
     /// Constructs an empty CST, with no associations.
     pub fn new() -> Self {
         AssociatedGreenCst {
-            cst: Cst::new(),
+            cst: im::Vector::new(),
             associations: AssociationTable::new(),
+            diagnostics: DiagnosticsTable::new(),
         }
     }
 
@@ -63,7 +104,7 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
         I: Input + ?Sized,
     {
         let mut byte_offset = input.byte_offset(old_cursor);
-        let mut leaf_cst: Cst<GreenElement> = im::Vector::new();
+        let mut leaf_cst: im::Vector<GreenElement> = im::Vector::new();
 
         // Leading trivia.
         if old_cursor == input.start() {
@@ -149,9 +190,17 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
         AssociatedGreenCst {
             cst: leaf_cst,
             associations: AssociationTable::new(),
+            diagnostics: DiagnosticsTable::new(),
         }
     }
+}
 
+impl<Id, EId, E> AssociatedGreenCst<Id, EId, E>
+where
+    Id: Debug + Clone + Eq + Hash,
+    EId: Debug + Clone + Eq + Hash,
+    E: Clone,
+{
     /// Associatively merges with `self` as the left-hand-side, and a given right-hand-side.
     ///
     /// # Panics
@@ -159,22 +208,26 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
     /// Panics if the [`IdSupply`](crate::cst::supply::IdSupply) protocol is violated,
     /// such that there exists overlapping entries in both association tables.
     pub fn merge_with(self, rhs: Self) -> Self {
-        let merged_origin = self
+        let merged_associations = self
             .associations
             .merge_with(rhs.associations, self.cst.len());
+        let merged_diagnostics = self.diagnostics.merge_with(rhs.diagnostics, self.cst.len());
         let merged_forest = self.cst + rhs.cst;
         AssociatedGreenCst {
             cst: merged_forest,
-            associations: merged_origin,
+            associations: merged_associations,
+            diagnostics: merged_diagnostics,
         }
     }
     /// Creates a new parent taking the forest of `self` as children.
     pub fn attach_parent(self, kind: SyntaxKind, interner: &mut GreenInterner) -> Self {
-        let new_origin = self.associations.with_new_parent(0);
+        let new_associations = self.associations.with_new_parent(0);
+        let new_diagnostics = self.diagnostics.with_new_parent(0);
         let new_node = interner.node(kind, self.cst);
         AssociatedGreenCst {
-            cst: Cst::unit(new_node.into()),
-            associations: new_origin,
+            cst: im::Vector::unit(new_node.into()),
+            associations: new_associations,
+            diagnostics: new_diagnostics,
         }
     }
 
@@ -192,7 +245,6 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
         }
         match self
             .associations
-            .inner
             .insert(with_id.clone(), CstPath::here_at(index))
         {
             None => (),
@@ -215,6 +267,52 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
     ) -> Self {
         self = self.attach_parent(kind, interner);
         self = self.associate_root_at(0, with_id);
+        self
+    }
+
+    /// Diagnoses a root node at the given index of the forest with the corresponding EId and diagnostic.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index >= self.green.len()` or if `with_id` already exists in the diagnostic table.
+    pub fn diagnose_root_at(mut self, index: usize, with_id: EId, diagnostic: E) -> Self
+    where
+        E: Debug,
+    {
+        if index >= self.cst.len() {
+            panic!(
+                "Cannot find node {index}; forest is of length {}!",
+                self.cst.len()
+            )
+        }
+        match self
+            .diagnostics
+            .insert(with_id.clone(), (diagnostic, CstPath::here_at(index)))
+        {
+            None => (),
+            Some(existing) => panic!(
+                "IdSupply invariant invalidated: {with_id:?} has existing mapping to {existing:?}!"
+            ),
+        }
+        self
+    }
+    /// Constructs and diagnoses a root node as the new parent of the forest, with the corresponding Id and diagnostic.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `with_id` already exists in the diagnostics table.
+    pub fn diagnose_new_parent(
+        mut self,
+        kind: SyntaxKind,
+        with_id: EId,
+        diagnostic: E,
+        interner: &mut GreenInterner,
+    ) -> Self
+    where
+        E: Debug,
+    {
+        self = self.attach_parent(kind, interner);
+        self = self.diagnose_root_at(0, with_id, diagnostic);
         self
     }
 
@@ -242,7 +340,7 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
     {
         // It doesn't matter that the GreenInterner here is bogus.
         // We don't need to deduplicate the root node.
-        let rooted: AssociatedGreenCst<Id> = self
+        let rooted: Self = self
             .clone()
             .attach_parent(T::kind_to_raw(root), &mut GreenInterner::new());
         rooted.canonize().expect("Just appended root node!")
@@ -260,71 +358,90 @@ impl<Id: Debug + Clone + Eq + Hash> AssociatedGreenCst<Id> {
 }
 
 /// The actualization of `AssociatedGreenCst` as a red syntax tree.
-pub struct AssociatedRedCst<Id, L>
+pub struct AssociatedRedCst<Id, EId, E, L>
 where
     Id: Eq + Hash,
+    EId: Eq + Hash,
     L: Language,
 {
     /// The actualized red CST.
     cst: SyntaxNode<L>,
     /// The association table between `Id` and paths into `self.cst` to get those nodes.
     associations: AssociationTable<Id>,
+    /// The diagnostics table between `EId` and the diagnostic corresponding into `self.cst`.
+    diagnostics: DiagnosticsTable<EId, E>,
 }
 
 // Can't derive because that places an unecessary bound on `L`. Yeah.
-impl<Id, L> Debug for AssociatedRedCst<Id, L>
+impl<Id, EId, E, L> Debug for AssociatedRedCst<Id, EId, E, L>
 where
     Id: Debug + Eq + Hash,
+    EId: Debug + Eq + Hash,
+    E: Debug,
     L: Language,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AssociatedRedCst")
             .field("cst", &self.cst)
             .field("associations", &self.associations)
+            .field("diagnostics", &self.diagnostics)
             .finish()
     }
 }
-impl<Id, L> Clone for AssociatedRedCst<Id, L>
+impl<Id, EId, E, L> Clone for AssociatedRedCst<Id, EId, E, L>
 where
     Id: Clone + Eq + Hash,
+    EId: Clone + Eq + Hash,
+    E: Clone,
     L: Language,
 {
     fn clone(&self) -> Self {
         Self {
             cst: self.cst.clone(),
             associations: self.associations.clone(),
+            diagnostics: self.diagnostics.clone(),
         }
     }
 }
-impl<Id, L> PartialEq for AssociatedRedCst<Id, L>
+impl<Id, EId, E, L> PartialEq for AssociatedRedCst<Id, EId, E, L>
 where
     Id: Eq + Hash,
+    EId: Eq + Hash,
+    E: PartialEq,
     L: Language,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.cst == other.cst && self.associations == other.associations
+        self.cst == other.cst
+            && self.associations == other.associations
+            && self.diagnostics == other.diagnostics
     }
 }
-impl<Id, L> Eq for AssociatedRedCst<Id, L>
+impl<Id, EId, E, L> Eq for AssociatedRedCst<Id, EId, E, L>
 where
     Id: Eq + Hash,
+    EId: Eq + Hash,
+    E: Eq,
     L: Language,
 {
 }
-impl<Id, L> Hash for AssociatedRedCst<Id, L>
+impl<Id, EId, E, L> Hash for AssociatedRedCst<Id, EId, E, L>
 where
     Id: Eq + Hash,
+    EId: Eq + Hash,
+    E: Hash,
     L: Language,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.cst.hash(state);
         self.associations.hash(state);
+        self.diagnostics.hash(state);
     }
 }
 
-impl<Id, L> AssociatedRedCst<Id, L>
+impl<Id, EId, E, L> AssociatedRedCst<Id, EId, E, L>
 where
     Id: Eq + Hash,
+    EId: Eq + Hash,
     L: Language,
 {
     /// Returns an immutable view into the red CST tree.
@@ -335,9 +452,37 @@ where
     pub const fn associations(&self) -> &im::HashMap<Id, CstPath> {
         self.associations.inner()
     }
+    /// Returns an immutable view into the diagnostics table.
+    pub const fn diagnostics(&self) -> &im::HashMap<EId, (E, CstPath)> {
+        self.diagnostics.inner()
+    }
     /// Deconstructs and returns the components of `self`.
-    pub fn into_parts(self) -> (SyntaxNode<L>, im::HashMap<Id, CstPath>) {
-        (self.cst, self.associations.into_inner())
+    #[allow(clippy::type_complexity)]
+    pub fn into_parts(
+        self,
+    ) -> (
+        SyntaxNode<L>,
+        im::HashMap<Id, CstPath>,
+        im::HashMap<EId, (E, CstPath)>,
+    ) {
+        (
+            self.cst,
+            self.associations.into_inner(),
+            self.diagnostics.into_inner(),
+        )
+    }
+
+    /// Deconstructs and transforms `self` into raw diagnostics, discarding all `EId` embeddings and path information.
+    pub fn into_raw_diagnostics(self) -> Vec<E>
+    where
+        EId: Clone,
+        E: Clone,
+    {
+        self.diagnostics
+            .into_inner()
+            .into_iter()
+            .map(|(_, (e, _))| e)
+            .collect()
     }
 
     /// Searches `self` for the CST node associated with the given `Id`, if any.
@@ -348,5 +493,15 @@ where
                 .search(path)
                 .expect("Association table contains invalid path!"),
         )
+    }
+    /// Searches `self` for the diagnostic and CST node associated with the given `EId`, if any.
+    pub fn diagnose(&self, id: &EId) -> Option<(&E, SyntaxNode<L>)> {
+        let diagnosis = self.diagnostics.get(id)?;
+        Some((
+            &diagnosis.0,
+            self.cst
+                .search(&diagnosis.1)
+                .expect("Association table contains invalid path!"),
+        ))
     }
 }

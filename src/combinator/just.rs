@@ -2,9 +2,11 @@ use std::fmt::Debug;
 
 use crate::{
     cst::AssociatedGreenCst,
-    failure::{ParseFailure, ParseFailureKind},
+    failure::{FailureKind, ParseFailure},
     input::{Input, Pattern},
-    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
+    parse::{
+        ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, ParseStateData, Parser,
+    },
 };
 
 /// Parser combinator that matches on a pattern compatible with the input type.
@@ -30,14 +32,11 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, E::Supply>,
-        ParseOutput<P::Payload, E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<P::Payload, E>) {
         match self.pattern.matches_at(input, state.cursor) {
             Ok(matched) => {
-                let new_state = ParseState {
+                let new_state = ParseStateData {
                     cursor: matched.next_cursor,
                     ..state
                 };
@@ -62,7 +61,7 @@ where
                 let failure = E::Failure::failure_at(
                     input,
                     state.cursor,
-                    ParseFailureKind::ExpectedFound {
+                    FailureKind::ExpectedFound {
                         hint: self.pattern.hint(),
                         difference_at: error_position,
                     },
@@ -81,11 +80,11 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         match self.pattern.matches_at(input, state.cursor) {
             Ok(matched) => {
-                let new_state = ParseState {
+                let new_state = ParseStateData {
                     cursor: matched.next_cursor,
                     ..state
                 };
@@ -101,7 +100,7 @@ where
                 let failure = E::Failure::failure_at(
                     input,
                     state.cursor,
-                    ParseFailureKind::ExpectedFound {
+                    FailureKind::ExpectedFound {
                         hint: self.pattern.hint(),
                         difference_at: error_position,
                     },

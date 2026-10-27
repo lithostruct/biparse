@@ -12,15 +12,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         <P as Parser<'src, I, A, E>>::parse(*self, input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         <P as Parser<'src, I, A, E>>::check(*self, input, state)
     }
     fn hint(&self) -> ParseHint {
@@ -35,15 +35,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         (&**self as &P).parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
     }
     fn hint(&self) -> ParseHint {
@@ -58,15 +58,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         (&**self as &P).parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
     }
     fn hint(&self) -> ParseHint {
@@ -81,15 +81,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         (&**self as &P).parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
     }
     fn hint(&self) -> ParseHint {
@@ -154,15 +154,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<A, E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         self.inner.parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, E::Supply>,
-    ) -> (ParseState<'src, I::Cursor, E::Supply>, ParseOutput<(), E>) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.inner.check(input, state)
     }
     fn hint(&self) -> ParseHint {
@@ -228,21 +228,15 @@ where
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<A, E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         self.inner.parse(input, state)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.inner.check(input, state)
     }
     fn hint(&self) -> ParseHint {

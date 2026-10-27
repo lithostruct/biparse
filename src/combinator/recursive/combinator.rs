@@ -7,13 +7,15 @@ use std::{
 
 use crate::{
     combinator::{
-        RecursiveState,
+        recursive::frame::RecursiveState,
         recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId},
     },
     cst::AssociatedGreenCst,
-    failure::{ParseFailure, ParseFailureKind},
+    failure::{FailureKind, ParseFailure},
     input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
+    parse::{
+        ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, ParseStateData, Parser,
+    },
 };
 
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.
@@ -122,16 +124,20 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
     }
     /// Defines a parser to use the following inner definition.
     ///
+    /// # Panics
+    ///
+    /// Panics on multiple or re-entrant definition of the same parser object.
+    ///
     /// # Limitation on Strong Cycles
     ///
     /// Strong reference cycles formed by [`Recursive<Indirect<...>>`] groups (including `self` cycles)
     /// *never* deallocate, even after becoming inaccessible, throughout the lifetime of the program.
     ///
-    /// This is currently considered acceptable because parsers typically are constructed no more than once,
-    /// and stored and reused throughout the lifetime of the program.
-    /// In other words, the memory leak is bounded to the creation of a mutually-recursive combinator group.
+    /// This is currently considered acceptable, if undesirable,
+    /// because the space leak is bounded to the creation of a mutually-recursive combinator group.
     ///
-    /// Future mitigation of this would entail a `RecursiveGroup`-like structure involving n-variadic type arguments.
+    /// Future mitigation of this would entail a explicit group-like structure
+    /// involving either n-variadic type arguments or payload type erasure.
     pub fn define<P>(&mut self, parser: P)
     where
         P: Parser<'src, I, A, E> + 'p,
@@ -262,7 +268,7 @@ macro_rules! recursive_growth {
                     // Clone seed value, restore its type and return.
                     Some((seed_state, erased)) => {
                         assert_eq!(
-                            typeid::of::<ParseOutput<$payload, E>>(),
+                            std::any::TypeId::of::<ParseOutput<$payload, E>>(),
                             erased.type_id(),
                             "recursive output has different expected type!"
                         );
@@ -277,23 +283,24 @@ macro_rules! recursive_growth {
                         // 1. Every `RecursiveFrame` is associated with exactly one `RecursiveId`,
                         //    identifying the Recursive combinator whose invocation the frame represents.
                         // 2. Each `RecursiveId` uniquely corresponds to exactly one output type in this invocation,
-                        //    which is identified by `erased.type_id()`.
+                        //    which is asserted by `erased.type_id()`.
                         // 3. Following 1 and 2: the erased payload is asserted to be
                         //    created by this Recursive combinator in this invocation,
                         //    hence the output must be of type:
                         //    - `ParseOutput<A, E>` for `parse`;
                         //    - `ParseOutput<(), E>` for `check`.
                         // 4. `ErasedOutput::as_ptr` points directly to its contained `ParseOutput<_, E>`.
-                        //    We borrow that value and clone it; ownership of the erased output remains unchanged.
-                        // 5. Lifetime `'src` of A is recovered during cloning from the recursive state.
-                        //    A non-`'src` payload will not survive the parser invocation from which it originates.
-                        //    Hence, using `::typeid::of` is sufficient to establish type identity despite lifetime erasure.
+                        //    We borrow that value and clone it;
+                        //    ownership of the erased output remains with RecursiveState and is unchanged.
+                        // 5. Lifetime of A is static, hence `std::any::TypeId` is sufficient to establish type equality,
+                        //    guarding against unsound type downcasting.
                         let parse_output = unsafe {
                             let output = &*(erased.as_ptr() as *const ParseOutput<$payload, E>);
                             output.clone()
                         };
 
-                        // Overwrite seed state's recursive state with that discovered from the current state.
+                        // Overwrite seed state's recursive state with that discovered from the current state,
+                        // therefore preserving any recursive evaulation progress made after the seed is cached.
                         // Hence, update dependency to the enclosure.
                         let mut return_state = seed_state.clone();
                         return_state.recursive_state = state.recursive_state.clone();
@@ -312,7 +319,7 @@ macro_rules! recursive_growth {
                         let failure = E::Failure::failure_at(
                             input,
                             state.cursor,
-                            ParseFailureKind::ZeroProgressRecursion {
+                            FailureKind::ZeroProgressRecursion {
                                 name: this.description.as_ref().map(|s| s.clone().into_owned())
                             },
                         );
@@ -364,7 +371,7 @@ macro_rules! recompute {
                 dependencies: im::Vector::new(),
                 generation: 0,
             });
-        let seed_state = ParseState {
+        let seed_state = ParseStateData {
             recursive_state,
             ..state.clone()
         };
@@ -402,9 +409,9 @@ macro_rules! recompute {
             debug_log!("GENERATION {}: {} @ {:?}", frame.generation, &this.name(), input.byte_offset(state.cursor));
             rec_seed_state.recursive_state.push_to_top(this.recursive_id(), state.cursor, frame);
 
-            // Subsequent iteration
+            // Subsequent iteration.
             let current_best_cursor = rec_seed_state.cursor;
-            let current_state = ParseState {
+            let current_state = ParseStateData {
                 recursive_state: rec_seed_state.recursive_state.clone(),
                 ..state.clone()
             };
@@ -430,6 +437,8 @@ macro_rules! recompute {
                         // Zero (or negative) progress encountered.
                         // Treat stagnancy similarly to speculative error:
                         // reached fixpoint and break.
+                        //
+                        // This returns the previous result prior to encountering zero/negative progress.
                         break (rec_seed_state, rec_seed_result);
                     }
                 }
@@ -464,7 +473,7 @@ impl<P: ?Sized> Recursive<P> {
     fn entry_is_stale_or_absent<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         &self,
         cursor: I::Cursor,
-        state: &RecursiveState<'src, I::Cursor, E::Supply>,
+        state: &RecursiveState<'src, I::Cursor, E::Supply, E::ErrorSupply>,
     ) -> bool
     where
         P: Parser<'src, I, A, E>,
@@ -491,26 +500,20 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I,
     for Recursive<P>
 where
     P: Parser<'src, I, A, E> + 'src,
-    A: Clone + 'src,
+    A: Clone + 'static,
 {
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<A, E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         recursive_growth!(self, input, state, parse, A)
     }
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         recursive_growth!(self, input, state, check, ())
     }
     fn hint(&self) -> ParseHint {
@@ -531,16 +534,13 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P: ?Sized> Parser<'src, I,
     for RecursiveInner<P>
 where
     P: Parser<'src, I, A, E>,
-    A: Clone + 'src,
+    A: Clone + 'static,
 {
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<A, E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         match self {
             RecursiveInner::Owned(owned) => owned.as_ref().parse(input, state),
             RecursiveInner::Unowned(weak) => weak
@@ -552,11 +552,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         match self {
             RecursiveInner::Owned(owned) => owned.as_ref().check(input, state),
             RecursiveInner::Unowned(weak) => weak
@@ -569,16 +566,13 @@ where
 impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E>
     for Indirect<'p, 'src, I, A, E>
 where
-    A: Clone + 'src,
+    A: Clone + 'static,
 {
     fn parse(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<A, E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         self.inner
             .get()
             .unwrap_or_else(|| {
@@ -595,11 +589,8 @@ where
     fn check(
         &self,
         input: &'src I,
-        state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.inner
             .get()
             .unwrap_or_else(|| {

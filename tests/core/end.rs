@@ -1,6 +1,6 @@
 //! Tests for the `End` sentinel combinator.
 
-use biparse::{input::StrIndex, prelude::*};
+use biparse::prelude::*;
 use rowan::SyntaxKind;
 
 #[test]
@@ -9,7 +9,7 @@ fn single_end() {
     let no_input: ParseOutput<(), DefaultParseEnvironment> = end()
         .parse(
             NO_TEXT,
-            ParseState::<<str as Input>::Cursor, usize>::new(NO_TEXT),
+            ParseState::<str, DefaultParseEnvironment>::new(NO_TEXT),
         )
         .1;
     assert!(matches!(no_input.ast, ParseOutcome::Success(_)));
@@ -17,7 +17,7 @@ fn single_end() {
     const SOME_TEXT: &str = "lorem ipsum dolor sit amet";
     let (state, some_input): (_, ParseOutput<(), DefaultParseEnvironment>) = end().parse(
         SOME_TEXT,
-        ParseState::<<str as Input>::Cursor, usize>::new(SOME_TEXT),
+        ParseState::<str, DefaultParseEnvironment>::new(SOME_TEXT),
     );
     assert!(matches!(some_input.ast, ParseOutcome::Speculative(_)));
     assert_eq!(state.cursor.into_usize(), 0);
@@ -63,7 +63,10 @@ fn all_trivia_end() {
 
     const ALL_TRIVIA: &str = "     ";
     let input = SkippingStr::whitespace(ALL_TRIVIA, Kind(0));
-    let (_, result) = ends.parse(&input, ParseState::<StrIndex, usize>::new(&input));
+    let (_, result) = ends.parse(
+        &input,
+        ParseState::<str, DefaultParseEnvironment>::new(&input),
+    );
 
     assert!(result.ast.into_result().is_ok());
     let tree = result.cst.canonize_with(Kind(1)).0;

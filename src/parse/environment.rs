@@ -9,10 +9,12 @@ use crate::{
 pub trait ParseEnvironment: 'static {
     type Failure: ParseFailure + std::error::Error;
     type Supply: IdSupply;
+    type ErrorSupply: IdSupply;
 }
 #[derive(Debug, Clone, Copy)]
 pub struct DefaultParseEnvironment;
 impl ParseEnvironment for DefaultParseEnvironment {
     type Failure = failure::Simple;
     type Supply = usize;
+    type ErrorSupply = usize;
 }

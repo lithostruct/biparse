@@ -5,8 +5,8 @@
 use rowan::SyntaxKind;
 
 use crate::{
+    failure::{Descriptor, ParseHint},
     input::{Input, Pattern, PatternMatch, PatternMatchResult, str::StrIndex},
-    parse::{Expectation, ParseHint},
 };
 
 /// `regex` support.
@@ -42,7 +42,7 @@ where
         format!("regex {:?}", self.1.as_str())
     }
     fn hint(&self) -> ParseHint {
-        ParseHint::Expectation(Expectation::Pattern {
+        ParseHint::Expectation(Descriptor::Pattern {
             kind: "regex".to_string(),
             kind_plural: "regexes".to_string(),
             data: format!("{:?}", self.1.as_str()),
@@ -83,7 +83,7 @@ where
         format!("regex {:?}", self.1.as_str())
     }
     fn hint(&self) -> ParseHint {
-        ParseHint::Expectation(Expectation::Pattern {
+        ParseHint::Expectation(Descriptor::Pattern {
             kind: "regex".to_string(),
             kind_plural: "regexes".to_string(),
             data: format!("{:?}", self.1.as_str()),

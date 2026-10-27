@@ -1,5 +1,5 @@
+pub use crate::combinator::RecursiveState;
 use crate::{
-    combinator::RecursiveState,
     cst::{AssociatedGreenCst, IdSupply},
     green::GreenInterner,
     input::Input,
@@ -8,15 +8,20 @@ use crate::{
 use std::{cell::RefCell, fmt::Debug, hash::Hash, rc::Rc};
 
 /// The parse state to be passed and returned by all parser combinators.
-pub struct ParseState<'src, C, S: IdSupply> {
+///
+/// Prefer the usage of the [`ParseState`](crate::parse::ParseState) alias where applicable,
+/// which is equivalent but has more suitable associated types for use in [`Parser`](crate::parse::Parser) implementors.
+pub struct ParseStateData<'src, C, S: IdSupply, ES: IdSupply> {
     /// The current cursor position.
     pub cursor: C,
-    /// A supply of type `S`.
+    /// Id supply for associations.
     pub supply: S,
+    /// Id supply for recovered errors/diagnostics.
+    pub error_supply: ES,
     /// A reference-counted shared interner, allowing for clones to access the same structure.
     ///
     /// Direct usage is discouraged. The interning methods of [`GreenInterner`]
-    /// may be accessed via [`ParseState::with_interner`],
+    /// may be accessed via [`Self::with_interner`],
     /// which holds the mutable borrow for as short as possible.
     ///
     /// # Panics
@@ -26,13 +31,16 @@ pub struct ParseState<'src, C, S: IdSupply> {
     pub interner: Rc<RefCell<GreenInterner>>,
     /// The current recursive stack.
     ///
-    /// Do not discard the recursive stack during parsing. This may lead to undefined behaviour.
-    pub recursive_state: RecursiveState<'src, C, S>,
+    /// Do not discard the recursive stack during a parse operation,
+    /// or retain the recursive stack across independent parse operations.
+    /// This may lead to undefined behaviour.
+    pub recursive_state: RecursiveState<'src, C, S, ES>,
 }
-impl<'src, C, S: IdSupply> Debug for ParseState<'src, C, S>
+impl<'src, C, S: IdSupply, ES: IdSupply> Debug for ParseStateData<'src, C, S, ES>
 where
     C: Debug,
     S: Debug,
+    ES: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("ParseState");
@@ -50,26 +58,31 @@ where
             Err(_) => debug.field("interner", &"<borrowed>"),
         };
 
-        debug.field("supply", &self.supply).finish()
+        debug
+            .field("supply", &self.supply)
+            .field("error_supply", &self.error_supply)
+            .finish()
     }
 }
-impl<'src, C: Clone, S: IdSupply> Clone for ParseState<'src, C, S> {
+impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Clone for ParseStateData<'src, C, S, ES> {
     fn clone(&self) -> Self {
-        ParseState {
+        ParseStateData {
             cursor: self.cursor.clone(),
             interner: self.interner.clone(),
             supply: self.supply.clone(),
+            error_supply: self.error_supply.clone(),
             recursive_state: self.recursive_state.clone(),
         }
     }
 }
-impl<'src, C, S: IdSupply + Default> ParseState<'src, C, S> {
+impl<'src, C, S: IdSupply + Default, ES: IdSupply + Default> ParseStateData<'src, C, S, ES> {
     /// Creates a new parse state from this input.
-    pub fn new<I: Input + ?Sized>(input: &I) -> ParseState<'_, I::Cursor, S> {
-        ParseState {
+    pub fn new<I: Input + ?Sized>(input: &I) -> ParseStateData<'src, I::Cursor, S, ES> {
+        ParseStateData {
             cursor: input.start(),
             interner: Rc::new(RefCell::new(GreenInterner::new())),
             supply: S::default(),
+            error_supply: ES::default(),
             recursive_state: RecursiveState::new(),
         }
     }
@@ -89,7 +102,11 @@ impl<'src, C, S: IdSupply + Default> ParseState<'src, C, S> {
 /// Parse output produced by [`Parser`](crate::parse::Parser) implementors.
 pub struct ParseOutput<A, E: ParseEnvironment> {
     pub ast: ParseOutcome<A, E::Failure>,
-    pub cst: AssociatedGreenCst<<E::Supply as IdSupply>::Id>,
+    pub cst: AssociatedGreenCst<
+        <E::Supply as IdSupply>::Id,
+        <E::ErrorSupply as IdSupply>::Id,
+        E::Failure,
+    >,
 }
 impl<A, E: ParseEnvironment> Debug for ParseOutput<A, E>
 where
@@ -129,27 +146,89 @@ where
 {
 }
 
-pub type ParseResult<A, E> = Result<ParseArtifact<A, E>, <E as ParseEnvironment>::Failure>;
 impl<A, E: ParseEnvironment> ParseOutput<A, E> {
-    /// Converts self into a [`Result<ParseArtifact<A, E>, ...>`],
-    /// erasing the distinction between speculative and committed failure.
+    /// Consumes `self`, lifting parse failure out of the AST component into a [`Result`] value.
+    /// Speculative and commited failure are promoted to [`TerminalFailure`].
     ///
     /// This is typically used for top-level parser output;
     /// see [`ParserExt::parse_all`](crate::parse::ParserExt::parse_all)
     /// and [`ParserExt::check_all`](crate::parse::ParserExt::check_all).
-    pub fn into_result(self) -> ParseResult<A, E> {
-        self.ast
-            .into_result()
-            .map(|ast| ParseArtifact { ast, cst: self.cst })
+    pub fn into_lifted(self) -> Result<ParseArtifact<A, E>, TerminalFailure<E::Failure>> {
+        match self.ast.into_result() {
+            Ok(ast) => Ok(ParseArtifact { ast, cst: self.cst }),
+            Err(terminating) => Err(TerminalFailure {
+                terminating,
+                supplemental: self.cst.into_raw_diagnostics(),
+            }),
+        }
     }
 }
 
+/// Intermediate outcome of a parse on the AST payload.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ParseOutcome<A, F> {
+    /// A successful parse producing an AST payload.
+    Success(A),
+    /// Speculative failure.
+    /// The combinator system is free to try out parsing alternatives,
+    /// and a later success will cause this value to be discarded.
+    Speculative(F),
+    /// Committed failure.
+    /// The combinator system may not try other alternatives.
+    /// This failure is propagated outwards until explicitly handled.
+    Committed(F),
+}
+impl<A, F> ParseOutcome<A, F> {
+    /// Converts `self` into a [`Result`], erasing the outcome distinction between speculative and committed failure.
+    ///
+    /// This is typically used for top-level parser output.
+    pub fn into_result(self) -> Result<A, F> {
+        match self {
+            ParseOutcome::Success(success) => Ok(success),
+            ParseOutcome::Speculative(failure) | ParseOutcome::Committed(failure) => Err(failure),
+        }
+    }
+    /// Transforms the [`Self::Success`] payload via the given closure.
+    pub fn map<B>(self, f: impl FnOnce(A) -> B) -> ParseOutcome<B, F> {
+        match self {
+            ParseOutcome::Success(inner) => ParseOutcome::Success(f(inner)),
+            ParseOutcome::Speculative(failure) => ParseOutcome::Speculative(failure),
+            ParseOutcome::Committed(failure) => ParseOutcome::Committed(failure),
+        }
+    }
+    /// Transforms the [`Self::Speculative`] and [`Self::Committed`] failure payloads via the given closure.
+    pub fn map_err<F2>(self, f: impl FnOnce(F) -> F2) -> ParseOutcome<A, F2> {
+        match self {
+            ParseOutcome::Success(inner) => ParseOutcome::Success(inner),
+            ParseOutcome::Speculative(failure) => ParseOutcome::Speculative(f(failure)),
+            ParseOutcome::Committed(failure) => ParseOutcome::Committed(f(failure)),
+        }
+    }
+}
+
+/// The top-level error of a failed parse.
+/// Represents irrevocable and premature termination of parsing.
+///
+/// Converted from [`ParseOutput::into_result`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TerminalFailure<T> {
+    /// The main parse failure that caused termination of parsing.
+    pub terminating: T,
+    /// Supplemental diagnostics from normal parsing prior to termination.
+    pub supplemental: Vec<T>,
+}
+
 /// The top-level payload of a successful parse.
-/// Converted from and has the same parse information as `ParseOutput`,
-/// with accessor functions for end-use.
+///
+/// Converted from [`ParseOutput::into_result`] and contains near-similar parse information,
+/// with easier-to-use accessor functions.
 pub struct ParseArtifact<A, E: ParseEnvironment> {
     ast: A,
-    cst: AssociatedGreenCst<<E::Supply as IdSupply>::Id>,
+    cst: AssociatedGreenCst<
+        <E::Supply as IdSupply>::Id,
+        <E::ErrorSupply as IdSupply>::Id,
+        E::Failure,
+    >,
 }
 
 impl<A, E: ParseEnvironment> Debug for ParseArtifact<A, E>
@@ -191,73 +270,83 @@ where
 }
 
 impl<A, E: ParseEnvironment> ParseArtifact<A, E> {
+    /// Materializes an immutable view into the AST payload and raw diagnostics.
+    ///
+    /// To view only the AST component, ignoring diagnostics, use [`Self::ast_only`].
+    ///
+    /// To view only diagnostics, use [`Self::diagnostics`].
+    pub fn ast(&self) -> (&A, Vec<&E::Failure>) {
+        (&self.ast, self.diagnostics())
+    }
     /// Provides an immutable view into the AST payload only.
+    ///
+    /// This method discards diagnostics.
+    /// To view both the AST component *and* diagnostics, use [`Self::ast`].
     pub fn ast_only(&self) -> &A {
         &self.ast
     }
+    /// Materializes immutable access into raw diagnostics.
+    pub fn diagnostics(&self) -> Vec<&E::Failure> {
+        self.cst().diagnostics().values().map(|(f, _)| f).collect()
+    }
+    /// Consumes `self` to produce the AST payload and diagnostics.
+    ///
+    /// To obtain only the AST component, discarding diagnostics, use [`Self::into_ast_only`].
+    ///
+    /// To obtain only diagnostics, use [`Self::into_diagnostics`].
+    ///
+    /// To obtain both AST and CST components, use [`Self::into_parts`].
+    pub fn into_ast(self) -> (A, Vec<E::Failure>) {
+        (self.ast, self.cst.into_raw_diagnostics())
+    }
     /// Consumes `self` into the AST payload only.
+    ///
+    /// This method discards diagnostics. To obtain both the AST component *and* diagnostics, use [`Self::into_ast`].
     ///
     /// To obtain both AST and CST components, use [`Self::into_parts`].
     pub fn into_ast_only(self) -> A {
         self.ast
     }
+    /// Consumes `self` into raw diagnostics.
+    pub fn into_diagnostics(self) -> Vec<E::Failure> {
+        self.cst.into_raw_diagnostics()
+    }
+
     /// Provides an immutable view into the CST payload.
-    pub fn cst(&self) -> &AssociatedGreenCst<<E::Supply as IdSupply>::Id> {
+    pub fn cst(
+        &self,
+    ) -> &AssociatedGreenCst<
+        <E::Supply as IdSupply>::Id,
+        <E::ErrorSupply as IdSupply>::Id,
+        E::Failure,
+    > {
         &self.cst
     }
     /// Consumes `self` into the CST payload.
     ///
     /// To obtain both AST and CST components, use [`Self::into_parts`].
-    pub fn into_cst(self) -> AssociatedGreenCst<<E::Supply as IdSupply>::Id> {
+    pub fn into_cst(
+        self,
+    ) -> AssociatedGreenCst<<E::Supply as IdSupply>::Id, <E::ErrorSupply as IdSupply>::Id, E::Failure>
+    {
         self.cst
     }
-    /// Consumes `self` and returns its constituent parts.
+
+    /// Consumes `self` and returns its constituent AST and CST components.
     ///
     /// Note that diagnostic information is contained within the CST component
     /// due to coupling with CST path-based finding and resolution.
-    pub fn into_parts(self) -> (A, AssociatedGreenCst<<E::Supply as IdSupply>::Id>) {
+    #[allow(clippy::type_complexity)]
+    pub fn into_parts(
+        self,
+    ) -> (
+        A,
+        AssociatedGreenCst<
+            <E::Supply as IdSupply>::Id,
+            <E::ErrorSupply as IdSupply>::Id,
+            E::Failure,
+        >,
+    ) {
         (self.ast, self.cst)
-    }
-}
-
-/// Status of parse result of the AST payload.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ParseOutcome<A, F> {
-    /// A successful parse producing an AST payload.
-    Success(A),
-    /// Speculative failure.
-    /// The combinator system is free to try out parsing alternatives,
-    /// and a later success will cause this value to be discarded.
-    Speculative(F),
-    /// Committed failure.
-    /// The combinator system may not try other alternatives.
-    /// This failure is propagated outwards until explicitly handled.
-    Committed(F),
-}
-impl<A, F> ParseOutcome<A, F> {
-    /// Converts `self` into a [`Result`], erasing the parser-internal distinction between speculative and committed failure.
-    ///
-    /// This is typically used for top-level parser output.
-    pub fn into_result(self) -> Result<A, F> {
-        match self {
-            ParseOutcome::Success(success) => Ok(success),
-            ParseOutcome::Speculative(failure) | ParseOutcome::Committed(failure) => Err(failure),
-        }
-    }
-    /// Maps the [`Self::Success`] payload to a different type.
-    pub fn map<B>(self, f: impl FnOnce(A) -> B) -> ParseOutcome<B, F> {
-        match self {
-            ParseOutcome::Success(inner) => ParseOutcome::Success(f(inner)),
-            ParseOutcome::Speculative(failure) => ParseOutcome::Speculative(failure),
-            ParseOutcome::Committed(failure) => ParseOutcome::Committed(failure),
-        }
-    }
-    /// Maps the [`Self::Speculative`] and [`Self::Committed`] failure payloads to a different type.
-    pub fn map_err<F2>(self, f: impl FnOnce(F) -> F2) -> ParseOutcome<A, F2> {
-        match self {
-            ParseOutcome::Success(inner) => ParseOutcome::Success(inner),
-            ParseOutcome::Speculative(failure) => ParseOutcome::Speculative(f(failure)),
-            ParseOutcome::Committed(failure) => ParseOutcome::Committed(f(failure)),
-        }
     }
 }

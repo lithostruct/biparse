@@ -8,7 +8,7 @@ proptest! {
     #[test]
     fn single_empty(s in any::<String>()) {
         let (state, result): (_, ParseOutput<(), DefaultParseEnvironment>) = success()
-            .parse(s.as_str(), ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+            .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         assert_eq!(state.cursor.into_usize(), 0);
         assert_eq!(result.ast, ParseOutcome::Success(()));
     }
@@ -17,12 +17,12 @@ proptest! {
     fn empty_then_just(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
         let (state1, result1): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern.clone()))
-                .parse(s.as_str(), ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         let (state2, result2): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = success()
                 .then(just((SyntaxKind(kind), pattern)))
                 .map(|(_, s)| s)
-                .parse(s.as_str(), ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         assert_eq!(result1, result2);
         assert_eq!(state1.cursor, state2.cursor);
@@ -33,11 +33,11 @@ proptest! {
     fn just_then_empty(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
         let (state1, result1): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern.clone()))
-                .parse(s.as_str(), ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         let (state2, result2): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern))
                 .then(success()).map(|(s, _)| s)
-                .parse(s.as_str(), ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         assert_eq!(result1, result2);
         assert_eq!(state1.cursor, state2.cursor);
@@ -48,11 +48,11 @@ proptest! {
     fn empty_or_just(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
         let (state1, result1): (_, ParseOutput<Either<(), &str>, DefaultParseEnvironment>)
             = success().map(Either::Left)
-                .parse(s.as_str(), ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         let (state2, result2): (_, ParseOutput<Either<(), &str>, DefaultParseEnvironment>)
             = success()
                 .or(just((SyntaxKind(kind), pattern)))
-                .parse(s.as_str(), ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         assert_eq!(result1, result2);
         assert_eq!(state1.cursor, state2.cursor);
         assert_eq!(state1.supply, state2.supply);
@@ -65,7 +65,7 @@ proptest! {
         let (state, result): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern.clone()))
                 .or(success())
-                .parse(s.as_str(), ParseState::<<str as Input>::Cursor, _>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         let ParseOutcome::Success(inner) = result.ast else {panic!()};
         match inner {

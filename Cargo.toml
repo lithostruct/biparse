@@ -23,7 +23,6 @@ either = "1.18.0"
 regex = {version = "1.13.1", optional = true}
 regex-lite = {version = "0.1.9", optional = true}
 logos = {version = "0.16.1", optional = true}
-typeid = "1.0.3"
 
 [dev-dependencies]
 indoc = "2.0.7"

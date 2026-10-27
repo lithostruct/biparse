@@ -6,7 +6,7 @@ use std::{
 use rowan::{GreenNode, Language, api::SyntaxNode};
 use thiserror::Error;
 
-use crate::{cst::Cst, green::GreenElement};
+use crate::green::GreenElement;
 
 /// The path through a forest of CST nodes.
 ///
@@ -95,7 +95,7 @@ pub trait Pathfind {
     fn search(&self, path: &CstPath) -> Result<Self::Output, PathfindError>;
 }
 
-impl Pathfind for Cst<GreenElement> {
+impl Pathfind for im::Vector<GreenElement> {
     type Output = GreenNode;
 
     fn search(&self, path: &CstPath) -> Result<Self::Output, PathfindError> {

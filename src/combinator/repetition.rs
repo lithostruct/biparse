@@ -1,13 +1,15 @@
+use derive_more::From;
+
 use crate::{
-    combinator::success,
     cst::AssociatedGreenCst,
     input::Input,
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
 /// Parser combinator that executes a given parser zero, one or more than one times.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From)]
 pub struct Many<P> {
+    #[from]
     inner: P,
 }
 impl<P> Many<P> {
@@ -26,21 +28,18 @@ where
     fn parse(
         &self,
         input: &'src I,
-        mut state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<Vec<A>, E>,
-    ) {
+        mut state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<Vec<A>, E>) {
         let mut accumulative = Vec::new();
         let mut cst = AssociatedGreenCst::new();
         loop {
-            let (new_state, new_result) = self.inner.parse(input, state.clone());
-            match new_result.ast {
+            let (new_state, new_output) = self.inner.parse(input, state.clone());
+            match new_output.ast {
                 ParseOutcome::Success(element) => {
                     // Combine and continue.
                     accumulative.push(element);
                     state = new_state;
-                    cst = cst.merge_with(new_result.cst);
+                    cst = cst.merge_with(new_output.cst);
                     continue;
                 }
                 ParseOutcome::Speculative(_) => {
@@ -60,7 +59,7 @@ where
                         new_state,
                         ParseOutput {
                             ast: ParseOutcome::Committed(failure),
-                            cst: new_result.cst,
+                            cst: new_output.cst,
                         },
                     );
                 }
@@ -70,18 +69,15 @@ where
     fn check(
         &self,
         input: &'src I,
-        mut state: ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-    ) -> (
-        ParseState<'src, I::Cursor, <E as ParseEnvironment>::Supply>,
-        ParseOutput<(), E>,
-    ) {
-        let mut cst = success::<'src, I, E>().check(input, state.clone()).1.cst;
+        mut state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
+        let mut cst = AssociatedGreenCst::new();
         loop {
-            let (new_state, new_result) = self.inner.check(input, state.clone());
-            cst = cst.merge_with(new_result.cst);
-            match new_result.ast {
+            let (new_state, new_output) = self.inner.check(input, state.clone());
+            match new_output.ast {
                 ParseOutcome::Success(()) => {
                     state = new_state;
+                    cst = cst.merge_with(new_output.cst);
                     continue;
                 }
                 ParseOutcome::Speculative(_) => {

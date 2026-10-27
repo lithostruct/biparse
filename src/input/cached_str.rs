@@ -4,8 +4,8 @@ use derive_more::{AsRef, Deref};
 use rowan::SyntaxKind;
 
 use crate::{
+    failure::{Descriptor, ParseHint},
     input::{Input, InputItem, LineColumn, Pattern, PatternMatchResult, StrIndex},
-    parse::ParseHint,
 };
 
 /// A string structure that caches line start information of its source.
@@ -145,11 +145,11 @@ impl<'source> Input for CachedStr<'source> {
     fn slice_bytes(&self, start: usize, end: usize) -> Cow<'_, str> {
         self.source.slice_bytes(start, end)
     }
-    fn describe_token<'src>(&self, token: &Self::Token<'src>) -> String
+    fn describe<'src>(&self, token: &Self::Token<'src>) -> Descriptor
     where
         Self: 'src,
     {
-        self.source().describe_token(token)
+        self.source().describe(token)
     }
 }
 

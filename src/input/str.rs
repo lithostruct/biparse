@@ -4,8 +4,8 @@ use derive_more::Into;
 use rowan::SyntaxKind;
 
 use crate::{
+    failure::{Descriptor, ParseHint},
     input::{Input, InputItem, LineColumn, Pattern, PatternMatch, PatternMatchResult},
-    parse::{Expectation, ParseHint},
 };
 
 /// The cursor type for `str`-based input, which wraps a byyte offset into the source string.
@@ -69,11 +69,15 @@ impl Input for str {
         LineColumn { line, column }
     }
 
-    fn describe_token<'src>(&self, token: &Self::Token<'src>) -> String
+    fn describe<'src>(&self, token: &Self::Token<'src>) -> Descriptor
     where
         Self: 'src,
     {
-        format!("character '{token}'")
+        Descriptor::Pattern {
+            kind: "character".to_string(),
+            kind_plural: "characters".to_string(),
+            data: format!("'{token}'"),
+        }
     }
     fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind> {
         None
@@ -114,7 +118,7 @@ where
         format!("character '{}'", self.1)
     }
     fn hint(&self) -> ParseHint {
-        ParseHint::Expectation(Expectation::Pattern {
+        ParseHint::Expectation(Descriptor::Pattern {
             kind: "character".to_string(),
             kind_plural: "characters".to_string(),
             data: format!("'{}'", self.1),
@@ -174,7 +178,7 @@ where {
         format!("string \"{:?}\"", self.1)
     }
     fn hint(&self) -> ParseHint {
-        ParseHint::Expectation(Expectation::Pattern {
+        ParseHint::Expectation(Descriptor::Pattern {
             kind: "string".to_string(),
             kind_plural: "strings".to_string(),
             data: format!("\"{:?}\"", self.1),

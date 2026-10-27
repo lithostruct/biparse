@@ -14,7 +14,7 @@ proptest! {
             );
         let (state, result) = combinator.parse(
             &s,
-            ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
         assert!(matches!(result.ast, ParseOutcome::Success(_)));
         assert_eq!(state.cursor.into_usize(), 0);
@@ -28,7 +28,7 @@ proptest! {
             );
         let (state, result) = combinator.parse(
             &s,
-            ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
         assert!(matches!(result.ast, ParseOutcome::Success(_)));
         assert_eq!(state.cursor.into_usize(), 0);
@@ -43,7 +43,7 @@ proptest! {
 
         let (state, result) = combinator.parse(
             &s,
-            ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
         assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
         assert_eq!(state.cursor.into_usize(), 0);
@@ -59,7 +59,7 @@ proptest! {
 
         let (state, result) = rec_a.parse(
             &s,
-            ParseState::<<str as Input>::Cursor, usize>::new(s.as_str())
+            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
         assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
         assert_eq!(state.cursor.into_usize(), 0);

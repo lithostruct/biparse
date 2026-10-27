@@ -1,7 +1,9 @@
 use std::{collections::VecDeque, fmt::Display};
 
-/// The diagnostics information for
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+/// The type used by [`Parser`](crate::parse::Parser)'s to "hint" at the input they expect.
+///
+/// Used for [`ParseFailure`](crate::failure::ParseFailure) error construction and reporting.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub enum ParseHint {
     /// No information known.
     #[default]
@@ -12,12 +14,12 @@ pub enum ParseHint {
     /// Fails unconditionally.
     Fails,
     /// Expects something, consuming up to that point.
-    Expectation(Expectation),
+    Expectation(Descriptor),
 
     /// Anything but this; consumes no input.
     Not(Box<Self>),
     /// This, but consume no input.
-    Positive(Box<Self>),
+    Peek(Box<Self>),
 
     /// All of the following in sequential order.
     Sequence(Vec<Self>),
@@ -55,7 +57,7 @@ impl ParseHint {
         ParseHint::Choice(result)
     }
 
-    /// Postorder traversal to canonize a `ParseHint`, to be used by text renderers.
+    /// Postorder traversal to canonize a [`ParseHint`], to be used by text renderers.
     pub fn canonize(self) -> Self {
         match self {
             // Leaves.
@@ -70,20 +72,20 @@ impl ParseHint {
                     ParseHint::Empty => ParseHint::Fails,
                     ParseHint::Fails => ParseHint::Empty,
                     // Inner inversion.
-                    ParseHint::Not(inner) => ParseHint::Positive(inner),
-                    ParseHint::Positive(inner) => ParseHint::Not(inner),
+                    ParseHint::Not(inner) => ParseHint::Peek(inner),
+                    ParseHint::Peek(inner) => ParseHint::Not(inner),
                     hint => ParseHint::Not(Box::new(hint)),
                 }
             }
-            ParseHint::Positive(hint) => {
+            ParseHint::Peek(hint) => {
                 match hint.canonize() {
                     // Leaf propagation.
                     ParseHint::Empty => ParseHint::Empty,
                     ParseHint::Fails => ParseHint::Fails,
                     // Inner de-nesting.
                     ParseHint::Not(inner) => ParseHint::Not(inner),
-                    ParseHint::Positive(inner) => ParseHint::Positive(inner),
-                    hint => ParseHint::Positive(Box::new(hint)),
+                    ParseHint::Peek(inner) => ParseHint::Peek(inner),
+                    hint => ParseHint::Peek(Box::new(hint)),
                 }
             }
             ParseHint::Many(hint) => {
@@ -156,8 +158,11 @@ impl ParseHint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Expectation {
+/// A textual representation of an expected item or token.
+///
+/// Used for [`ParseFailure`](crate::failure::ParseFailure) error construction and reporting.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Descriptor {
     /// A primitive pattern.
     Pattern {
         /// The kind of this pattern. Must be singular, all-lowercase.
@@ -170,16 +175,16 @@ pub enum Expectation {
     EndOfInput,
     Any,
 }
-impl Display for Expectation {
+impl Display for Descriptor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expectation::Pattern {
+            Descriptor::Pattern {
                 kind,
                 kind_plural: _,
                 data,
             } => write!(f, "{kind} {data}"),
-            Expectation::EndOfInput => write!(f, "end of input"),
-            Expectation::Any => write!(f, "any input"),
+            Descriptor::EndOfInput => write!(f, "end of input"),
+            Descriptor::Any => write!(f, "any input"),
         }
     }
 }

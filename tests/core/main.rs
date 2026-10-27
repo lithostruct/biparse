@@ -10,3 +10,5 @@ mod many;
 mod recursive;
 
 mod associate;
+
+mod commit_recover;
