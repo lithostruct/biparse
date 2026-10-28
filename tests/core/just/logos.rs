@@ -12,7 +12,7 @@ use logos::Logos;
 use num_bigint::BigUint;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
-use rowan::{Language, SyntaxKind, SyntaxNode};
+use rowan::{Language, SyntaxKind};
 
 #[derive(
     Debug, Logos, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, FromPrimitive, ToPrimitive,

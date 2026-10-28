@@ -73,12 +73,12 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
     /// Creates a new self-recursive combinator with the given name.
     /// Combinator names are used for error reporting and better diagnostics.
     /// The closure taken will be provided a reference to the created combinator (`self`).
-    pub fn new_as<F, P>(s: impl Into<Cow<'static, str>>, closure: F) -> Self
+    pub fn new_as<F, P>(name: impl Into<Cow<'static, str>>, closure: F) -> Self
     where
         F: FnOnce(Recursive<Direct<'p, 'src, I, A, E>>) -> P,
         P: Parser<'src, I, A, E> + 'p,
     {
-        let description = s.into();
+        let description = name.into();
         let rc: Rc<P> = Rc::new_cyclic(|weak| {
             let this: Recursive<Direct<'p, 'src, I, A, E>> = Recursive {
                 inner: RecursiveInner::Unowned(weak.clone() as Weak<Direct<'p, 'src, I, A, E>>),
@@ -112,8 +112,8 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
     /// and a named object is required to define mutual recursion between related combinators.
-    pub fn declare_as(s: impl Into<Cow<'static, str>>) -> Self {
-        let name: Cow<'static, str> = s.into();
+    pub fn declare_as(name: impl Into<Cow<'static, str>>) -> Self {
+        let name: Cow<'static, str> = name.into();
         Recursive {
             inner: RecursiveInner::Owned(Rc::new(Indirect {
                 description: Some(name.clone()),
@@ -279,7 +279,7 @@ macro_rules! recursive_growth {
                             input.byte_offset(seed_state.cursor)
                         );
 
-                        // # SAFETY:
+                        // SAFETY:
                         // 1. Every `RecursiveFrame` is associated with exactly one `RecursiveId`,
                         //    identifying the Recursive combinator whose invocation the frame represents.
                         // 2. Each `RecursiveId` uniquely corresponds to exactly one output type in this invocation,
@@ -292,11 +292,9 @@ macro_rules! recursive_growth {
                         // 4. `ErasedOutput::as_ptr` points directly to `ParseOutput<_, E>`.
                         //    We borrow that value and clone it;
                         //    ownership of the erased output remains refcounted within RecursiveState instances.
-                        // 5. Lifetime of A is static, hence `std::any::TypeId` is sufficient to establish type equality,
+                        // 5. Lifetime of A, `E::Failure` and the CST data are of lifetime `'static`,
+                        //    hence `std::any::TypeId` is sufficient to establish type equality,
                         //    guarding against unsound type downcasting.
-                        // 6. Type of E (and hence all associated types, particularly `E::Failure` in the AST payload,
-                        //    and the various `Id`s in the CST payload) is known and retained.
-                        // 7. `E::Failure` and the CST data are of lifetime `'static`.
                         let parse_output = unsafe {
                             let output = &*(erased.as_ptr() as *const ParseOutput<$payload, E>);
                             output.clone()

@@ -1,4 +1,4 @@
-# Recursive Parsing
+# Recursive Combinators
 
 ## Self Recursion
 

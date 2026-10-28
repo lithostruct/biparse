@@ -70,7 +70,8 @@ let object = (just((Kind::LeftBrace, '{')).then(optional_whitespace.clone()))
                 rest.insert(0, first);
                 rest
             })
-            .optional_with_default()
+            .optional()
+            .map(Option::unwrap_or_default)
     )
     .then_ignore(
         optional_whitespace
@@ -90,7 +91,8 @@ let object = just(Kind::LeftBrace)
                 rest.insert(0, first);
                 rest
             })
-            .optional_with_default()
+            .optional()
+            .map(Option::unwrap_or_default)
     )
     .then_ignore(just(Kind::RightBrace))
     .map(Json::Object)

@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{borrow::Cow, rc::Rc};
 
 use either::Either;
 use rowan::SyntaxKind;
@@ -132,22 +132,38 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         WithEnv::new(Map::new(self, closure))
     }
     /// Chains `self` to add a new parent to the current CST forest.
-    fn node<K>(self, kind: K) -> WithEnv<E, Node<Self>>
+    fn node(self, kind: impl Into<SyntaxKind>) -> WithEnv<E, Node<Self>>
     where
-        K: Into<SyntaxKind>,
         Self: Sized,
     {
         WithEnv::new(Node::new(kind.into(), self))
     }
+    /// Chains `self` to add a new parent to the current CST forest.
+    /// Additionally provides a name to the parser object for use in diagnostics.
+    fn named(self, name: impl Into<Cow<'static, str>>, kind: impl Into<SyntaxKind>) -> WithEnv<E, Node<Self>>
+    where
+        Self: Sized,
+    {
+        WithEnv::new(Node::new_as(name, kind.into(), self))
+    }
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
-    fn associate<K, F, B>(self, kind: K, closure: F) -> WithEnv<E, Associate<Self, F, A>>
+    fn associate<F, B>(self, kind: impl Into<SyntaxKind>, closure: F) -> WithEnv<E, Associate<Self, F, A>>
     where
-        K: Into<SyntaxKind>,
         F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
         Self: Sized,
     {
         WithEnv::new(Associate::new(self, kind.into(), closure))
+    }
+    /// Chains `self` to add a new parent to the current CST forest,
+    /// and associate it with the fresh `Id` supplied to the closure.
+    /// Additionally provides a name to the parser object for use in diagnostics.
+    fn associate_as<F, B>(self, name: impl Into<Cow<'static, str>>, kind: impl Into<SyntaxKind>, closure: F) -> WithEnv<E, Associate<Self, F, A>>
+    where
+        F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
+        Self: Sized,
+    {
+        WithEnv::new(Associate::new_as(name, self, kind.into(), closure))
     }
 
     /// Chains `self` to repeat zero or more times, returning [`Vec<A>`].
@@ -174,14 +190,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         self.or(success()).map(Either::left)
     }
-    /// Chains `self` to match on zero or one occurence. Returns the default value if not present.
-    fn optional_with_default(self) -> composite::OptionalWithDefault<'src, I, A, E, Self>
-    where
-        Self: Sized,
-        A: Default,
-    {
-        self.or(success()).map(Either::left_or_default)
-    }
 
     /// Chains `self` to attempt fallible mapping on the success payload,
     /// signalling a committed failure if conversion fails.
@@ -193,14 +201,15 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         WithEnv::new(TryMap::new(self, closure))
     }
-    /// Chains `self` to commit, transforming speculative failure into committed failure.
+    /// Chains `self` to commit, promoting speculative failure into committed failure.
     fn commit(self) -> WithEnv<E, Commit<Self>>
     where
         Self: Sized,
     {
         WithEnv::new(Commit::new(self))
     }
-    /// Chains `self` to a recovery strategy, transforming committed failure into an associated diagnostic upon success.
+    /// Chains `self` to a recovery strategy, handling and transforming committed failure
+    /// into an associated diagnostic upon success.
     ///
     /// Common recovery strategies include parsing up to a set of recognized "safe characters",
     /// where regular parsing can then resume.
@@ -282,14 +291,6 @@ pub mod composite {
         Map<
             WithEnv<E, Or<P, AsParser<'src, I, (), E, Success>>>,
             fn(Either<A, ()>) -> Option<A>,
-            Either<A, ()>,
-        >,
-    >;
-    pub type OptionalWithDefault<'src, I, A, E, P> = WithEnv<
-        E,
-        Map<
-            WithEnv<E, Or<P, AsParser<'src, I, (), E, Success>>>,
-            fn(Either<A, ()>) -> A,
             Either<A, ()>,
         >,
     >;

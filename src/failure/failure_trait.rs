@@ -129,10 +129,10 @@ impl ParseFailure for Simple {
                     let found = input
                         .peek(difference_location)
                         .map_or(Descriptor::EndOfInput, |item| input.describe(&item.token));
-                    format!("{}found: {found} at location {difference_line_col}", hint.to_expectation_tree())
+                    format!("{}found: {found} at location {difference_line_col}", hint.to_expectation())
                 }
                 None => {
-                    let mut text = hint.to_expectation_tree();
+                    let mut text = hint.to_expectation();
                     if text.ends_with('\n') { text.pop(); }
                     text
                 },
@@ -190,7 +190,7 @@ pub enum RichKind {
     /// This may correspond to a cursor location in which the input diverges.
     #[error("{}{}",
         {
-            let mut tree = hint.to_expectation_tree();
+            let mut tree = hint.to_expectation();
             if tree.ends_with('\n') {
                 tree.pop();
             }

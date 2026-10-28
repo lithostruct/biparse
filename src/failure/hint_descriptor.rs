@@ -1,4 +1,5 @@
 use std::{borrow::Cow, collections::VecDeque, fmt::Display};
+use ptree::*;
 
 /// The type used by [`Parser`](crate::parse::Parser)'s to "hint" at the input they expect.
 ///
@@ -159,34 +160,50 @@ impl ParseHint {
 
     /// Returns `self` as a string containing a structured tree representation.
     pub fn to_tree(&self) -> String {
-        self.to_tree_with(&ptree::PrintConfig::default())
+        self.to_tree_with(&ptree::PrintConfig::default(), false)
     }
-    /// Returns `self` as a string containing a structured tree representation, applying the provided [`ptree::PrintConfig`].
-    pub fn to_tree_with(&self, config: &ptree::PrintConfig) -> String {
+    /// Returns `self` as a string containing a structured tree representation,
+    /// applying the provided [`ptree::PrintConfig`].
+    /// 
+    /// The `verbose` flag specifies whether named hints should be
+    /// treated as terminals ([`false`]) or non-terminals ([`true`]).
+    pub fn to_tree_with(&self, config: &ptree::PrintConfig, verbose: bool) -> String {
         let mut store = Vec::<u8>::new();
-        ptree::write_tree_with(self, &mut store, config).unwrap();
+        if verbose {
+            ptree::write_tree_with(ExpandedHint::expand(self), &mut store, config).unwrap();
+        } else {
+            ptree::write_tree_with(self, &mut store, config).unwrap();
+        }
         String::from_utf8(store).unwrap()
     }
     /// Returns `self` as an structured expectation tree.
     /// 
     /// Differs from [`Self::to_tree`] by attaching an `"expected:"` ancestor node.
-    pub fn to_expectation_tree(&self) -> String {
-        self.to_expectation_tree_with(&ptree::PrintConfig::default())
+    pub fn to_expectation(&self) -> String {
+        self.to_expectation_with(&ptree::PrintConfig::default(), false)
     }
-    /// Returns `self` as an structured expectation tree.
+    /// Returns `self` as an structured expectation tree,
+    /// applying the provided [`ptree::PrintConfig`].
     /// 
     /// Differs from [`Self::to_tree_with`] by attaching an `"expected:"` ancestor node.
-    pub fn to_expectation_tree_with(&self, config: &ptree::PrintConfig) -> String {
+    /// 
+    /// The `verbose` flag specifies whether named hints should be
+    /// treated as terminals ([`false`]) or non-terminals ([`true`]).
+    pub fn to_expectation_with(&self, config: &PrintConfig, verbose: bool) -> String {
         let mut store = Vec::<u8>::new();
-        ptree::write_tree_with(&Expected(self), &mut store, config).unwrap();
+        if verbose {
+            ptree::write_tree_with(&Expected(ExpandedHint::expand(self)), &mut store, config).unwrap();
+        } else {
+            ptree::write_tree_with(&Expected(self), &mut store, config).unwrap();
+        }
         String::from_utf8(store).unwrap()
     }
 }
 
-impl ptree::TreeItem for ParseHint {
+impl TreeItem for ParseHint {
     type Child = Self;
 
-    fn write_self<W: std::io::Write>(&self, f: &mut W, style: &ptree::Style) -> std::io::Result<()> {
+    fn write_self<W: std::io::Write>(&self, f: &mut W, style: &Style) -> std::io::Result<()> {
         let text = match self {
             ParseHint::Opaque => "something",
             ParseHint::Empty => "nothing",
@@ -207,11 +224,9 @@ impl ptree::TreeItem for ParseHint {
             ParseHint::Opaque
             | ParseHint::Empty
             | ParseHint::Fails
-            | ParseHint::Expectation(_) => {
-                Cow::Owned(Vec::new())
-            },
+            | ParseHint::Expectation(_)
             // Named is treated as a terminal.
-            ParseHint::Named { .. } => {
+            | ParseHint::Named { .. } => {
                 Cow::Owned(Vec::new())
             },
 
@@ -231,16 +246,84 @@ impl ptree::TreeItem for ParseHint {
     }
 }
 
+/// A transparent newtype for prepending `"expected:"` as an ancestor to the enclosed `ParseHint` or `ExpandedHint`.
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
-struct Expected<'a>(&'a ParseHint);
-impl<'a> ptree::TreeItem for Expected<'a> {
-    type Child = ParseHint;
-    fn write_self<W: std::io::Write>(&self, f: &mut W, style: &ptree::Style) -> std::io::Result<()> {
+struct Expected<'a, T>(&'a T);
+impl<'a, T> TreeItem for Expected<'a, T>
+where T : TreeItem {
+    type Child = T;
+    fn write_self<W: std::io::Write>(&self, f: &mut W, style: &Style) -> std::io::Result<()> {
         write!(f, "{}", style.paint("expected:"))
     }
     fn children(&self) -> Cow<'_, [Self::Child]> {
         Cow::Borrowed(std::slice::from_ref(self.0))
+    }
+}
+
+/// A transparent newtype for expanding the `ptree::TreeItem` implementation to look into named hints.
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+struct ExpandedHint(ParseHint);
+impl ExpandedHint {
+    /// Converts a single reference into expanded form.
+    fn expand(hint: &ParseHint) -> &Self {
+        // SAFETY:
+        // - Pointer is non-null and points to `ParseHint` data.
+        // - Lifetime of the borrow is unchanged, and the underlying data may not be mutated.
+        // - Transparent wrapper results in identical layout and alignment.
+        unsafe { &*(hint as *const ParseHint as *const ExpandedHint) }
+    }
+    /// Converts a slice of references into expanded form.
+    fn expand_slice(children: &[ParseHint]) -> &[Self] {
+        // SAFETY:
+        // - Pointer is non-null and points to `ParseHint` slice data.
+        // - Lifetime of the borrow is unchanged, and the underlying data may not be mutated.
+        // - Transparent wrapper results in identical layout and alignment for each element.
+        // - The length of the slice is unchanged, and is no larger than `isize::MAX`.
+        unsafe {
+            std::slice::from_raw_parts(
+                children.as_ptr() as *const ExpandedHint,
+                children.len(),
+            )
+        }
+    }
+}
+impl TreeItem for ExpandedHint {
+    type Child = Self;
+    fn write_self<W: std::io::Write>(&self, f: &mut W, style: &Style) -> std::io::Result<()> {
+        // None of the lines changed, so we delegate to [`ParseHint`].
+        self.0.write_self(f, style)
+    }
+    fn children(&self) -> Cow<'_, [Self::Child]> {
+        match &self.0 {
+            // Terminals
+            ParseHint::Opaque
+            | ParseHint::Empty
+            | ParseHint::Fails
+            | ParseHint::Expectation(_) => {
+                Cow::Owned(Vec::new())
+            },
+
+            // Single child.
+            ParseHint::Not(hint)
+            | ParseHint::Peek(hint)
+            | ParseHint::Many(hint)
+            // Named is treated as a non-terminal.
+            | ParseHint::Named { name: _, inner: hint } => {
+                Cow::Borrowed(ExpandedHint::expand_slice(
+                    std::slice::from_ref(hint.as_ref())
+                ))
+            },
+
+            // Multiple children.
+            ParseHint::Sequence(hints)
+            | ParseHint::Choice(hints) => {
+                Cow::Borrowed(ExpandedHint::expand_slice(
+                    hints.as_slice()
+                ))
+            },
+        }
     }
 }
 

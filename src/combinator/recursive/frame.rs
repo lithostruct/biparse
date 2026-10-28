@@ -141,7 +141,7 @@ pub(super) struct RecursiveFrame<'src, C, E: ParseEnvironment> {
     /// [`Some`] means that there exists a seed state that can be recovered.
     /// Payload erased via [`ErasedOutput`], which is recovered via unsafe code in [`Recursive`](crate::combinator::Recursive).
     #[allow(clippy::type_complexity)]
-    pub(super) seed_result: Option<(ParseStateData<'src, C, E>, Rc<dyn ErasedOutput<E>>)>,
+    pub(super) seed_result: Option<(ParseStateData<'src, C, E>, Rc<dyn ErasedOutput>)>,
 
     /// Informs whether this frame is currently involved in fixpoint seed growing.
     pub(super) active_fixpoint: bool,
@@ -193,16 +193,16 @@ pub(super) struct RecursiveId(pub(super) *const ());
 
 /// Trait erasure for storing heterogeneous [`ParseOutput<A, E>`] within [`RecursiveFrame`].
 /// Basically a specialty implementation of [`std::any::Any`].
-pub(super) trait ErasedOutput<E> {
-    fn clone_erased(&self) -> Rc<dyn ErasedOutput<E>>;
+pub(super) trait ErasedOutput {
+    fn clone_erased(&self) -> Rc<dyn ErasedOutput>;
     fn as_ptr(&self) -> *const ();
     fn type_id(&self) -> std::any::TypeId;
 }
-impl<A, E: ParseEnvironment> ErasedOutput<E> for ParseOutput<A, E>
+impl<A, E: ParseEnvironment> ErasedOutput for ParseOutput<A, E>
 where
     A: Clone + 'static,
 {
-    fn clone_erased(&self) -> Rc<dyn ErasedOutput<E>> {
+    fn clone_erased(&self) -> Rc<dyn ErasedOutput> {
         Rc::new((*self).clone())
     }
     fn as_ptr(&self) -> *const () {

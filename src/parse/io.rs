@@ -161,7 +161,7 @@ impl<A, E: ParseEnvironment> ParseOutput<A, E> {
         match self.ast.into_result() {
             Ok(ast) => Ok(ParseArtifact { ast, cst: self.cst }),
             Err(terminating) => Err(TerminalFailure {
-                terminating,
+                terminating: Box::new(terminating),
                 supplemental: self.cst.into_raw_diagnostics(),
             }),
         }
@@ -217,7 +217,7 @@ impl<A, F> ParseOutcome<A, F> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TerminalFailure<T> {
     /// The main parse failure that caused termination of parsing.
-    pub terminating: T,
+    pub terminating: Box<T>,
     /// Supplemental diagnostics from normal parsing prior to termination.
     pub supplemental: Vec<T>,
 }

@@ -1,8 +1,7 @@
 //! Test relating to `CachedStr` input type.
 
 use biparse::{
-    input::str::{CachedStr, StrIndex},
-    parse::ParseStateData,
+    input::str::CachedStr,
     prelude::*,
 };
 use proptest::{arbitrary::any, proptest};

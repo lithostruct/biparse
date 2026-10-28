@@ -68,7 +68,7 @@ where
                 just((Kind::LeftParen, "("))
                     .ignore_then(this.many())
                     .then_ignore(just((Kind::RightParen, ")")))
-                    .associate(Kind::List, SExp::List),
+                    .associate_as("list", Kind::List, SExp::List),
             )
     })
 }

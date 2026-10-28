@@ -112,7 +112,7 @@ impl From<Kind> for rowan::SyntaxKind {
 ///   Users may be consider this verbose or error-prone, and prefer `LexerStream`-based solutions instead.
 ///   Refer to [TODO].
 fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
-    let mut value: Recursive<Indirect<'_, '_, str, Json, E>> = Recursive::declare_as("json");
+    let mut value: Recursive<Indirect<'_, '_, str, Json, E>> = Recursive::declare_as("json value");
 
     // Primitives.
     let optional_whitespace = just((Kind::Whitespace, Regex::new(r"[ \t\r\n]+").unwrap()))
@@ -164,7 +164,8 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                     rest.insert(0, first);
                     rest
                 })
-                .optional_with_default(),
+                .optional()
+                .map(Option::unwrap_or_default),
         )
         .then_ignore(
             optional_whitespace
@@ -172,7 +173,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                 .then(just((Kind::RightBracket, ']'))),
         )
         .map(Json::Array)
-        .node(Kind::Array);
+        .named("array", Kind::Array);
 
     // Key-value pair.
     let key_value = string
@@ -205,7 +206,8 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                     rest.insert(0, first);
                     rest
                 })
-                .optional_with_default(),
+                .optional()
+                .map(Option::unwrap_or_default),
         )
         .then_ignore(
             optional_whitespace
@@ -213,7 +215,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                 .then(just((Kind::RightBrace, '}'))),
         )
         .map(Json::Object)
-        .node(Kind::Object);
+        .named("object", Kind::Object);
 
     // Finally!
     value.define(
@@ -243,7 +245,7 @@ fn json_null() {
     "#]]
     .assert_debug_eq(result.ast_only());
 
-    let tree: rowan::SyntaxNode<Kind> = result.into_cst().canonize(Kind::Root).into_parts().0;;
+    let tree: rowan::SyntaxNode<Kind> = result.into_cst().canonize(Kind::Root).into_parts().0;
     assert_eq!(tree.text(), data);
     expect![[r#"
         Root@0..4

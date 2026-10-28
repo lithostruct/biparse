@@ -1,6 +1,6 @@
 # Comparison between `Input` Types
 
-The `biparse` parser combinator ecosystem specializes according to a suitable input type implementing the `Input` trait. While all input types have similar expressivity, choosing a suitable input type may help with subsequent writing and composition of combinators. This document describes some of the tradeoffs between existing `Input` types.
+The Biparse parser combinator ecosystem specializes according to a suitable input type implementing the `Input` trait. While all input types have similar expressivity, choosing a suitable input type may help with subsequent writing and composition of combinators. This document describes some of the tradeoffs between existing `Input` types.
 
 For a concrete example, refer to sibling files [`json_str.rs`](/tests/integration/json_str.rs) and [`json_logos.rs`](/tests/integration/json_logos.rs).
 

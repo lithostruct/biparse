@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{borrow::Cow, marker::PhantomData};
 
 use rowan::SyntaxKind;
 
@@ -11,6 +11,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Node<P> {
     kind: SyntaxKind,
+    name: Option<Cow<'static, str>>,
     inner: P,
 }
 impl<P> Node<P> {
@@ -18,7 +19,13 @@ impl<P> Node<P> {
     where
         P: Parser<'src, I, A, E>,
     {
-        Node { inner, kind }
+        Node { inner, kind, name: None }
+    }
+    pub fn new_as<'src, I: Input + ?Sized, A, E: ParseEnvironment>(name: impl Into<Cow<'static, str>>, kind: SyntaxKind, inner: P) -> Self
+    where
+        P: Parser<'src, I, A, E>,
+    {
+        Node { inner, kind, name: Some(name.into()) }
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> for Node<P>
@@ -58,7 +65,13 @@ where
         self.inner.check(input, state)
     }
     fn hint(&self) -> ParseHint {
-        self.inner.hint()
+        match &self.name {
+            Some(name) => ParseHint::Named {
+                name: name.clone().into_owned(),
+                inner: Box::new(self.inner.hint()),
+            },
+            None => self.inner.hint(),
+        }
     }
 }
 
@@ -67,6 +80,7 @@ pub struct Associate<P, F, A> {
     inner: P,
     closure: F,
     kind: SyntaxKind,
+    name: Option<Cow<'static, str>>,
     _marker: PhantomData<fn(A)>,
 }
 impl<P, F, A> Associate<P, F, A> {
@@ -82,6 +96,24 @@ impl<P, F, A> Associate<P, F, A> {
             inner,
             closure,
             kind,
+            name: None,
+            _marker: PhantomData,
+        }
+    }
+    pub fn new_as<'src, I: Input + ?Sized, E: ParseEnvironment, B>(
+        name: impl Into<Cow<'static, str>>,
+        inner: P,
+        kind: SyntaxKind,
+        closure: F,
+    ) -> Self
+    where
+        Self: Parser<'src, I, B, E>,
+    {
+        Associate {
+            inner,
+            closure,
+            kind,
+            name: Some(name.into()),
             _marker: PhantomData,
         }
     }
@@ -138,6 +170,12 @@ where
         self.inner.check(input, state)
     }
     fn hint(&self) -> ParseHint {
-        self.inner.hint()
+        match &self.name {
+            Some(name) => ParseHint::Named {
+                name: name.clone().into_owned(),
+                inner: Box::new(self.inner.hint()),
+            },
+            None => self.inner.hint(),
+        }
     }
 }

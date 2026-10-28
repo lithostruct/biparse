@@ -123,7 +123,7 @@ where
     'source: 'src,
 {
     let mut value: Recursive<Indirect<'_, '_, LexerStream<'_, Kind>, Json, E>> =
-        Recursive::declare_as("json");
+        Recursive::declare_as("json value");
 
     // Primitives.
 
@@ -171,11 +171,12 @@ where
                     rest.insert(0, first);
                     rest
                 })
-                .optional_with_default(),
+                .optional()
+                .map(Option::unwrap_or_default),
         )
         .then_ignore(just(Kind::RightBracket))
         .map(Json::Array)
-        .node(Kind::Array);
+        .named("array", Kind::Array);
 
     // Key-value pair.
     let key_value = string
@@ -197,11 +198,12 @@ where
                     rest.insert(0, first);
                     rest
                 })
-                .optional_with_default(),
+                .optional()
+                .map(Option::unwrap_or_default),
         )
         .then_ignore(just(Kind::RightBrace))
         .map(Json::Object)
-        .node(Kind::Object);
+        .named("object", Kind::Object);
 
     value.define(
         null.or_same(boolean)

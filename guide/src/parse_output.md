@@ -1,7 +1,7 @@
 # Parse Output and Outcomes
 
 The intermediate output of a parse, `ParseOutput`, consists of an AST and CST component. 
-Both components are vital to the functionality of the `biparse` combinator library.
+Both components are vital to the functionality of the Biparse combinator library.
 
 ## Abstract Syntax Tree (AST)
 
@@ -61,6 +61,6 @@ where
 
 The `Id` and `EId` associated types may be configured by implementing the `ParseEnvironment` threaded throughout a parse operation. The default types for both associated types is `usize`.
 
-`AssociatedGreenCst` maintains the strong invariant that all association and diagnostic paths correspond to the same green nodes within the CST forest throughout CST transformation for the entire parse operation. This also means that `Id` and `EId` values embedded within the AST constructed will always point to the same CST spans from which they are associated with. This forms the AST-CST correspondence mechanism of `biparse`.
+`AssociatedGreenCst` maintains the strong invariant that all association and diagnostic paths correspond to the same green nodes within the CST forest throughout CST transformation for the entire parse operation. This also means that `Id` and `EId` values embedded within the AST constructed will always point to the same CST spans from which they are associated with. This forms the AST-CST correspondence mechanism of Biparse.
 
 `AssociatedGreenCst` may be canonized into `AssociatedRedCst`, which instead contains a `rowan::SyntaxNode<L>` red tree. Both types may weaken their correspondence invariants via deconstruction to take ownership of their constituent parts.
