@@ -44,14 +44,15 @@ pub enum FailureKind<I: Input + ?Sized> {
         hint: ParseHint,
         difference_at: Option<I::Cursor>,
     },
-    /// Zero-progress left recursion.
-    ZeroProgressRecursion { name: Option<String> },
+    /// Unbounded recursion.
+    UnboundedRecursion { name: Option<String> },
     /// Failure caused by the [`Fail`](crate::combinator::Fail) primitive combinator.
     FailPrimitive,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
-#[error("Parser error encountered.")]
+#[error("parse failure encountered")]
+/// Zero-sized failure type.
 pub struct ZeroSized;
 impl ParseFailure for ZeroSized {
     fn failure_at<I: Input + ?Sized>(_: &I, _: I::Cursor, _: FailureKind<I>) -> Self {
@@ -76,6 +77,33 @@ impl ParseFailure for ZeroSized {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
+#[error("{0} parse failure encountered")]
+/// Failure type containing only positional information.
+pub struct PositionOnly(LineColumn);
+impl ParseFailure for PositionOnly {
+    fn failure_at<I: Input + ?Sized>(input: &I, cursor: I::Cursor, _: FailureKind<I>) -> Self {
+        PositionOnly(input.to_line_col(cursor))
+    }
+    fn custom_failure_at<I: Input + ?Sized, E: std::error::Error>(
+        input: &I,
+        cursor: I::Cursor,
+        _: E,
+    ) -> Self {
+        PositionOnly(input.to_line_col(cursor))
+    }
+    fn composite<I: Input + ?Sized>(
+        input: &I,
+        cursor: I::Cursor,
+        _: impl IntoIterator<Item = Self>,
+    ) -> Self {
+        PositionOnly(input.to_line_col(cursor))
+    }
+    fn supplement(self, _: Self) -> Self {
+        self
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, From, Error)]
 #[error("{position}: {}",
     if messages.len() == 1 {
@@ -83,6 +111,7 @@ impl ParseFailure for ZeroSized {
     } else {
         "\n\t".to_string() + &messages.join("\n\t")
     })]
+/// Failure type that flattens information into its string representation.
 pub struct Simple {
     pub position: LineColumn,
     pub messages: Vec<String>,
@@ -100,11 +129,15 @@ impl ParseFailure for Simple {
                     let found = input
                         .peek(difference_location)
                         .map_or(Descriptor::EndOfInput, |item| input.describe(&item.token));
-                    format!("expected {hint:?}, found {found} at location {difference_line_col}")
+                    format!("{}found: {found} at location {difference_line_col}", hint.to_expectation_tree())
                 }
-                None => format!("expected {hint:?}"),
+                None => {
+                    let mut text = hint.to_expectation_tree();
+                    if text.ends_with('\n') { text.pop(); }
+                    text
+                },
             },
-            FailureKind::ZeroProgressRecursion { name } => {
+            FailureKind::UnboundedRecursion { name } => {
                 format!(
                     "zero-progress recursion detected{}",
                     name.map(|s| format!(" in '{s}'")).unwrap_or("".into())
@@ -148,25 +181,60 @@ impl ParseFailure for Simple {
     }
 }
 
-/// TODO: Error impl.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Enum used by the [`Rich`] failure type, representing the failure kinds of parsing.
+/// 
+/// Variants and fields closely resemble that of [`FailureKind`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
 pub enum RichKind {
     /// Expected a certain pattern, failed to match.
     /// This may correspond to a cursor location in which the input diverges.
+    #[error("{}{}",
+        {
+            let mut tree = hint.to_expectation_tree();
+            if tree.ends_with('\n') {
+                tree.pop();
+            }
+            tree
+        },
+        if diverges_at.len() == 1 {
+            format!("\nfound: {} at {}", diverges_at[0].1, diverges_at[0].0)
+        } else { String::new() }
+    )]
     ExpectedFound {
         hint: ParseHint,
         diverges_at: Vec<(LineColumn, Descriptor)>,
     },
     /// Zero-progress left recursion.
-    ZeroProgressRecursion { name: Option<String> },
+    #[error("unbounded recursion{}", .name.as_deref().unwrap_or(""))]
+    UnboundedRecursion { name: Option<String> },
     /// Failure caused by the [`Fail`](crate::combinator::Fail) primitive combinator.
+    #[error("failure from primitive Fail combinator")]
     FailPrimitive,
     /// Composite failure, which cannot be further reduced.
+    /// 
+    /// This variant is meaningful where the enclosing [`Rich`] value has a non-empty `supplemental` field.
+    #[error("composite failure")]
     CompositeFailure,
-    /// Custom failure from an [`std::error::Error`] implementor.
+    /// Custom failure from an [`std::error::Error`] implementor, as its textual representation.
+    #[error("{0}")]
     Custom(String),
 }
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
+#[error("{position} {kind}{}",
+    if !self.supplemental.is_empty() {
+        format!("\nsupplemental diagnostics:{}",
+            self.supplemental.iter()
+                .map(|inner| {
+                    let mut inner_str = inner.to_string();
+                    inner_str.insert(0, '\n');
+                    indent::indent_all_by(4, inner_str)
+                })
+                .collect::<String>()
+        )
+    } else { String::new() }
+)]
+/// Failure type that preserves most information supplied, with automated merging of related failure kinds.
 pub struct Rich {
     pub position: LineColumn,
     pub kind: RichKind,
@@ -188,7 +256,7 @@ impl ParseFailure for Rich {
                     vec![(diff_position, descriptor)]
                 }),
             },
-            FailureKind::ZeroProgressRecursion { name } => RichKind::ZeroProgressRecursion { name },
+            FailureKind::UnboundedRecursion { name } => RichKind::UnboundedRecursion { name },
             FailureKind::FailPrimitive => RichKind::FailPrimitive,
         };
         Self {
@@ -235,21 +303,30 @@ impl ParseFailure for Rich {
                     _ => Err(()),
                 },
         );
-
-        match all_expected_found {
-            Ok((hints, diverges_at, supplemental)) => Self {
+        if let Ok((hints, diverges_at, supplemental)) = all_expected_found {
+            return Self {
                 position,
                 kind: RichKind::ExpectedFound {
                     hint: ParseHint::choice(hints),
                     diverges_at,
                 },
                 supplemental,
-            },
-            Err(()) => Self {
-                position,
-                kind: RichKind::CompositeFailure,
-                supplemental,
-            },
+            }
+        }
+
+        // Composite failure flat-mapping.
+        let supplemental = supplemental.into_iter()
+            .flat_map(|elem| if elem.kind == RichKind::CompositeFailure {
+                // Position information of inner composite lost.
+                // I consider this acceptable.
+                elem.supplemental
+            } else { vec![elem] })
+            .collect();
+
+        Self {
+            kind: RichKind::CompositeFailure,
+            position,
+            supplemental,
         }
     }
     fn supplement(mut self, additional: Self) -> Self {

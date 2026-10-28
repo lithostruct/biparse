@@ -1,20 +1,26 @@
 mod proptest;
 mod cst;
 
-use biparse::{cst::IdSupply, green::GreenInterner, prelude::*};
+use std::str::FromStr;
+
+use biparse::{cst::IdSupply, green::GreenInterner, parse::TerminalFailure, prelude::*};
 use rowan::{NodeOrToken, SyntaxKind};
 
+/// A specialized S-expression variant, which embeds a SyntaxKind.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SExp {
     Symbol(String),
     List(SyntaxKind, Vec<Self>),
 }
 impl SExp {
+    /// Converts `self` to a textual representation.
+    /// 
+    /// Guarantees that `SExp::from_str(self.to_text()) == Ok(self)`.
     pub fn to_text(&self) -> String {
         match self {
             SExp::Symbol(s) => s.clone(),
-            SExp::List(_, sexps) => {
-                sexps.iter().fold(String::from("("), |mut s, child| {
+            SExp::List(kind, sexps) => {
+                sexps.iter().fold(format!("({:}", kind.0), |mut s, child| {
                     if &s == "(" {
                         //  First element
                         s += &child.to_text();
@@ -46,6 +52,12 @@ impl SExp {
                 }
             },
         }
+    }
+}
+impl FromStr for SExp {
+    type Err = TerminalFailure<<DefaultParseEnvironment as ParseEnvironment>::Failure>;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        todo!()
     }
 }
 

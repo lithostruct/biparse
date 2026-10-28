@@ -123,11 +123,19 @@ where
     where
         Self: 'src,
     {
-        Descriptor::Pattern {
-            kind: "token".into(),
-            kind_plural: "tokens".into(),
-            data: format!("{token:?}"),
+        match token {
+            Ok(inner) => Descriptor::Pattern {
+                kind: "token".into(),
+                kind_plural: "tokens".into(),
+                data: format!("{inner:?}"),
+            },
+            Err(e) => Descriptor::Pattern {
+                kind: "lex error".into(),
+                kind_plural: "lex errors".into(),
+                data: format!("{e:?}"),
+            },
         }
+        
     }
 
     fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind> {

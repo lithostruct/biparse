@@ -14,7 +14,7 @@ pub trait ParseEnvironment: 'static {
 #[derive(Debug, Clone, Copy)]
 pub struct DefaultParseEnvironment;
 impl ParseEnvironment for DefaultParseEnvironment {
-    type Failure = failure::Simple;
+    type Failure = failure::Rich;
     type Supply = usize;
     type ErrorSupply = usize;
 }

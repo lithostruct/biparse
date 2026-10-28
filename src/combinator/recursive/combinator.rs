@@ -322,7 +322,7 @@ macro_rules! recursive_growth {
                         let failure = E::Failure::failure_at(
                             input,
                             state.cursor,
-                            FailureKind::ZeroProgressRecursion {
+                            FailureKind::UnboundedRecursion {
                                 name: this.description.as_ref().map(|s| s.clone().into_owned())
                             },
                         );

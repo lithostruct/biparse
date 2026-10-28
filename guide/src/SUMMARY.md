@@ -6,6 +6,7 @@
     - [Input `LexerStream<'source>`](./input_comparison/1_input_lexerstream.md)
     - [Input `SkippingStr<'source>`](./input_comparison/2_input_skippingstr.md)
 - [`Parser` Trait Description and Usage](./parser_trait.md)
+- [Parser Combinators](./combinators.md)
 - [Parser Output and Outcomes](./parse_output.md)
 - [Recursive Parsing](./recursive_parsing.md)
 - [Error Recovery](./error_recovery.md)

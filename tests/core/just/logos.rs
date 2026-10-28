@@ -186,16 +186,9 @@ fn mismatched_token() {
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
     expect![[r#"
-        Simple {
-            position: LineColumn {
-                line: 1,
-                column: 1,
-            },
-            messages: [
-                "expected Expectation(Pattern { kind: \"token\", kind_plural: \"tokens\", data: \"Root\" }), found token 'Ok(Plus)' at location (1, 1)",
-            ],
-        }
-    "#]].assert_debug_eq(&result.unwrap_err().terminating);
+        (1, 1) expected:
+        └─ token Root
+        found: token Plus at (1, 1)"#]].assert_eq(&result.unwrap_err().terminating.to_string());
 }
 #[test]
 fn unrecognized_token() {
@@ -206,16 +199,9 @@ fn unrecognized_token() {
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
     expect![[r#"
-        Simple {
-            position: LineColumn {
-                line: 1,
-                column: 1,
-            },
-            messages: [
-                "expected Expectation(Pattern { kind: \"token\", kind_plural: \"tokens\", data: \"Root\" }), found token 'Err(())' at location (1, 1)",
-            ],
-        }
-    "#]].assert_debug_eq(&result.unwrap_err().terminating);
+        (1, 1) expected:
+        └─ token Root
+        found: lex error () at (1, 1)"#]].assert_eq(&result.unwrap_err().terminating.to_string());
 }
 
 /// Parser that parses an arithmatic equation involving parentheses, addition and multipliciation.
