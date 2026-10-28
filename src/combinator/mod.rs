@@ -1,5 +1,4 @@
-//! Module relating to parser combinators.
-#![allow(non_upper_case_globals)]
+//! Module for parser combinator types, which implement [`Parser`](crate::parse::Parser).
 
 mod blanket;
 

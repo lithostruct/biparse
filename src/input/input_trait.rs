@@ -88,7 +88,7 @@ pub trait Input {
     /// Panics if `at_offset` is not at a UTF-8 character boundary.
     fn byte_to_line_col(&self, at_offset: usize) -> LineColumn;
 
-    /// Displays the description of a token in the form of an [`Expectation::Pattern`] object.
+    /// Provides the description of a token in the form of an [`Descriptor`] object.
     ///
     /// Used for diagnostic construction and error reporting.
     fn describe<'src>(&self, token: &Self::Token<'src>) -> Descriptor
@@ -121,13 +121,6 @@ pub trait Pattern<'src, I: Input + ?Sized + 'src> {
         cursor: <I as Input>::Cursor,
     ) -> PatternMatchResult<'src, Self, I>;
 
-    /// Writes a description of what is expected by `self` as a string.
-    /// Omit [`rowan::SyntaxKind`] information.
-    ///
-    /// This is used for error reporting:
-    /// Assume a typical format of "expected \<description\>, got \<token\>".
-    fn describe(&self) -> String;
-
     /// Returns the [`ParseHint`] represented by this pattern.
     ///
     /// Unlike in [`Parser`](crate::parse::Parser), this method is not default-implemented
@@ -155,7 +148,7 @@ impl<T, C> InputItem<T, C> {
 }
 
 /// One-indexed line and column number.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LineColumn {
     pub line: usize,
     pub column: usize,

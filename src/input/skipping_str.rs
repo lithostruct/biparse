@@ -4,7 +4,10 @@ use rowan::SyntaxKind;
 
 use crate::{
     failure::{Descriptor, ParseHint},
-    input::{CachedStr, Input, InputItem, LineColumn, Pattern, PatternMatchResult, StrIndex},
+    input::{
+        Input, InputItem, LineColumn, Pattern, PatternMatchResult,
+        str::{CachedStr, StrIndex},
+    },
 };
 
 /// A [`str`]-based [`Input`] implementor that implicitly skips trivia at the character level after pattern-matching constructs.
@@ -43,9 +46,6 @@ use crate::{
 ///         cursor: <SkippingStr<'source> as Input>::Cursor,
 ///     ) -> PatternMatchResult<'src, Self, SkippingStr<'source>> {
 ///         input.match_with_skipping(self, cursor)
-///     }
-///     fn describe(&self) -> String {
-///         <Self as Pattern<str>>::describe(self)
 ///     }
 ///     fn hint(&self) -> ParseHint {
 ///         <Self as Pattern<str>>::hint(self)
@@ -207,7 +207,7 @@ impl<'source> Input for SkippingStr<'source> {
         self.source().slice_bytes(start, end)
     }
     fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
-        self.cached.to_line_col(at_offset)
+        self.cached.byte_to_line_col(at_offset)
     }
 
     fn describe<'src>(&self, token: &Self::Token<'src>) -> Descriptor
@@ -235,9 +235,6 @@ where
     ) -> PatternMatchResult<'src, Self, SkippingStr<'source>> {
         input.match_with_skipping(self, cursor)
     }
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
     }
@@ -260,9 +257,6 @@ where
     ) -> PatternMatchResult<'src, Self, SkippingStr<'source>> {
         input.match_with_skipping(self, cursor)
     }
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
     }
@@ -284,9 +278,6 @@ where
         cursor: <SkippingStr<'source> as Input>::Cursor,
     ) -> PatternMatchResult<'src, Self, SkippingStr<'source>> {
         input.match_with_skipping(self, cursor)
-    }
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
     }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
@@ -311,9 +302,6 @@ where
     ) -> PatternMatchResult<'src, Self, SkippingStr<'source>> {
         input.match_with_skipping(self, cursor)
     }
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
     }
@@ -336,9 +324,6 @@ where
         cursor: <SkippingStr<'source> as Input>::Cursor,
     ) -> PatternMatchResult<'src, Self, SkippingStr<'source>> {
         input.match_with_skipping(self, cursor)
-    }
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
     }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)

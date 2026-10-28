@@ -11,41 +11,43 @@ use std::{cell::RefCell, fmt::Debug, hash::Hash, rc::Rc};
 ///
 /// Prefer the usage of the [`ParseState`](crate::parse::ParseState) alias where applicable,
 /// which is equivalent but has more suitable associated types for use in [`Parser`](crate::parse::Parser) implementors.
-pub struct ParseStateData<'src, C, S: IdSupply, ES: IdSupply> {
+pub struct ParseStateData<'src, C, E: ParseEnvironment> {
     /// The current cursor position.
     pub cursor: C,
+    /// Indicates whether the parse state has encountered the end-of-input
+    pub encountered_end: bool,
     /// Id supply for associations.
-    pub supply: S,
+    pub supply: E::Supply,
     /// Id supply for recovered errors/diagnostics.
-    pub error_supply: ES,
+    pub error_supply: E::ErrorSupply,
     /// A reference-counted shared interner, allowing for clones to access the same structure.
     ///
     /// Direct usage is discouraged. The interning methods of [`GreenInterner`]
     /// may be accessed via [`Self::with_interner`],
     /// which holds the mutable borrow for as short as possible.
-    ///
-    /// # Panics
-    ///
-    /// This field comes with the usual pitfalls of [`Rc<RefCell<...>>`];
-    /// holding a mutable borrow and attempting subsequent borrowing will cause panicking.
+    /// 
+    /// Holding a mutable borrow and attempting subsequent borrowing will cause panicking.
     pub interner: Rc<RefCell<GreenInterner>>,
     /// The current recursive stack.
     ///
     /// Do not discard the recursive stack during a parse operation,
     /// or retain the recursive stack across independent parse operations.
     /// This may lead to undefined behaviour.
-    pub recursive_state: RecursiveState<'src, C, S, ES>,
+    /// 
+    /// Refer to [`RecursiveState`] for further documentation.
+    pub recursive_state: RecursiveState<'src, C, E>,
 }
-impl<'src, C, S: IdSupply, ES: IdSupply> Debug for ParseStateData<'src, C, S, ES>
+impl<'src, C, E: ParseEnvironment> Debug for ParseStateData<'src, C, E>
 where
     C: Debug,
-    S: Debug,
-    ES: Debug,
+    <E as ParseEnvironment>::Supply: Debug,
+    <E as ParseEnvironment>::ErrorSupply: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("ParseState");
 
-        debug.field("cursor", &self.cursor);
+        debug.field("cursor", &self.cursor)
+            .field("encountered_end", &self.encountered_end);
 
         // This is a whole thing because we cannot get an immutable view
         // if the interner is currently mutably-borrowed (results in panic naively).
@@ -64,10 +66,11 @@ where
             .finish()
     }
 }
-impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Clone for ParseStateData<'src, C, S, ES> {
+impl<'src, C: Clone, E: ParseEnvironment> Clone for ParseStateData<'src, C, E> {
     fn clone(&self) -> Self {
         ParseStateData {
             cursor: self.cursor.clone(),
+            encountered_end: self.encountered_end,
             interner: self.interner.clone(),
             supply: self.supply.clone(),
             error_supply: self.error_supply.clone(),
@@ -75,14 +78,15 @@ impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Clone for ParseStateData<'src, C
         }
     }
 }
-impl<'src, C, S: IdSupply + Default, ES: IdSupply + Default> ParseStateData<'src, C, S, ES> {
+impl<'src, C, E: ParseEnvironment> ParseStateData<'src, C, E> {
     /// Creates a new parse state from this input.
-    pub fn new<I: Input + ?Sized>(input: &I) -> ParseStateData<'src, I::Cursor, S, ES> {
+    pub fn new<I: Input + ?Sized>(input: &I) -> ParseStateData<'src, I::Cursor, E> {
         ParseStateData {
             cursor: input.start(),
+            encountered_end: false,
             interner: Rc::new(RefCell::new(GreenInterner::new())),
-            supply: S::default(),
-            error_supply: ES::default(),
+            supply: <E as ParseEnvironment>::Supply::default(),
+            error_supply: <E as ParseEnvironment>::ErrorSupply::default(),
             recursive_state: RecursiveState::new(),
         }
     }
@@ -209,7 +213,7 @@ impl<A, F> ParseOutcome<A, F> {
 /// The top-level error of a failed parse.
 /// Represents irrevocable and premature termination of parsing.
 ///
-/// Converted from [`ParseOutput::into_result`].
+/// Converted from [`ParseOutput::into_lifted`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TerminalFailure<T> {
     /// The main parse failure that caused termination of parsing.
@@ -220,7 +224,7 @@ pub struct TerminalFailure<T> {
 
 /// The top-level payload of a successful parse.
 ///
-/// Converted from [`ParseOutput::into_result`] and contains near-similar parse information,
+/// Converted from [`ParseOutput::into_lifted`] and contains near-similar parse information,
 /// with easier-to-use accessor functions.
 pub struct ParseArtifact<A, E: ParseEnvironment> {
     ast: A,

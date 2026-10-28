@@ -225,7 +225,7 @@ fn json_null() {
     "#]]
     .assert_debug_eq(result.ast_only());
 
-    let tree: rowan::SyntaxNode<Kind> = result.cst().canonize_with(Kind::Root).0;
+    let tree: rowan::SyntaxNode<Kind> = result.into_cst().canonize(Kind::Root).into_parts().0;
     assert_eq!(tree.text(), data.source());
     expect![[r#"
         Root@0..4
@@ -248,7 +248,7 @@ fn json_true() {
     "#]]
     .assert_debug_eq(result.ast_only());
 
-    let tree: rowan::SyntaxNode<Kind> = result.cst().canonize_with(Kind::Root).0;
+    let tree: rowan::SyntaxNode<Kind> = result.into_cst().canonize(Kind::Root).into_parts().0;
     assert_eq!(tree.text(), data.source());
     expect![[r#"
         Root@0..4
@@ -270,7 +270,7 @@ fn json_false() {
     "#]]
     .assert_debug_eq(result.ast_only());
 
-    let tree: rowan::SyntaxNode<Kind> = result.cst().canonize_with(Kind::Root).0;
+    let tree: rowan::SyntaxNode<Kind> = result.into_cst().canonize(Kind::Root).into_parts().0;
     assert_eq!(tree.text(), data.source());
     expect![[r#"
         Root@0..5
@@ -293,7 +293,7 @@ fn json_num() {
     "#]]
     .assert_debug_eq(result.ast_only());
 
-    let tree: rowan::SyntaxNode<Kind> = result.cst().canonize_with(Kind::Root).0;
+    let tree: rowan::SyntaxNode<Kind> = result.into_cst().canonize(Kind::Root).into_parts().0;
     assert_eq!(tree.text(), data.source());
     expect![[r#"
         Root@0..5
@@ -339,7 +339,7 @@ fn json_array() {
     "#]]
     .assert_debug_eq(result.ast_only());
 
-    let tree: rowan::SyntaxNode<Kind> = result.cst().canonize_with(Kind::Root).0;
+    let tree: rowan::SyntaxNode<Kind> = result.into_cst().canonize(Kind::Root).into_parts().0;
     assert_eq!(tree.text(), data.source());
     expect![[r#"
         Root@0..26
@@ -436,7 +436,7 @@ fn package_data() {
     expect![[r#"{"name": "biparse", "version": 0, "features": {"recursion", "forest", {"left_recursive": true}}}"#]]
         .assert_eq(&ast.to_flat_text());
 
-    let tree: rowan::SyntaxNode<Kind> = cst.canonize_with(Kind::Root).0;
+    let tree: rowan::SyntaxNode<Kind> = cst.canonize(Kind::Root).into_parts().0;
     assert_eq!(tree.text(), data.source());
     expect![[r#"
         Root@0..143

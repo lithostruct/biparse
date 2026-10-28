@@ -1,7 +1,7 @@
 //! Test relating to `CachedStr` input type.
 
 use biparse::{
-    input::{CachedStr, StrIndex},
+    input::str::{CachedStr, StrIndex},
     parse::ParseStateData,
     prelude::*,
 };
@@ -19,9 +19,9 @@ proptest! {
             just::<'_, CachedStr<'_>, DefaultParseEnvironment, _>((SyntaxKind(0), pat))
                 .to_owned();
 
-        let str_output = str_parser.parse(&s, ParseStateData::<StrIndex, usize, usize>::new(s.as_str()));
+        let str_output = str_parser.parse(&s, ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         let cachedstr = CachedStr::new(&s);
-        let cachedstr_output = cachedstr_parser.parse(&cachedstr, ParseStateData::<StrIndex, usize, usize>::new(&cachedstr));
+        let cachedstr_output = cachedstr_parser.parse(&cachedstr, ParseState::<str, DefaultParseEnvironment>::new(&cachedstr));
 
         assert_eq!(str_output.1, cachedstr_output.1);
         assert_eq!(str_output.0.cursor, cachedstr_output.0.cursor);
@@ -35,9 +35,9 @@ proptest! {
             just::<'_, CachedStr<'_>, DefaultParseEnvironment, _>((SyntaxKind(0), pat))
                 .to_owned();
 
-        let str_output = str_parser.parse(&s, ParseStateData::<StrIndex, usize, usize>::new(s.as_str()));
+        let str_output = str_parser.parse(&s, ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         let cachedstr = CachedStr::new(&s);
-        let cachedstr_output = cachedstr_parser.parse(&cachedstr, ParseStateData::<StrIndex, usize, usize>::new(&cachedstr));
+        let cachedstr_output = cachedstr_parser.parse(&cachedstr, ParseState::<str, DefaultParseEnvironment>::new(&cachedstr));
 
         assert_eq!(str_output.1, cachedstr_output.1);
         assert_eq!(str_output.0.cursor, cachedstr_output.0.cursor);

@@ -150,7 +150,7 @@ impl ParseFailure for Simple {
 
 /// TODO: Error impl.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum RichKind {
+pub enum RichKind {
     /// Expected a certain pattern, failed to match.
     /// This may correspond to a cursor location in which the input diverges.
     ExpectedFound {
@@ -161,11 +161,13 @@ enum RichKind {
     ZeroProgressRecursion { name: Option<String> },
     /// Failure caused by the [`Fail`](crate::combinator::Fail) primitive combinator.
     FailPrimitive,
+    /// Composite failure, which cannot be further reduced.
+    CompositeFailure,
     /// Custom failure from an [`std::error::Error`] implementor.
     Custom(String),
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct Rich {
+pub struct Rich {
     pub position: LineColumn,
     pub kind: RichKind,
     pub supplemental: Vec<Self>,
@@ -213,7 +215,42 @@ impl ParseFailure for Rich {
         cursor: I::Cursor,
         branches: impl IntoIterator<Item = Self>,
     ) -> Self {
-        todo!()
+        let position = input.to_line_col(cursor);
+        let supplemental: Vec<Self> = branches.into_iter().collect();
+
+        // Attempt unification of the common expected-found speculative error.
+        let all_expected_found = supplemental.clone().into_iter().try_fold(
+            (Vec::new(), Vec::new(), Vec::new()),
+            |(mut hints, mut divergence, mut supplemental), mut inner|
+                match inner.kind {
+                    RichKind::ExpectedFound {
+                        hint,
+                        mut diverges_at,
+                    } if inner.position == position => {
+                        hints.push(hint);
+                        divergence.append(&mut diverges_at);
+                        supplemental.append(&mut inner.supplemental);
+                        Ok((hints, divergence, supplemental))
+                    }
+                    _ => Err(()),
+                },
+        );
+
+        match all_expected_found {
+            Ok((hints, diverges_at, supplemental)) => Self {
+                position,
+                kind: RichKind::ExpectedFound {
+                    hint: ParseHint::choice(hints),
+                    diverges_at,
+                },
+                supplemental,
+            },
+            Err(()) => Self {
+                position,
+                kind: RichKind::CompositeFailure,
+                supplemental,
+            },
+        }
     }
     fn supplement(mut self, additional: Self) -> Self {
         self.supplemental.push(additional);

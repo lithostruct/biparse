@@ -43,7 +43,7 @@ where
     EId: Eq + Hash,
 {
     /// Returns an immutable view into the green CST forest.
-    pub const fn cst(&self) -> &im::Vector<GreenElement> {
+    pub const fn forest(&self) -> &im::Vector<GreenElement> {
         &self.cst
     }
     /// Returns an immutable view into the associations table.
@@ -91,10 +91,25 @@ where
             diagnostics: DiagnosticsTable::new(),
         }
     }
+    /// Constructs a CST forest from the given green tokens, with no associations.
+    /// 
+    /// This is considered a low-level constructor;
+    /// for [`Parser`](crate::parse::Parser) implementors, prefer [`Self::leaves`] where applicable.
+    pub fn from_tokens(tokens: impl IntoIterator<Item = GreenElement>) -> Self {
+        AssociatedGreenCst {
+            cst: tokens.into_iter().collect(),
+            associations: AssociationTable::new(),
+            diagnostics: DiagnosticsTable::new(),
+        }
+    }
 
     /// Constructs a CST containing multiple leaf elements from pattern-match information, with no associations.
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if the provided spans and 
     pub fn leaves<I>(
-        spans: &[(SyntaxKind, Range<usize>)],
+        spans: impl IntoIterator<Item = (SyntaxKind, Range<usize>)>,
         old_cursor: I::Cursor,
         next_cursor: I::Cursor,
         input: &I,
@@ -155,7 +170,7 @@ where
             }
             // Add the substring of the actual match to the current one.
             let substring = input.slice_bytes(span.start, span.end);
-            let element: GreenElement = interner.token(*kind, &substring).into();
+            let element: GreenElement = interner.token(kind, &substring).into();
             leaf_cst.push_back(element);
             // Mutate `byte_offset`.
             byte_offset = span.end;
@@ -260,14 +275,12 @@ where
     ///
     /// Panics if `with_id` already exists in the association table.
     pub fn associate_new_parent(
-        mut self,
+        self,
         kind: SyntaxKind,
         with_id: Id,
         interner: &mut GreenInterner,
     ) -> Self {
-        self = self.attach_parent(kind, interner);
-        self = self.associate_root_at(0, with_id);
-        self
+        self.attach_parent(kind, interner).associate_root_at(0, with_id)
     }
 
     /// Diagnoses a root node at the given index of the forest with the corresponding EId and diagnostic.
@@ -302,7 +315,7 @@ where
     ///
     /// Panics if `with_id` already exists in the diagnostics table.
     pub fn diagnose_new_parent(
-        mut self,
+        self,
         kind: SyntaxKind,
         with_id: EId,
         diagnostic: E,
@@ -311,15 +324,26 @@ where
     where
         E: Debug,
     {
-        self = self.attach_parent(kind, interner);
-        self = self.diagnose_root_at(0, with_id, diagnostic);
-        self
+        self.attach_parent(kind, interner).diagnose_root_at(0, with_id, diagnostic)
     }
 
-    /// Canonizes `self` as a syntax tree, returning the materialized red node and association table as an [`im::HashMap`].
+    
+    /// Canonizes `self` as a syntax tree using the given kind as the root node.
+    pub fn canonize<T>(self, root: impl Into<SyntaxKind>) -> AssociatedRedCst<Id, EId, E, T>
+    where
+        T: Language,
+    {
+        // It doesn't matter that the GreenInterner here is bogus.
+        // We don't need to deduplicate the root node.
+        let rooted: Self = self
+            .clone()
+            .attach_parent(root.into(), &mut GreenInterner::new());
+        rooted.canonize_without_root().expect("Just appended root node!")
+    }
+    /// Canonizes `self` as a syntax tree.
     ///
     /// Returns `None` if `self.cst.len != 1`, or the current root is a `GreenToken`.
-    pub fn canonize<L>(&self) -> Option<(SyntaxNode<L>, im::HashMap<Id, CstPath>)>
+    pub fn canonize_without_root<L>(self) -> Option<AssociatedRedCst<Id, EId, E, L>>
     where
         L: Language,
     {
@@ -330,20 +354,11 @@ where
 
         let root = self.cst[0].as_node().cloned().expect("Preconditions met!");
         let red_tree = SyntaxNode::<L>::new_root(root);
-        Some((red_tree, self.associations.inner().clone()))
-    }
-    /// Canonizes `self` as a syntax tree using the given kind as the root node,
-    /// returning the materialized red node and association table as an [`im::HashMap`].
-    pub fn canonize_with<T>(&self, root: T) -> (SyntaxNode<T>, im::HashMap<Id, CstPath>)
-    where
-        T: Language<Kind = T>,
-    {
-        // It doesn't matter that the GreenInterner here is bogus.
-        // We don't need to deduplicate the root node.
-        let rooted: Self = self
-            .clone()
-            .attach_parent(T::kind_to_raw(root), &mut GreenInterner::new());
-        rooted.canonize().expect("Just appended root node!")
+        Some(AssociatedRedCst {
+            cst: red_tree,
+            associations: self.associations,
+            diagnostics: self.diagnostics,
+        })
     }
 
     /// Searches `self` for the CST node associated with the given `Id`, if any.
@@ -445,7 +460,7 @@ where
     L: Language,
 {
     /// Returns an immutable view into the red CST tree.
-    pub const fn cst(&self) -> &SyntaxNode<L> {
+    pub const fn tree(&self) -> &SyntaxNode<L> {
         &self.cst
     }
     /// Returns an immutable view into the associations table.

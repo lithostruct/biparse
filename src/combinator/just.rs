@@ -42,7 +42,7 @@ where
                 };
                 let new_cst = new_state.with_interner(|interner| {
                     AssociatedGreenCst::leaves(
-                        &matched.cst_spans,
+                        matched.cst_spans,
                         state.cursor,
                         matched.next_cursor,
                         input,

@@ -5,7 +5,7 @@ use rowan::SyntaxKind;
 
 use crate::{
     failure::{Descriptor, ParseHint},
-    input::{Input, InputItem, LineColumn, Pattern, PatternMatchResult, StrIndex},
+    input::{Input, InputItem, LineColumn, Pattern, PatternMatchResult, str::StrIndex},
 };
 
 /// A string structure that caches line start information of its source.
@@ -37,9 +37,6 @@ use crate::{
 ///         cursor: <CachedStr<'source> as Input>::Cursor,
 ///     ) -> super::PatternMatchResult<'src, Self, CachedStr<'source>> {
 ///         self.matches_at(input.source(), cursor)
-///     }
-///     fn describe(&self) -> String {
-///         <Self as Pattern<str>>::describe(self)
 ///     }
 ///     fn hint(&self) -> ParseHint {
 ///         <Self as Pattern<str>>::hint(self)
@@ -85,8 +82,16 @@ impl<'source> CachedStr<'source> {
     pub const fn source(&self) -> &str {
         self.source
     }
+    /// Uses cached linestart information to return the byte offset at which the first character in the same line is located at.
+    pub fn to_linestart(&self, at_offset: usize) -> usize {
+        let line_index = self
+            .linestarts
+            .partition_point(|&start| start <= at_offset)
+            .saturating_sub(1);
+        self.linestarts[line_index]
+    }
     /// Uses cached linestart information to calculate the line and column of a byte offset in `O(lg N)` average time.
-    pub fn to_line_col(&self, at_offset: usize) -> LineColumn {
+    pub fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
         let line_index = self
             .linestarts
             .partition_point(|&start| start <= at_offset)
@@ -125,7 +130,7 @@ impl<'source> Input for CachedStr<'source> {
         Self: 'src;
 
     fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
-        self.to_line_col(at_offset)
+        CachedStr::byte_to_line_col(self, at_offset)
     }
 
     // Delegate to `str`.
@@ -174,9 +179,6 @@ where
         self.matches_at(input.source(), cursor)
     }
 
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
     }
@@ -201,9 +203,6 @@ where
         self.matches_at(input.source(), cursor)
     }
 
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
     }
@@ -228,9 +227,6 @@ where
         self.matches_at(input.source(), cursor)
     }
 
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
     }
@@ -256,9 +252,6 @@ where
         self.matches_at(input.source(), cursor)
     }
 
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
     }
@@ -284,9 +277,6 @@ where
         self.matches_at(input.source(), cursor)
     }
 
-    fn describe(&self) -> String {
-        <Self as Pattern<str>>::describe(self)
-    }
     fn hint(&self) -> ParseHint {
         <Self as Pattern<str>>::hint(self)
     }

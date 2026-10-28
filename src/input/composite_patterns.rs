@@ -41,9 +41,6 @@ where
         }
     }
 
-    fn describe(&self) -> String {
-        "predicate-satisfying token".into()
-    }
     fn hint(&self) -> ParseHint {
         ParseHint::Opaque
     }
@@ -59,8 +56,8 @@ where
 ///
 /// The [`Pattern`] implementation on [`AllOf`] is non-atomic; it defers to the inner patterns for matching,
 /// and chains the output of the previous element to the next.  
-/// This may have unintended interactions with [`SkippingStr`](crate::input::SkippingStr).
-/// Refer to [`SkippingStr`](crate::input::SkippingStr) "Notes on Trivia Matching and Pattern Atomicity" for more information.
+/// This may have unintended interactions with [`SkippingStr`](crate::input::str::SkippingStr).
+/// Refer to [`SkippingStr`](crate::input::str::SkippingStr) "Notes on Trivia Matching and Pattern Atomicity" for more information.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Deref, DerefMut, AsRef, AsMut,
 )]
@@ -101,16 +98,6 @@ where
         Ok(accumulative)
     }
 
-    fn describe(&self) -> String {
-        format!(
-            "sequential matching of [{}]",
-            self.0
-                .iter()
-                .map(|child| child.describe())
-                .collect::<Vec<String>>()
-                .join(", ")
-        )
-    }
     fn hint(&self) -> ParseHint {
         ParseHint::Sequence(self.0.iter().map(|child| child.hint()).collect())
     }
@@ -155,16 +142,6 @@ where
         })
     }
 
-    fn describe(&self) -> String {
-        format!(
-            "all of [{}]",
-            self.0
-                .iter()
-                .map(|child| child.describe())
-                .collect::<Vec<String>>()
-                .join(", ")
-        )
-    }
     fn hint(&self) -> ParseHint {
         ParseHint::Sequence(self.0.iter().map(|child| child.hint()).collect())
     }
@@ -212,16 +189,6 @@ where
         Err(None)
     }
 
-    fn describe(&self) -> String {
-        format!(
-            "any of [{}]",
-            self.0
-                .iter()
-                .map(|child| child.describe())
-                .collect::<Vec<String>>()
-                .join(", ")
-        )
-    }
     fn hint(&self) -> ParseHint {
         ParseHint::Choice(self.0.iter().map(|child| child.hint()).collect())
     }
@@ -253,16 +220,6 @@ where
         Err(None)
     }
 
-    fn describe(&self) -> String {
-        format!(
-            "any of [{}]",
-            self.0
-                .iter()
-                .map(|child| child.describe())
-                .collect::<Vec<String>>()
-                .join(", ")
-        )
-    }
     fn hint(&self) -> ParseHint {
         ParseHint::Choice(self.0.iter().map(|child| child.hint()).collect())
     }

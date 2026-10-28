@@ -1,6 +1,7 @@
 //! Tests for the `End` sentinel combinator.
 
 use biparse::prelude::*;
+use expect_test::expect;
 use rowan::SyntaxKind;
 
 #[test]
@@ -42,33 +43,38 @@ fn just_then_end() {
 /// This relates to logos-based input and `SkippingStr<'_>`.
 #[test]
 fn all_trivia_end() {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    struct Kind(u16);
-    impl rowan::Language for Kind {
-        type Kind = Self;
-        fn kind_from_raw(raw: SyntaxKind) -> Self::Kind {
-            Kind(raw.0)
-        }
-        fn kind_to_raw(kind: Self::Kind) -> SyntaxKind {
-            SyntaxKind(kind.0)
-        }
-    }
-    impl From<Kind> for SyntaxKind {
-        fn from(value: Kind) -> Self {
-            <Kind as rowan::Language>::kind_to_raw(value)
-        }
-    }
+    use biparse::input::str::SkippingStr;
 
     let ends: AsParser<'_, SkippingStr<'_>, (), DefaultParseEnvironment, _> = end();
 
-    const ALL_TRIVIA: &str = "     ";
-    let input = SkippingStr::whitespace(ALL_TRIVIA, Kind(0));
-    let (_, result) = ends.parse(
-        &input,
-        ParseState::<str, DefaultParseEnvironment>::new(&input),
-    );
+    const ALL_TRIVIA: &str = "     "; // length 5.
+    let input = SkippingStr::whitespace(ALL_TRIVIA, SyntaxKind(0));
+    let artifact = ends.parse_all(&input).expect("Success!");
+    
+    let green = artifact.into_cst();
+    assert_eq!(Into::<usize>::into(green.forest()[0].text_len()), ALL_TRIVIA.len());
 
-    assert!(result.ast.into_result().is_ok());
-    let tree = result.cst.canonize_with(Kind(1)).0;
-    assert_eq!(tree.text(), ALL_TRIVIA)
+    // Actual well-formedness not tested; see [`end_then_end`].
+}
+
+/// Regression:
+/// 
+/// Prevent duplicate actualization of all-trivia input.
+#[test]
+fn end_then_end() {
+    use biparse::{input::str::SkippingStr, cst::NoLang};
+
+    const ALL_TRIVIA: &str = "     "; // length 5.
+    let input = SkippingStr::whitespace(ALL_TRIVIA, SyntaxKind(0));
+
+    let ends: Box<dyn Parser<'_, SkippingStr<'_>, ((), ()), DefaultParseEnvironment, >> = end().then(end()).boxed();
+
+    // `parse_all` adds one more `end`, so the text is tripled if not handled correctly.
+    let artifact = ends.parse_all(&input).expect("Success!");
+    
+    let red = artifact.into_cst().canonize::<NoLang>(SyntaxKind(0));
+    expect![[r#"
+        5
+    "#]].assert_debug_eq(&red.tree().text().len());
+    assert_eq!(red.tree().text(), ALL_TRIVIA)
 }

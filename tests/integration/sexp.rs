@@ -1,6 +1,6 @@
 #![cfg(feature = "regex")]
 
-use biparse::prelude::*;
+use biparse::{input::str::SkippingStr, prelude::*};
 use derive_more::From;
 use expect_test::expect;
 use num_derive::{FromPrimitive, ToPrimitive};

@@ -66,6 +66,10 @@ fn hash_existing_token(token: &GreenToken) -> u64 {
     hash_token(token.kind(), token.text())
 }
 
+/// [`GreenNode`] and [`GreenToken`] interner for bottom-up construction.
+/// Similar to [`rowan::NodeCache`], but with exposed methods.
+///
+/// Used within [`ParseStateData`](crate::parse::ParseStateData).
 #[derive(Debug, Clone, Default)]
 pub struct GreenInterner {
     // These are qualified as pub(super) so that the testing module can use the internals for a has collision test.

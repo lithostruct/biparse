@@ -1,11 +1,11 @@
 use biparse::prelude::*;
 
 #[test]
-fn try_map_usize(){
+fn try_map_usize() {
     todo!()
 }
 
 #[test]
-fn try_map_with_recovery(){
+fn try_map_with_recovery() {
     todo!()
 }

@@ -1,3 +1,5 @@
+//! Module containing data structures relating to [`str`]-based [`Input`] implementations.
+
 use std::borrow::Cow;
 
 use derive_more::Into;
@@ -7,6 +9,8 @@ use crate::{
     failure::{Descriptor, ParseHint},
     input::{Input, InputItem, LineColumn, Pattern, PatternMatch, PatternMatchResult},
 };
+
+pub use super::{cached_str::CachedStr, skipping_str::SkippingStr};
 
 /// The cursor type for `str`-based input, which wraps a byyte offset into the source string.
 /// The contained value is asserted to be at a UTF-8 boundary.
@@ -114,9 +118,6 @@ where
         }
     }
 
-    fn describe(&self) -> String {
-        format!("character '{}'", self.1)
-    }
     fn hint(&self) -> ParseHint {
         ParseHint::Expectation(Descriptor::Pattern {
             kind: "character".to_string(),
@@ -174,9 +175,7 @@ where {
             unreachable!("The whole pattern cannot match!")
         }
     }
-    fn describe(&self) -> String {
-        format!("string \"{:?}\"", self.1)
-    }
+
     fn hint(&self) -> ParseHint {
         ParseHint::Expectation(Descriptor::Pattern {
             kind: "string".to_string(),
@@ -200,9 +199,7 @@ where
 where {
         (self.0.clone(), self.1.as_str()).matches_at(input, cursor)
     }
-    fn describe(&self) -> String {
-        <(K, &str) as Pattern<str>>::describe(&(self.0.clone(), self.1.as_str()))
-    }
+
     fn hint(&self) -> ParseHint {
         <(K, &str) as Pattern<str>>::hint(&(self.0.clone(), self.1.as_str()))
     }

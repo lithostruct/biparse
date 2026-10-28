@@ -2,6 +2,8 @@
 
 Trivia skipping for `str`-based input, typically whitespace. Trivia is skipped before and after successful pattern matching.
 
+This type is not exported by the prelude. It may be accessed via module path `biparse::input::str::SkippingStr`.
+
 ## Usage
 A producer of parser combinators expecting this input type should have the signature:
 ```rs

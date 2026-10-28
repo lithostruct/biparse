@@ -94,12 +94,21 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for En
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let cursor = state.cursor;
-        let cst = state.with_interner(|interner| {
-            AssociatedGreenCst::leaves(&Vec::new(), cursor, cursor, input, interner)
-        });
+        let cst = if state.encountered_end {
+            // Previously encountered end, leading span materialized for all-trivia input.
+            // Do nothing.
+            AssociatedGreenCst::new()
+        } else {
+            state.with_interner(|interner| {
+                AssociatedGreenCst::leaves([], cursor, cursor, input, interner)
+            })
+        };
 
         (
-            state,
+            ParseState::<I, E> {
+                encountered_end: true,
+                ..state
+            },
             ParseOutput {
                 ast: input.peek(cursor).map_or(ParseOutcome::Success(()), |_| {
                     let failure = E::Failure::failure_at(

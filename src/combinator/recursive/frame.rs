@@ -6,7 +6,6 @@ use std::{
 };
 
 use crate::{
-    cst::IdSupply,
     parse::{ParseEnvironment, ParseOutput, ParseStateData},
 };
 
@@ -38,17 +37,17 @@ use crate::{
 ///   The `RecursiveState` of the *successful* branch should be returned.
 ///   `RecursiveState` corresponding to discarded alternatives must *not* be returned, and should be discarded.
 /// - **All of the Above:** *Must* hold for *both* parsing and checking modes.
-pub struct RecursiveState<'src, C, S: IdSupply, ES: IdSupply> {
+pub struct RecursiveState<'src, C, E: ParseEnvironment> {
     /// The recursion stack + memoization table.
-    pub(super) inner: im::HashMap<(RecursiveId, C), RecursiveFrame<'src, C, S, ES>>,
+    pub(super) inner: im::HashMap<(RecursiveId, C), RecursiveFrame<'src, C, E>>,
 
     /// The currently-active recursive combinator invocation.
     pub(super) current_enclosing: Option<(RecursiveId, C)>,
     /// Dependencies for the currently-enclosing recursive combinator.
     pub(super) current_dependencies: im::Vector<(RecursiveId, C, usize)>,
 }
-impl<'src, C: Clone + Eq + Hash + Debug, S: IdSupply, ES: IdSupply> Debug
-    for RecursiveState<'src, C, S, ES>
+impl<'src, C: Clone + Eq + Hash + Debug, E: ParseEnvironment> Debug
+    for RecursiveState<'src, C, E>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecursiveState")
@@ -58,7 +57,7 @@ impl<'src, C: Clone + Eq + Hash + Debug, S: IdSupply, ES: IdSupply> Debug
             .finish()
     }
 }
-impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Default for RecursiveState<'src, C, S, ES> {
+impl<'src, C: Clone, E: ParseEnvironment> Default for RecursiveState<'src, C, E> {
     fn default() -> Self {
         RecursiveState {
             inner: im::HashMap::new(),
@@ -67,7 +66,7 @@ impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Default for RecursiveState<'src,
         }
     }
 }
-impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Clone for RecursiveState<'src, C, S, ES> {
+impl<'src, C: Clone, E: ParseEnvironment> Clone for RecursiveState<'src, C, E> {
     fn clone(&self) -> Self {
         RecursiveState {
             inner: self.inner.clone(),
@@ -76,17 +75,17 @@ impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Clone for RecursiveState<'src, C
         }
     }
 }
-impl<'src, C: Clone, S: IdSupply, ES: IdSupply> RecursiveState<'src, C, S, ES> {
+impl<'src, C: Clone, E: ParseEnvironment> RecursiveState<'src, C, E> {
     pub fn new() -> Self {
         Self::default()
     }
 }
-impl<'src, C: Clone + Hash + Eq, S: IdSupply, ES: IdSupply> RecursiveState<'src, C, S, ES> {
+impl<'src, C: Clone + Hash + Eq, E: ParseEnvironment> RecursiveState<'src, C, E> {
     pub(super) fn get(
         &self,
         id: RecursiveId,
         start_cursor: C,
-    ) -> Option<&RecursiveFrame<'src, C, S, ES>>
+    ) -> Option<&RecursiveFrame<'src, C, E>>
     where
         C: Eq,
     {
@@ -96,7 +95,7 @@ impl<'src, C: Clone + Hash + Eq, S: IdSupply, ES: IdSupply> RecursiveState<'src,
         &mut self,
         id: RecursiveId,
         start_cursor: C,
-    ) -> Option<&mut RecursiveFrame<'src, C, S, ES>>
+    ) -> Option<&mut RecursiveFrame<'src, C, E>>
     where
         C: Eq,
     {
@@ -106,7 +105,7 @@ impl<'src, C: Clone + Hash + Eq, S: IdSupply, ES: IdSupply> RecursiveState<'src,
         &mut self,
         id: RecursiveId,
         start_cursor: C,
-        frame: RecursiveFrame<'src, C, S, ES>,
+        frame: RecursiveFrame<'src, C, E>,
     ) {
         self.current_enclosing = Some((id, start_cursor.clone()));
         self.current_dependencies = frame.dependencies.clone();
@@ -115,7 +114,7 @@ impl<'src, C: Clone + Hash + Eq, S: IdSupply, ES: IdSupply> RecursiveState<'src,
 }
 
 /// A frame containing recursive information.
-pub(super) struct RecursiveFrame<'src, C, S: IdSupply, ES: IdSupply> {
+pub(super) struct RecursiveFrame<'src, C, E: ParseEnvironment> {
     // IDENTIFYING INFORMATION
     /// The user-given name for this recursive combinator.
     pub(super) description: Option<Cow<'static, str>>,
@@ -142,7 +141,7 @@ pub(super) struct RecursiveFrame<'src, C, S: IdSupply, ES: IdSupply> {
     /// [`Some`] means that there exists a seed state that can be recovered.
     /// Payload erased via [`ErasedOutput`], which is recovered via unsafe code in [`Recursive`](crate::combinator::Recursive).
     #[allow(clippy::type_complexity)]
-    pub(super) seed_result: Option<(ParseStateData<'src, C, S, ES>, Rc<dyn ErasedOutput>)>,
+    pub(super) seed_result: Option<(ParseStateData<'src, C, E>, Rc<dyn ErasedOutput<E>>)>,
 
     /// Informs whether this frame is currently involved in fixpoint seed growing.
     pub(super) active_fixpoint: bool,
@@ -155,7 +154,7 @@ pub(super) struct RecursiveFrame<'src, C, S: IdSupply, ES: IdSupply> {
     /// Used for cache invalidation.
     pub(super) dependencies: im::Vector<(RecursiveId, C, usize)>,
 }
-impl<'src, C: Clone + Debug, S: IdSupply, ES: IdSupply> Debug for RecursiveFrame<'src, C, S, ES> {
+impl<'src, C: Clone + Debug, E: ParseEnvironment> Debug for RecursiveFrame<'src, C, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecursiveFrame")
             .field("description", &self.description)
@@ -174,7 +173,7 @@ impl<'src, C: Clone + Debug, S: IdSupply, ES: IdSupply> Debug for RecursiveFrame
             .finish()
     }
 }
-impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Clone for RecursiveFrame<'src, C, S, ES> {
+impl<'src, C: Clone, E: ParseEnvironment> Clone for RecursiveFrame<'src, C, E> {
     fn clone(&self) -> Self {
         RecursiveFrame {
             description: self.description.clone(),
@@ -193,16 +192,17 @@ impl<'src, C: Clone, S: IdSupply, ES: IdSupply> Clone for RecursiveFrame<'src, C
 pub(super) struct RecursiveId(pub(super) *const ());
 
 /// Trait erasure for storing heterogeneous [`ParseOutput<A, E>`] within [`RecursiveFrame`].
-pub(super) trait ErasedOutput {
-    fn clone_erased(&self) -> Rc<dyn ErasedOutput>;
+/// Basically a specialty implementation of [`std::any::Any`].
+pub(super) trait ErasedOutput<E> {
+    fn clone_erased(&self) -> Rc<dyn ErasedOutput<E>>;
     fn as_ptr(&self) -> *const ();
     fn type_id(&self) -> std::any::TypeId;
 }
-impl<A, E: ParseEnvironment> ErasedOutput for ParseOutput<A, E>
+impl<A, E: ParseEnvironment> ErasedOutput<E> for ParseOutput<A, E>
 where
     A: Clone + 'static,
 {
-    fn clone_erased(&self) -> Rc<dyn ErasedOutput> {
+    fn clone_erased(&self) -> Rc<dyn ErasedOutput<E>> {
         Rc::new((*self).clone())
     }
     fn as_ptr(&self) -> *const () {

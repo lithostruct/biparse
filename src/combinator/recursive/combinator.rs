@@ -289,11 +289,14 @@ macro_rules! recursive_growth {
                         //    hence the output must be of type:
                         //    - `ParseOutput<A, E>` for `parse`;
                         //    - `ParseOutput<(), E>` for `check`.
-                        // 4. `ErasedOutput::as_ptr` points directly to its contained `ParseOutput<_, E>`.
+                        // 4. `ErasedOutput::as_ptr` points directly to `ParseOutput<_, E>`.
                         //    We borrow that value and clone it;
-                        //    ownership of the erased output remains with RecursiveState and is unchanged.
+                        //    ownership of the erased output remains refcounted within RecursiveState instances.
                         // 5. Lifetime of A is static, hence `std::any::TypeId` is sufficient to establish type equality,
                         //    guarding against unsound type downcasting.
+                        // 6. Type of E (and hence all associated types, particularly `E::Failure` in the AST payload,
+                        //    and the various `Id`s in the CST payload) is known and retained.
+                        // 7. `E::Failure` and the CST data are of lifetime `'static`.
                         let parse_output = unsafe {
                             let output = &*(erased.as_ptr() as *const ParseOutput<$payload, E>);
                             output.clone()
@@ -473,7 +476,7 @@ impl<P: ?Sized> Recursive<P> {
     fn entry_is_stale_or_absent<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         &self,
         cursor: I::Cursor,
-        state: &RecursiveState<'src, I::Cursor, E::Supply, E::ErrorSupply>,
+        state: &RecursiveState<'src, I::Cursor, E>,
     ) -> bool
     where
         P: Parser<'src, I, A, E>,

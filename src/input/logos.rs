@@ -116,7 +116,7 @@ where
     }
 
     fn byte_to_line_col(&self, at_offset: usize) -> LineColumn {
-        self.source.to_line_col(at_offset)
+        self.source.byte_to_line_col(at_offset)
     }
 
     fn describe<'src>(&self, token: &Self::Token<'src>) -> Descriptor
@@ -174,9 +174,7 @@ where
             None => Err(Some(cursor)),
         }
     }
-    fn describe(&self) -> String {
-        format!("token {:?}", self.1)
-    }
+
     fn hint(&self) -> ParseHint {
         ParseHint::Expectation(Descriptor::Pattern {
             kind: "token".into(),
@@ -216,9 +214,7 @@ where
             None => Err(Some(cursor)),
         }
     }
-    fn describe(&self) -> String {
-        format!("token {self:?}")
-    }
+
     fn hint(&self) -> ParseHint {
         ParseHint::Expectation(Descriptor::Pattern {
             kind: "token".into(),
@@ -269,9 +265,6 @@ where
         })
     }
 
-    fn describe(&self) -> String {
-        self.0.describe()
-    }
     fn hint(&self) -> ParseHint {
         self.0.hint()
     }
@@ -303,9 +296,6 @@ where
         })
     }
 
-    fn describe(&self) -> String {
-        self.0.describe()
-    }
     fn hint(&self) -> ParseHint {
         self.0.hint()
     }
@@ -340,9 +330,6 @@ where
         })
     }
 
-    fn describe(&self) -> String {
-        self.0.describe()
-    }
     fn hint(&self) -> ParseHint {
         self.0.hint()
     }
@@ -377,9 +364,6 @@ where
         })
     }
 
-    fn describe(&self) -> String {
-        self.0.describe()
-    }
     fn hint(&self) -> ParseHint {
         self.0.hint()
     }

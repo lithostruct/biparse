@@ -38,13 +38,10 @@ where
         }
     }
 
-    fn describe(&self) -> String {
-        format!("regex {:?}", self.1.as_str())
-    }
     fn hint(&self) -> ParseHint {
         ParseHint::Expectation(Descriptor::Pattern {
-            kind: "regex".to_string(),
-            kind_plural: "regexes".to_string(),
+            kind: "regex pattern".to_string(),
+            kind_plural: "regex patterns".to_string(),
             data: format!("{:?}", self.1.as_str()),
         })
     }
@@ -79,13 +76,10 @@ where
         }
     }
 
-    fn describe(&self) -> String {
-        format!("regex {:?}", self.1.as_str())
-    }
     fn hint(&self) -> ParseHint {
         ParseHint::Expectation(Descriptor::Pattern {
-            kind: "regex".to_string(),
-            kind_plural: "regexes".to_string(),
+            kind: "regex pattern".to_string(),
+            kind_plural: "regex patterns".to_string(),
             data: format!("{:?}", self.1.as_str()),
         })
     }

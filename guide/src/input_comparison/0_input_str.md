@@ -28,6 +28,8 @@ Input type `CachedStr<'_>` is identical to `str`, but calculates the line start 
 
 This type is mainly used internally for other input types. You should prefer `str` unless benchmarking shows that diagnostic generation contributes significantly to the performance of parsing.
 
+This type is not exported by the prelude. It may be accessed via module path `biparse::input::str::CachedStr`.
+
 A producer of parser combinators expecting this input type should have the signature:
 ```rs,ignore
 fn make_parser<'parse, 'source, E: ParserEnvironment>(...) -> impl Parser<'parse, CachedStr<'source>, A, E>

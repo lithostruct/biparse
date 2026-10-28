@@ -18,12 +18,9 @@ use crate::{
 };
 
 /// Type alias over [`ParseStateData`] which provides more straightforward type arguments for usage in [`Parser`] implementors.
-pub type ParseState<'src, I, E> = ParseStateData<
-    'src,
-    <I as Input>::Cursor,
-    <E as ParseEnvironment>::Supply,
-    <E as ParseEnvironment>::ErrorSupply,
->;
+// Disabling the lint here because `ParseStateData` requires `E: ParseEnvironment` anyways.
+#[allow(type_alias_bounds)]
+pub type ParseState<'src, I, E: ParseEnvironment> = ParseStateData<'src, <I as Input>::Cursor, E>;
 
 /// The central parsing trait, implemented by all combinators.
 pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment> {
