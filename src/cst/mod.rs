@@ -8,7 +8,7 @@ mod supply;
 pub use self::{io::*, path::*, supply::*};
 
 /// A [`rowan::Language`] implementor that has `Kind = rowan::SyntaxKind`.
-/// 
+///
 /// May be used for red-tree canonization if a more specific implementor is not defined.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NoLang;

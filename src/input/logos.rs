@@ -1,4 +1,8 @@
-use std::{borrow::Cow, fmt::Debug, ops::Range};
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display},
+    ops::Range,
+};
 
 use derive_more::{AsMut, AsRef, Deref, DerefMut, From, Into};
 use logos::{Lexer, Logos};
@@ -25,6 +29,7 @@ pub struct LexerStream<'src, Token: Logos<'src>> {
     inner: im::Vector<LexerItem<'src, Token>>,
     source: CachedStr<'src>,
     skipped_kind: Option<SyntaxKind>,
+    descriptor: fn(&Token) -> String,
 }
 impl<'src, Token: Logos<'src>> Clone for LexerStream<'src, Token>
 where
@@ -35,24 +40,61 @@ where
             inner: self.inner.clone(),
             source: self.source.clone(),
             skipped_kind: self.skipped_kind,
+            descriptor: self.descriptor,
         }
     }
 }
 impl<'src, Token> LexerStream<'src, Token>
 where
-    Token: Logos<'src, Source = str>,
+    Token: Clone + Logos<'src, Source = str>,
+    Token::Extras: Default,
 {
     /// Creates a new `LexerStream` with a specified [`rowan::SyntaxKind`] for skipped source spans.
+    ///
+    /// This constructor method requires the token type to implement [`Display`],
+    /// to turn token references into string descriptors during diagnostic generation.
+    ///
+    /// Use [`LexerStream::new_via_debug`] to use the [`Debug`] trait instead,
+    /// or [`LexerStream::new_with_descriptor`] for a user-supplied closure.
     pub fn new<'root>(source: &'root str, skipped_kind: impl Into<SyntaxKind>) -> Self
     where
         'root: 'src,
-        Token: Clone,
-        Token::Extras: Default,
+        Token: Display,
+    {
+        LexerStream::new_with_descriptor(source, skipped_kind, ToString::to_string)
+    }
+    /// Creates a new `LexerStream` with a specified [`rowan::SyntaxKind`] for skipped source spans.
+    ///
+    /// This constructor method requires the token type to implement [`Debug`],
+    /// to turn token references into string descriptors during diagnostic generation.
+    ///
+    /// Use [`LexerStream::new`] to use the [`Display`] trait instead,
+    /// or [`LexerStream::new_with_descriptor`] for a user-supplied closure.
+    pub fn new_via_debug<'root>(source: &'root str, skipped_kind: impl Into<SyntaxKind>) -> Self
+    where
+        'root: 'src,
+        Token: Debug,
+    {
+        LexerStream::new_with_descriptor(source, skipped_kind, |token: &Token| format!("{token:?}"))
+    }
+    /// Creates a new `LexerStream` with a specified [`rowan::SyntaxKind`] for skipped source spans.
+    /// A closure is required to turn token references into string descriptors.
+    ///
+    /// You may use convenience methods [`LexerStream::new`] or [`LexerStream::new_via_debug`]
+    /// to delegate to the token type's [`Display`] and [`Debug`] implementations respectively.
+    pub fn new_with_descriptor<'root>(
+        source: &'root str,
+        skipped_kind: impl Into<SyntaxKind>,
+        descriptor: fn(&Token) -> String,
+    ) -> Self
+    where
+        'root: 'src,
     {
         LexerStream {
             inner: Lexer::new(source).spanned().collect(),
             skipped_kind: Some(skipped_kind.into()),
             source: CachedStr::new(source),
+            descriptor,
         }
     }
 
@@ -63,16 +105,18 @@ where
     /// This constructor assumes the caller has asserted that
     /// the Lexer created from this `Token` type produces gapless input coverage.
     /// Biparse may panic during parsing if this invariant is not upheld.
-    pub fn assume_contiguous<'root>(source: &'root Token::Source) -> Self
+    pub fn assume_contiguous<'root>(
+        source: &'root Token::Source,
+        descriptor: fn(&Token) -> String,
+    ) -> Self
     where
         'root: 'src,
-        Token: Clone,
-        Token::Extras: Default,
     {
         LexerStream {
             inner: Lexer::new(source).spanned().collect(),
             skipped_kind: None,
             source: CachedStr::new(source),
+            descriptor,
         }
     }
 
@@ -83,7 +127,7 @@ where
 
 impl<'source, Token> Input for LexerStream<'source, Token>
 where
-    Token: Debug + Clone + Logos<'source, Source = str>,
+    Token: Clone + Logos<'source, Source = str>,
 {
     type Cursor = LexerIndex;
     type Token<'src>
@@ -123,11 +167,11 @@ where
     where
         Self: 'src,
     {
-        match token {
+        match token.as_deref() {
             Ok(inner) => Descriptor::Pattern {
                 kind: "token".into(),
                 kind_plural: "tokens".into(),
-                data: format!("{inner:?}"),
+                data: (self.descriptor)(inner),
             },
             Err(e) => Descriptor::Pattern {
                 kind: "lex error".into(),
@@ -135,7 +179,6 @@ where
                 data: format!("{e:?}"),
             },
         }
-        
     }
 
     fn skipped_trivia_kind(&self) -> Option<rowan::SyntaxKind> {

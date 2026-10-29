@@ -26,7 +26,7 @@ fn single_end() {
 
 #[test]
 fn just_then_end() {
-    let combinator: WithEnv<DefaultParseEnvironment, _> = just((SyntaxKind(0), "a")).then(end());
+    let combinator: With<DefaultParseEnvironment, _> = just((SyntaxKind(0), "a")).then(end());
 
     let not_enough = combinator.parse_all("");
     let just_right = combinator.parse_all("a");
@@ -45,36 +45,41 @@ fn just_then_end() {
 fn all_trivia_end() {
     use biparse::input::str::SkippingStr;
 
-    let ends: AsParser<'_, SkippingStr<'_>, (), DefaultParseEnvironment, _> = end();
+    let ends: As<'_, SkippingStr<'_>, (), DefaultParseEnvironment, _> = end();
 
     const ALL_TRIVIA: &str = "     "; // length 5.
     let input = SkippingStr::whitespace(ALL_TRIVIA, SyntaxKind(0));
     let artifact = ends.parse_all(&input).expect("Success!");
-    
+
     let green = artifact.into_cst();
-    assert_eq!(Into::<usize>::into(green.forest()[0].text_len()), ALL_TRIVIA.len());
+    assert_eq!(
+        Into::<usize>::into(green.forest()[0].text_len()),
+        ALL_TRIVIA.len()
+    );
 
     // Actual well-formedness not tested; see [`end_then_end`].
 }
 
 /// Regression:
-/// 
+///
 /// Prevent duplicate actualization of all-trivia input.
 #[test]
 fn end_then_end() {
-    use biparse::{input::str::SkippingStr, cst::NoLang};
+    use biparse::{cst::NoLang, input::str::SkippingStr};
 
     const ALL_TRIVIA: &str = "     "; // length 5.
     let input = SkippingStr::whitespace(ALL_TRIVIA, SyntaxKind(0));
 
-    let ends: Box<dyn Parser<'_, SkippingStr<'_>, ((), ()), DefaultParseEnvironment, >> = end().then(end()).boxed();
+    let ends: Box<dyn Parser<'_, SkippingStr<'_>, ((), ()), DefaultParseEnvironment>> =
+        end().then(end()).boxed();
 
     // `parse_all` adds one more `end`, so the text is tripled if not handled correctly.
     let artifact = ends.parse_all(&input).expect("Success!");
-    
+
     let red = artifact.into_cst().canonize::<NoLang>(SyntaxKind(0));
     expect![[r#"
         5
-    "#]].assert_debug_eq(&red.tree().text().len());
+    "#]]
+    .assert_debug_eq(&red.tree().text().len());
     assert_eq!(red.tree().text(), ALL_TRIVIA)
 }

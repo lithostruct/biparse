@@ -9,7 +9,7 @@ regex = ["dep:regex", "dep:regex-lite"]
 logos = ["dep:logos"]
 
 [dependencies]
-derive_more = { version = "2.1.1", features = ["from", "into", "deref", "deref_mut", "as_ref"] }
+derive_more = { version = "2.1.1", features = ["from", "into", "display", "deref", "deref_mut", "as_ref"] }
 expect-test = "1.5.1"
 hashbrown = "0.17.1"
 im = "15.1.0"

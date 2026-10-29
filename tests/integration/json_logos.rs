@@ -4,6 +4,7 @@
 use std::str::FromStr;
 
 use biparse::prelude::*;
+use derive_more::Display;
 use expect_test::expect;
 use indoc::indoc;
 use logos::Logos;
@@ -62,7 +63,18 @@ impl Json {
 }
 
 #[derive(
-    FromPrimitive, ToPrimitive, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Logos,
+    FromPrimitive,
+    ToPrimitive,
+    Debug,
+    Display,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Logos,
 )]
 #[repr(u16)]
 enum Kind {

@@ -7,6 +7,7 @@
 use std::{rc::Rc, str::FromStr};
 
 use biparse::prelude::*;
+use derive_more::Display;
 use expect_test::expect;
 use logos::Logos;
 use num_bigint::BigUint;
@@ -15,7 +16,18 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use rowan::{Language, SyntaxKind};
 
 #[derive(
-    Debug, Logos, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, FromPrimitive, ToPrimitive,
+    Debug,
+    Display,
+    Logos,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    FromPrimitive,
+    ToPrimitive,
 )]
 #[logos(skip(r"[ \t\n]+"))]
 enum Kind {
@@ -98,7 +110,11 @@ fn trivia_recovery() {
     match parser.parse_all(&stream) {
         Ok(report) => {
             assert_eq!(report.ast_only(), &(&Kind::LeftParen, &Kind::RightParen));
-            let tree = report.into_cst().canonize::<Kind>(Kind::Root).into_parts().0;
+            let tree = report
+                .into_cst()
+                .canonize::<Kind>(Kind::Root)
+                .into_parts()
+                .0;
 
             assert_eq!(tree.kind(), Kind::Root);
             assert_eq!(tree.text(), source);
@@ -128,7 +144,11 @@ fn leading_trivia_recovery() {
     match parser.parse_all(&stream) {
         Ok(report) => {
             assert_eq!(report.ast_only(), &Kind::Plus);
-            let tree = report.into_cst().canonize::<Kind>(Kind::Root).into_parts().0;
+            let tree = report
+                .into_cst()
+                .canonize::<Kind>(Kind::Root)
+                .into_parts()
+                .0;
 
             assert_eq!(tree.kind(), Kind::Root);
             assert_eq!(tree.text(), source);
@@ -188,7 +208,8 @@ fn mismatched_token() {
     expect![[r#"
         (1, 1) expected:
         └─ token Root
-        found: token Plus at (1, 1)"#]].assert_eq(&result.unwrap_err().terminating.to_string());
+        found: token Plus at (1, 1)"#]]
+    .assert_eq(&result.unwrap_err().terminating.to_string());
 }
 #[test]
 fn unrecognized_token() {
@@ -201,7 +222,8 @@ fn unrecognized_token() {
     expect![[r#"
         (1, 1) expected:
         └─ token Root
-        found: lex error () at (1, 1)"#]].assert_eq(&result.unwrap_err().terminating.to_string());
+        found: lex error () at (1, 1)"#]]
+    .assert_eq(&result.unwrap_err().terminating.to_string());
 }
 
 /// Parser that parses an arithmatic equation involving parentheses, addition and multipliciation.
@@ -379,7 +401,7 @@ fn add_mult_3() {
         }
     "#]]
     .assert_debug_eq(&ast);
-    
+
     let red = cst.canonize::<Kind>(Kind::Root);
     assert_eq!(red.tree().text(), source);
 }

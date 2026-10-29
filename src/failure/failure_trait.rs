@@ -129,13 +129,18 @@ impl ParseFailure for Simple {
                     let found = input
                         .peek(difference_location)
                         .map_or(Descriptor::EndOfInput, |item| input.describe(&item.token));
-                    format!("{}found: {found} at location {difference_line_col}", hint.to_expectation())
+                    format!(
+                        "{}found: {found} at location {difference_line_col}",
+                        hint.to_expectation()
+                    )
                 }
                 None => {
                     let mut text = hint.to_expectation();
-                    if text.ends_with('\n') { text.pop(); }
+                    if text.ends_with('\n') {
+                        text.pop();
+                    }
                     text
-                },
+                }
             },
             FailureKind::UnboundedRecursion { name } => {
                 format!(
@@ -182,7 +187,7 @@ impl ParseFailure for Simple {
 }
 
 /// Enum used by the [`Rich`] failure type, representing the failure kinds of parsing.
-/// 
+///
 /// Variants and fields closely resemble that of [`FailureKind`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
 pub enum RichKind {
@@ -211,7 +216,7 @@ pub enum RichKind {
     #[error("failure from primitive Fail combinator")]
     FailPrimitive,
     /// Composite failure, which cannot be further reduced.
-    /// 
+    ///
     /// This variant is meaningful where the enclosing [`Rich`] value has a non-empty `supplemental` field.
     #[error("composite failure")]
     CompositeFailure,
@@ -289,19 +294,18 @@ impl ParseFailure for Rich {
         // Attempt unification of the common expected-found speculative error.
         let all_expected_found = supplemental.clone().into_iter().try_fold(
             (Vec::new(), Vec::new(), Vec::new()),
-            |(mut hints, mut divergence, mut supplemental), mut inner|
-                match inner.kind {
-                    RichKind::ExpectedFound {
-                        hint,
-                        mut diverges_at,
-                    } if inner.position == position => {
-                        hints.push(hint);
-                        divergence.append(&mut diverges_at);
-                        supplemental.append(&mut inner.supplemental);
-                        Ok((hints, divergence, supplemental))
-                    }
-                    _ => Err(()),
-                },
+            |(mut hints, mut divergence, mut supplemental), mut inner| match inner.kind {
+                RichKind::ExpectedFound {
+                    hint,
+                    mut diverges_at,
+                } if inner.position == position => {
+                    hints.push(hint);
+                    divergence.append(&mut diverges_at);
+                    supplemental.append(&mut inner.supplemental);
+                    Ok((hints, divergence, supplemental))
+                }
+                _ => Err(()),
+            },
         );
         if let Ok((hints, diverges_at, supplemental)) = all_expected_found {
             return Self {
@@ -311,16 +315,21 @@ impl ParseFailure for Rich {
                     diverges_at,
                 },
                 supplemental,
-            }
+            };
         }
 
         // Composite failure flat-mapping.
-        let supplemental = supplemental.into_iter()
-            .flat_map(|elem| if elem.kind == RichKind::CompositeFailure {
-                // Position information of inner composite lost.
-                // I consider this acceptable.
-                elem.supplemental
-            } else { vec![elem] })
+        let supplemental = supplemental
+            .into_iter()
+            .flat_map(|elem| {
+                if elem.kind == RichKind::CompositeFailure {
+                    // Position information of inner composite lost.
+                    // I consider this acceptable.
+                    elem.supplemental
+                } else {
+                    vec![elem]
+                }
+            })
             .collect();
 
         Self {

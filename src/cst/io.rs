@@ -92,7 +92,7 @@ where
         }
     }
     /// Constructs a CST forest from the given green tokens, with no associations.
-    /// 
+    ///
     /// This is considered a low-level constructor;
     /// for [`Parser`](crate::parse::Parser) implementors, prefer [`Self::leaves`] where applicable.
     pub fn from_tokens(tokens: impl IntoIterator<Item = GreenElement>) -> Self {
@@ -104,10 +104,10 @@ where
     }
 
     /// Constructs a CST containing multiple leaf elements from pattern-match information, with no associations.
-    /// 
+    ///
     /// # Panics
-    /// 
-    /// Panics if the provided spans and 
+    ///
+    /// Panics if the provided spans and
     pub fn leaves<I>(
         spans: impl IntoIterator<Item = (SyntaxKind, Range<usize>)>,
         old_cursor: I::Cursor,
@@ -280,7 +280,8 @@ where
         with_id: Id,
         interner: &mut GreenInterner,
     ) -> Self {
-        self.attach_parent(kind, interner).associate_root_at(0, with_id)
+        self.attach_parent(kind, interner)
+            .associate_root_at(0, with_id)
     }
 
     /// Diagnoses a root node at the given index of the forest with the corresponding EId and diagnostic.
@@ -324,10 +325,10 @@ where
     where
         E: Debug,
     {
-        self.attach_parent(kind, interner).diagnose_root_at(0, with_id, diagnostic)
+        self.attach_parent(kind, interner)
+            .diagnose_root_at(0, with_id, diagnostic)
     }
 
-    
     /// Canonizes `self` as a syntax tree using the given kind as the root node.
     pub fn canonize<T>(self, root: impl Into<SyntaxKind>) -> AssociatedRedCst<Id, EId, E, T>
     where
@@ -338,7 +339,9 @@ where
         let rooted: Self = self
             .clone()
             .attach_parent(root.into(), &mut GreenInterner::new());
-        rooted.canonize_without_root().expect("Just appended root node!")
+        rooted
+            .canonize_without_root()
+            .expect("Just appended root node!")
     }
     /// Canonizes `self` as a syntax tree.
     ///

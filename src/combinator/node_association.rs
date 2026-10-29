@@ -19,13 +19,25 @@ impl<P> Node<P> {
     where
         P: Parser<'src, I, A, E>,
     {
-        Node { inner, kind, name: None }
+        Node {
+            inner,
+            kind,
+            name: None,
+        }
     }
-    pub fn new_as<'src, I: Input + ?Sized, A, E: ParseEnvironment>(name: impl Into<Cow<'static, str>>, kind: SyntaxKind, inner: P) -> Self
+    pub fn new_as<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
+        name: impl Into<Cow<'static, str>>,
+        kind: SyntaxKind,
+        inner: P,
+    ) -> Self
     where
         P: Parser<'src, I, A, E>,
     {
-        Node { inner, kind, name: Some(name.into()) }
+        Node {
+            inner,
+            kind,
+            name: Some(name.into()),
+        }
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> for Node<P>

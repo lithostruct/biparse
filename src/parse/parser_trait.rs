@@ -6,8 +6,8 @@ use rowan::SyntaxKind;
 pub use crate::failure::ParseHint;
 use crate::{
     combinator::{
-        AsParser, Associate, Commit, IntoOwned, Many, Map, Node, Or, Recover, Success, Then,
-        TryMap, WithEnv, end, success,
+        As, Associate, Commit, IntoOwned, Many, Map, Node, Or, Recover, Success, Then, TryMap,
+        With, end, success,
     },
     cst::IdSupply,
     input::Input,
@@ -108,70 +108,83 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to then sequentially execute the second parser.
-    fn then<P, B>(self, next: P) -> WithEnv<E, Then<Self, P>>
+    fn then<P, B>(self, next: P) -> With<E, Then<Self, P>>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
     {
-        WithEnv::new(Then::new(self, next))
+        With::new(Then::new(self, next))
     }
     /// Chains `self` as an alternative, falling through to the second parser.
-    fn or<P, B>(self, other: P) -> WithEnv<E, Or<Self, P>>
+    fn or<P, B>(self, other: P) -> With<E, Or<Self, P>>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
     {
-        WithEnv::new(Or::new(self, other))
+        With::new(Or::new(self, other))
     }
     /// Chains `self` to execute `map` on the success payload.
-    fn map<F, B>(self, closure: F) -> WithEnv<E, Map<Self, F, A>>
+    fn map<F, B>(self, closure: F) -> With<E, Map<Self, F, A>>
     where
         F: Fn(A) -> B,
         Self: Sized,
     {
-        WithEnv::new(Map::new(self, closure))
+        With::new(Map::new(self, closure))
     }
     /// Chains `self` to add a new parent to the current CST forest.
-    fn node(self, kind: impl Into<SyntaxKind>) -> WithEnv<E, Node<Self>>
+    fn node(self, kind: impl Into<SyntaxKind>) -> With<E, Node<Self>>
     where
         Self: Sized,
     {
-        WithEnv::new(Node::new(kind.into(), self))
+        With::new(Node::new(kind.into(), self))
     }
     /// Chains `self` to add a new parent to the current CST forest.
     /// Additionally provides a name to the parser object for use in diagnostics.
-    fn named(self, name: impl Into<Cow<'static, str>>, kind: impl Into<SyntaxKind>) -> WithEnv<E, Node<Self>>
+    fn named(
+        self,
+        name: impl Into<Cow<'static, str>>,
+        kind: impl Into<SyntaxKind>,
+    ) -> With<E, Node<Self>>
     where
         Self: Sized,
     {
-        WithEnv::new(Node::new_as(name, kind.into(), self))
+        With::new(Node::new_as(name, kind.into(), self))
     }
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
-    fn associate<F, B>(self, kind: impl Into<SyntaxKind>, closure: F) -> WithEnv<E, Associate<Self, F, A>>
+    fn associate<F, B>(
+        self,
+        kind: impl Into<SyntaxKind>,
+        closure: F,
+    ) -> With<E, Associate<Self, F, A>>
     where
         F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
         Self: Sized,
     {
-        WithEnv::new(Associate::new(self, kind.into(), closure))
+        With::new(Associate::new(self, kind.into(), closure))
     }
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
     /// Additionally provides a name to the parser object for use in diagnostics.
-    fn associate_as<F, B>(self, name: impl Into<Cow<'static, str>>, kind: impl Into<SyntaxKind>, closure: F) -> WithEnv<E, Associate<Self, F, A>>
+    fn associate_as<F, B>(
+        self,
+        name: impl Into<Cow<'static, str>>,
+        kind: impl Into<SyntaxKind>,
+        closure: F,
+    ) -> With<E, Associate<Self, F, A>>
     where
         F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
         Self: Sized,
     {
-        WithEnv::new(Associate::new_as(name, self, kind.into(), closure))
+        With::new(Associate::new_as(name, self, kind.into(), closure))
     }
 
     /// Chains `self` to repeat zero or more times, returning [`Vec<A>`].
-    fn many(self) -> WithEnv<E, Many<Self>>
+    fn many(self) -> With<E, Many<Self>>
     where
         Self: Sized,
     {
-        WithEnv::new(Many::new(self))
+        With::new(Many::new(self))
     }
     /// Chains `self` to repeat one or more times, returning a non-empty [`Vec<A>`].
     fn some(self) -> composite::Some<E, Self, A>
@@ -193,20 +206,20 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
 
     /// Chains `self` to attempt fallible mapping on the success payload,
     /// signalling a committed failure if conversion fails.
-    fn try_map<F, B, Error>(self, closure: F) -> WithEnv<E, TryMap<Self, F, A>>
+    fn try_map<F, B, Error>(self, closure: F) -> With<E, TryMap<Self, F, A>>
     where
         F: Fn(A) -> Result<B, Error>,
         Error: std::error::Error,
         Self: Sized,
     {
-        WithEnv::new(TryMap::new(self, closure))
+        With::new(TryMap::new(self, closure))
     }
     /// Chains `self` to commit, promoting speculative failure into committed failure.
-    fn commit(self) -> WithEnv<E, Commit<Self>>
+    fn commit(self) -> With<E, Commit<Self>>
     where
         Self: Sized,
     {
-        WithEnv::new(Commit::new(self))
+        With::new(Commit::new(self))
     }
     /// Chains `self` to a recovery strategy, handling and transforming committed failure
     /// into an associated diagnostic upon success.
@@ -224,13 +237,13 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         with: R,
         closure: C,
         kind: impl Into<SyntaxKind>,
-    ) -> WithEnv<E, Recover<Self, R, B, C>>
+    ) -> With<E, Recover<Self, R, B, C>>
     where
         Self: Sized,
         R: Parser<'src, I, B, E>,
         C: Fn(<E::ErrorSupply as IdSupply>::Id, B) -> A,
     {
-        WithEnv::new(Recover::new(self, with, closure, kind))
+        With::new(Recover::new(self, with, closure, kind))
     }
 
     /// Discards the current AST payload.
@@ -282,27 +295,23 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E
 pub mod composite {
     use super::*;
 
-    pub type Some<E, P, A> = WithEnv<
-        E,
-        Map<WithEnv<E, Then<P, WithEnv<E, Many<P>>>>, fn((A, Vec<A>)) -> Vec<A>, (A, Vec<A>)>,
-    >;
-    pub type Optional<'src, I, A, E, P> = WithEnv<
+    pub type Some<E, P, A> =
+        With<E, Map<With<E, Then<P, With<E, Many<P>>>>, fn((A, Vec<A>)) -> Vec<A>, (A, Vec<A>)>>;
+    pub type Optional<'src, I, A, E, P> = With<
         E,
         Map<
-            WithEnv<E, Or<P, AsParser<'src, I, (), E, Success>>>,
+            With<E, Or<P, As<'src, I, (), E, Success>>>,
             fn(Either<A, ()>) -> Option<A>,
             Either<A, ()>,
         >,
     >;
 
-    pub type Ignore<E, P, A> = WithEnv<E, Map<P, fn(A) -> (), A>>;
-    pub type ThenIgnore<E, L, R, A, B> =
-        WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
-    pub type IgnoreThen<E, L, R, A, B> =
-        WithEnv<E, Map<WithEnv<E, Then<L, R>>, fn((A, B)) -> B, (A, B)>>;
+    pub type Ignore<E, P, A> = With<E, Map<P, fn(A) -> (), A>>;
+    pub type ThenIgnore<E, L, R, A, B> = With<E, Map<With<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
+    pub type IgnoreThen<E, L, R, A, B> = With<E, Map<With<E, Then<L, R>>, fn((A, B)) -> B, (A, B)>>;
 
     pub type OrSame<E, L, R, A> =
-        WithEnv<E, Map<WithEnv<E, Or<L, R>>, fn(Either<A, A>) -> A, Either<A, A>>>;
+        With<E, Map<With<E, Or<L, R>>, fn(Either<A, A>) -> A, Either<A, A>>>;
 }
 
 /// Convenience trait for [`.into_owned()`](Self::into_owned) method chaining.
@@ -312,11 +321,11 @@ where
     A: ToOwned + ?Sized + 'src,
 {
     /// Chains `self` by turning an AST payload reference into owned data.
-    fn into_owned(self) -> WithEnv<E, IntoOwned<Self, A>>
+    fn into_owned(self) -> With<E, IntoOwned<Self, A>>
     where
         Self: Sized,
     {
-        WithEnv::new(IntoOwned::new(self))
+        With::new(IntoOwned::new(self))
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserOwnedExt<'src, I, A, E> for T

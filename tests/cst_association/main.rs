@@ -1,5 +1,5 @@
 mod sexp_def;
-pub use sexp_def::{SExp, Lang, arbitrary_sexp};
+pub use sexp_def::{Lang, SExp, arbitrary_sexp};
 
-mod monoid_laws;
 mod cst;
+mod monoid_laws;

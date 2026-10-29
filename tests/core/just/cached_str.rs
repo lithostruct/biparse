@@ -1,9 +1,6 @@
 //! Test relating to `CachedStr` input type.
 
-use biparse::{
-    input::str::CachedStr,
-    prelude::*,
-};
+use biparse::{input::str::CachedStr, prelude::*};
 use proptest::{arbitrary::any, proptest};
 use rowan::SyntaxKind;
 

@@ -1,5 +1,5 @@
 //! Module for [`ParseFailure`] trait definition, implementors, and related types.
-//! 
+//!
 //! Note that the [`ptree`] re-export has only the `ansi` feature enabled.
 
 mod failure_trait;

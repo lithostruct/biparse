@@ -4,8 +4,18 @@ use biparse::prelude::*;
 // and speculative failure is promoted to committed failure.
 #[test]
 fn commit_semantics() {
-    assert!(success::<str, DefaultParseEnvironment>().commit().parse_all("").is_ok());
-    assert!(fail::<str, DefaultParseEnvironment>().commit().parse_all("").is_err());
+    assert!(
+        success::<str, DefaultParseEnvironment>()
+            .commit()
+            .parse_all("")
+            .is_ok()
+    );
+    assert!(
+        fail::<str, DefaultParseEnvironment>()
+            .commit()
+            .parse_all("")
+            .is_err()
+    );
 
     let combinator = fail::<str, DefaultParseEnvironment>().commit();
     let (_, output) = combinator.parse("", ParseState::<str, _>::new(""));

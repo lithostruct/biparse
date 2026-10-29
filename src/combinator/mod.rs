@@ -18,7 +18,7 @@ use crate::{
 
 pub use self::{
     binary::{Or, Then},
-    blanket::{AsParser, WithEnv},
+    blanket::{As, With},
     commit_recover::{Commit, Recover},
     just::Just,
     map_into_owned::{IntoOwned, Map, TryMap},
@@ -33,19 +33,18 @@ pub use self::{
 
 // Constants and functions.
 
-pub fn success<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Success>
-{
-    AsParser::from(Success)
+pub fn success<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, Success> {
+    As::from(Success)
 }
-pub fn fail<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, Fail> {
-    AsParser::from(Fail)
+pub fn fail<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, Fail> {
+    As::from(Fail)
 }
-pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> AsParser<'src, I, (), E, End> {
-    AsParser::from(End)
+pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, End> {
+    As::from(End)
 }
 
 pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<'src, I> + 'src>(
     pattern: P,
-) -> AsParser<'src, I, P::Payload, E, Just<P>> {
-    AsParser::from(Just::new(pattern))
+) -> As<'src, I, P::Payload, E, Just<P>> {
+    As::from(Just::new(pattern))
 }

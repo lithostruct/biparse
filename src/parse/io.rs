@@ -25,7 +25,7 @@ pub struct ParseStateData<'src, C, E: ParseEnvironment> {
     /// Direct usage is discouraged. The interning methods of [`GreenInterner`]
     /// may be accessed via [`Self::with_interner`],
     /// which holds the mutable borrow for as short as possible.
-    /// 
+    ///
     /// Holding a mutable borrow and attempting subsequent borrowing will cause panicking.
     pub interner: Rc<RefCell<GreenInterner>>,
     /// The current recursive stack.
@@ -33,7 +33,7 @@ pub struct ParseStateData<'src, C, E: ParseEnvironment> {
     /// Do not discard the recursive stack during a parse operation,
     /// or retain the recursive stack across independent parse operations.
     /// This may lead to undefined behaviour.
-    /// 
+    ///
     /// Refer to [`RecursiveState`] for further documentation.
     pub recursive_state: RecursiveState<'src, C, E>,
 }
@@ -46,7 +46,8 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = f.debug_struct("ParseState");
 
-        debug.field("cursor", &self.cursor)
+        debug
+            .field("cursor", &self.cursor)
             .field("encountered_end", &self.encountered_end);
 
         // This is a whole thing because we cannot get an immutable view

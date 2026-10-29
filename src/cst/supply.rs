@@ -20,7 +20,7 @@ pub trait IdSupply: Clone + Default {
 /// A [`IdSupply`] implementor that wraps a newtype around a monotonically-increasing [`usize`].
 ///
 /// # User Precondition
-/// 
+///
 /// This supply assumes that `T::from(value : usize)` is injective, which is the case for transparent newtypes.
 /// Violating this invariant may lead to panicking.
 #[derive(Debug, Clone, PartialEq, Eq)]

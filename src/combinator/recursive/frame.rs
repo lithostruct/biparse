@@ -5,9 +5,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{
-    parse::{ParseEnvironment, ParseOutput, ParseStateData},
-};
+use crate::parse::{ParseEnvironment, ParseOutput, ParseStateData};
 
 /// The recursive state stored in [`ParseState`](crate::parse::ParseState), which can be cheaply cloned.
 ///
@@ -46,9 +44,7 @@ pub struct RecursiveState<'src, C, E: ParseEnvironment> {
     /// Dependencies for the currently-enclosing recursive combinator.
     pub(super) current_dependencies: im::Vector<(RecursiveId, C, usize)>,
 }
-impl<'src, C: Clone + Eq + Hash + Debug, E: ParseEnvironment> Debug
-    for RecursiveState<'src, C, E>
-{
+impl<'src, C: Clone + Eq + Hash + Debug, E: ParseEnvironment> Debug for RecursiveState<'src, C, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecursiveState")
             .field("inner", &self.inner)

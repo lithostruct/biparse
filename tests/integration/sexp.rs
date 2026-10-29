@@ -107,7 +107,7 @@ fn nested_lists() {
     let input = SkippingStr::whitespace(DATA, Kind::Whitespace);
     let artifact = make_sexp_parser().parse_all(&input);
 
-    let (ast, cst) = artifact.unwrap().into_parts();
+    let (ast, _) = artifact.unwrap().into_parts();
     expect![[r#"
         List(
             Id(

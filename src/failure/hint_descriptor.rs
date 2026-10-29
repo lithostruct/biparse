@@ -1,5 +1,5 @@
-use std::{borrow::Cow, collections::VecDeque, fmt::Display};
 use ptree::*;
+use std::{borrow::Cow, collections::VecDeque, fmt::Display};
 
 /// The type used by [`Parser`](crate::parse::Parser)'s to "hint" at the input they expect.
 ///
@@ -164,7 +164,7 @@ impl ParseHint {
     }
     /// Returns `self` as a string containing a structured tree representation,
     /// applying the provided [`ptree::PrintConfig`].
-    /// 
+    ///
     /// The `verbose` flag specifies whether named hints should be
     /// treated as terminals ([`false`]) or non-terminals ([`true`]).
     pub fn to_tree_with(&self, config: &ptree::PrintConfig, verbose: bool) -> String {
@@ -177,22 +177,23 @@ impl ParseHint {
         String::from_utf8(store).unwrap()
     }
     /// Returns `self` as an structured expectation tree.
-    /// 
+    ///
     /// Differs from [`Self::to_tree`] by attaching an `"expected:"` ancestor node.
     pub fn to_expectation(&self) -> String {
         self.to_expectation_with(&ptree::PrintConfig::default(), false)
     }
     /// Returns `self` as an structured expectation tree,
     /// applying the provided [`ptree::PrintConfig`].
-    /// 
+    ///
     /// Differs from [`Self::to_tree_with`] by attaching an `"expected:"` ancestor node.
-    /// 
+    ///
     /// The `verbose` flag specifies whether named hints should be
     /// treated as terminals ([`false`]) or non-terminals ([`true`]).
     pub fn to_expectation_with(&self, config: &PrintConfig, verbose: bool) -> String {
         let mut store = Vec::<u8>::new();
         if verbose {
-            ptree::write_tree_with(&Expected(ExpandedHint::expand(self)), &mut store, config).unwrap();
+            ptree::write_tree_with(&Expected(ExpandedHint::expand(self)), &mut store, config)
+                .unwrap();
         } else {
             ptree::write_tree_with(&Expected(self), &mut store, config).unwrap();
         }
@@ -251,7 +252,9 @@ impl TreeItem for ParseHint {
 #[repr(transparent)]
 struct Expected<'a, T>(&'a T);
 impl<'a, T> TreeItem for Expected<'a, T>
-where T : TreeItem {
+where
+    T: TreeItem,
+{
     type Child = T;
     fn write_self<W: std::io::Write>(&self, f: &mut W, style: &Style) -> std::io::Result<()> {
         write!(f, "{}", style.paint("expected:"))
@@ -282,10 +285,7 @@ impl ExpandedHint {
         // - Transparent wrapper results in identical layout and alignment for each element.
         // - The length of the slice is unchanged, and is no larger than `isize::MAX`.
         unsafe {
-            std::slice::from_raw_parts(
-                children.as_ptr() as *const ExpandedHint,
-                children.len(),
-            )
+            std::slice::from_raw_parts(children.as_ptr() as *const ExpandedHint, children.len())
         }
     }
 }
