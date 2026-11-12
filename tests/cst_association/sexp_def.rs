@@ -10,7 +10,7 @@ use proptest::{arbitrary::any, proptest, strategy::Strategy};
 use rowan::{NodeOrToken, SyntaxKind};
 
 /// A specialized S-expression variant, which embeds a SyntaxKind.
-/// 
+///
 /// Used for [`proptest::strategy::Strategy`] fuzzing purposes,
 /// by constructing [`AssociatedGreenCst`] through its exposed interface.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -51,7 +51,8 @@ impl SExp {
                 });
                 if let Some(supply) = supply {
                     let fresh_id = supply.next_id();
-                    forest.associate_new_parent(*kind, fresh_id, interner)
+                    forest
+                        .associate_new_parent(*kind, fresh_id, interner)
                         .diagnose_root_at(0, fresh_id, ())
                 } else {
                     forest.attach_parent(*kind, interner)
@@ -62,7 +63,7 @@ impl SExp {
 
     /// Attempts to construct [`Self`] via parsing of an S-expression.
     /// The [`FromStr`] implementation delegates to this function.
-    /// 
+    ///
     /// Refer to [`Self::parse_with`] for expected format.
     pub fn parse(
         s: &str,
@@ -72,11 +73,11 @@ impl SExp {
 
     /// Attempts to construct [`Self`] via parsing of an S-expression,
     /// using the given [`ParseEnvironment`].
-    /// 
+    ///
     /// Construction follows the following PEG:
     /// ```markdown,ignore
     /// sexp ::= identifier | list
-    /// 
+    ///
     /// identifier ::= r"[a-zA-Z][a-zA-Z0-9_-]*"
     /// list ::= '(' syntax_kind (sexp)* ')'
     /// syntax_kind ::= r":[0-9]+"
@@ -86,7 +87,7 @@ impl SExp {
     ///   This is considerably narrower than an arbitrary [`String`] value.
     /// - Syntax kinds are [`u16`] digits not exceeding [`u16::MAX`] `- 1`.
     ///   This is to retain the injective invariants for [`Lang`].
-    /// 
+    ///
     /// CST information from the parse is discarded, and no recovery is attempted in the event of malformed input.
     pub fn parse_with<E: ParseEnvironment>(s: &str) -> Result<Self, TerminalFailure<E::Failure>> {
         let skipping = SkippingStr::whitespace(s, SyntaxKind(100));
@@ -301,7 +302,8 @@ fn sexp_roundtrip() {
                 ),
             ],
         )
-    "#]].assert_debug_eq(&sexp);
+    "#]]
+    .assert_debug_eq(&sexp);
 }
 
 proptest! {

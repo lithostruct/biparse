@@ -119,8 +119,8 @@ impl<First, Second> Or<First, Second> {
         Or { first, second }
     }
 }
-impl<'src, I: Input + ?Sized, First, Second, A, E: ParseEnvironment>
-    Parser<'src, I, A, E> for Or<First, Second>
+impl<'src, I: Input + ?Sized, First, Second, A, E: ParseEnvironment> Parser<'src, I, A, E>
+    for Or<First, Second>
 where
     First: Parser<'src, I, A, E>,
     Second: Parser<'src, I, A, E>,
@@ -132,9 +132,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         let (first_state, first_result) = self.first.parse(input, state.clone());
         let first_speculative_error = match first_result.ast {
-            ParseOutcome::Success(_)
-            | ParseOutcome::Committed(_)
-            | ParseOutcome::Fatal(_) => {
+            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 // Early termination.
                 return (first_state, first_result);
             }
@@ -144,9 +142,7 @@ where
 
         let (second_state, second_result) = self.second.parse(input, state.clone());
         let second_speculative_error = match second_result.ast {
-            ParseOutcome::Success(_)
-            | ParseOutcome::Committed(_)
-            | ParseOutcome::Fatal(_) => {
+            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 // Termination, discard first speculative error.
                 return (second_state, second_result);
             }
@@ -174,9 +170,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let (first_state, first_result) = self.first.check(input, state.clone());
         let first_speculative_error = match first_result.ast {
-            ParseOutcome::Success(_)
-            | ParseOutcome::Committed(_)
-            | ParseOutcome::Fatal(_) => {
+            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 // Early termination.
                 return (first_state, first_result);
             }
@@ -186,9 +180,7 @@ where
 
         let (second_state, second_result) = self.second.check(input, state.clone());
         let second_speculative_error = match second_result.ast {
-            ParseOutcome::Success(_)
-            | ParseOutcome::Committed(_)
-            | ParseOutcome::Fatal(_) => {
+            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 // Termination, discard first speculative error.
                 return (second_state, second_result);
             }

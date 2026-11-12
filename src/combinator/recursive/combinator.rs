@@ -18,35 +18,45 @@ use crate::{
     },
 };
 
+use arcstr::ArcStr;
+
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.
 
 #[derive(Debug)]
 pub struct Recursive<P: ?Sized> {
     /// Inner payload.
     inner: RecursiveInner<P>,
-    /// Description.
-    description: Option<Cow<'static, str>>,
 }
 impl<P: ?Sized> Clone for Recursive<P> {
     fn clone(&self) -> Self {
         Recursive {
             inner: self.inner.clone(),
-            description: self.description.clone(),
         }
     }
 }
 impl<P: ?Sized> Recursive<P> {
+    #[inline(always)]
     fn recursive_id(&self) -> RecursiveId {
         self.inner.recursive_id()
     }
+    #[inline(always)]
     fn diagnostic_name(&self) -> String {
         format!("<{:p}>", self.inner.as_ptr() as *const ())
     }
-    fn name(&self) -> String {
-        self.description.as_ref().map_or_else(
-            || self.diagnostic_name(),
-            |inner| inner.clone().into_owned(),
-        )
+
+    #[inline(always)]
+    fn name(&self) -> Option<ArcStr> {
+        self.inner.name()
+    }
+    #[inline(always)]
+    fn name_cow(&self) -> Option<Cow<'static, str>> {
+        self.inner.name_cow()
+    }
+
+    fn given_or_diagnostic_name(&self) -> String {
+        self.name()
+            .as_ref()
+            .map_or_else(|| self.diagnostic_name(), |inner| inner.to_string())
     }
 }
 impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, 'src, I, A, E>> {
@@ -59,14 +69,15 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
     {
         let rc: Rc<P> = Rc::new_cyclic(|weak| {
             let this: Recursive<Direct<'p, 'src, I, A, E>> = Recursive {
-                inner: RecursiveInner::Unowned(weak.clone() as Weak<Direct<'p, 'src, I, A, E>>),
-                description: None,
+                inner: RecursiveInner::Unowned(
+                    None,
+                    weak.clone() as Weak<Direct<'p, 'src, I, A, E>>,
+                ),
             };
             closure(this)
         });
         Recursive {
-            inner: RecursiveInner::Owned(rc as Rc<Direct<'p, 'src, I, A, E>>),
-            description: None,
+            inner: RecursiveInner::Owned(None, rc as Rc<Direct<'p, 'src, I, A, E>>),
         }
     }
 
@@ -78,59 +89,66 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
         F: FnOnce(Recursive<Direct<'p, 'src, I, A, E>>) -> P,
         P: Parser<'src, I, A, E> + 'p,
     {
-        let description = name.into();
+        let name: Option<ArcStr> = Some(name.into().into());
         let rc: Rc<P> = Rc::new_cyclic(|weak| {
             let this: Recursive<Direct<'p, 'src, I, A, E>> = Recursive {
-                inner: RecursiveInner::Unowned(weak.clone() as Weak<Direct<'p, 'src, I, A, E>>),
-                description: Some(description.clone()),
+                inner: RecursiveInner::Unowned(
+                    name.clone(),
+                    weak.clone() as Weak<Direct<'p, 'src, I, A, E>>,
+                ),
             };
             closure(this)
         });
         Recursive {
-            inner: RecursiveInner::Owned(rc as Rc<Direct<'p, 'src, I, A, E>>),
-            description: Some(description),
+            inner: RecursiveInner::Owned(name, rc as Rc<Direct<'p, 'src, I, A, E>>),
         }
     }
 }
 
 impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p, 'src, I, A, E>> {
     /// Declares a new recursive combinator to be later defined.
-    /// 
+    ///
     /// Attempting a parse with a declared but undefined recursive parser results in a fatal error.
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
     /// and a named object is required to define mutual recursion between related combinators.
     pub fn declare() -> Self {
         Recursive {
-            inner: RecursiveInner::Owned(Rc::new(Indirect {
-                description: None,
-                inner: OnceCell::new(),
-            })),
-            description: None,
+            inner: RecursiveInner::Owned(
+                None,
+                Rc::new(Indirect {
+                    name: None,
+                    inner: OnceCell::new(),
+                }),
+            ),
         }
     }
     /// Declares a new recursive combinator to be later defined, with the given name.
     /// Combinator names are used for error reporting and better diagnostics.
-    /// 
+    ///
     /// Attempting a parse with a declared but undefined recursive parser results in a fatal error.
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
     /// and a named object is required to define mutual recursion between related combinators.
     pub fn declare_as(name: impl Into<Cow<'static, str>>) -> Self {
-        let name: Cow<'static, str> = name.into();
+        let name: Option<ArcStr> = Some(name.into().into());
         Recursive {
-            inner: RecursiveInner::Owned(Rc::new(Indirect {
-                description: Some(name.clone()),
-                inner: OnceCell::new(),
-            })),
-            description: Some(name),
+            inner: RecursiveInner::Owned(
+                name.clone(),
+                Rc::new(Indirect {
+                    name: name.clone(),
+                    inner: OnceCell::new(),
+                }),
+            ),
         }
     }
+
     /// Defines a parser to use the following inner definition.
+    /// The parser object must be strongly-owned.
     ///
     /// # Panics
     ///
-    /// Panics on multiple or re-entrant definition of the same parser object.
+    /// Panics on multiple or re-entrant definition of the same parser object, or on a weak handle.
     ///
     /// # Limitation on Strong Cycles
     ///
@@ -147,53 +165,74 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
         P: Parser<'src, I, A, E> + 'p,
     {
         match &mut self.inner {
-            RecursiveInner::Owned(owned) => owned
+            RecursiveInner::Owned(_, owned) => owned
                 .as_ref()
                 .inner
                 .set(Box::new(parser))
                 .unwrap_or_else(|_| {
                     panic!(
                         "Called Recursive::define on already-defined combinator{}!",
-                        self.description
-                            .as_ref()
-                            .map(|s| format!(" '{s}'"))
-                            .unwrap_or("".into())
+                        self.name().map(|s| format!(" '{s}'")).unwrap_or("".into())
                     )
                 }),
-            RecursiveInner::Unowned(_) => {
+            RecursiveInner::Unowned(..) => {
                 panic!(
                     "Called Recursive::define on weak reference{}!",
-                    self.description
-                        .as_ref()
-                        .map(|s| format!(" '{s}'"))
-                        .unwrap_or("".into())
+                    self.name().map(|s| format!(" '{s}'")).unwrap_or("".into())
                 )
             }
         }
     }
+
+    /// Produces a non-owning handle to `self`.
+    /// This is primarily used to break strong recursive cycles,
+    /// allowing for mutually-recursive parsers to be deallocated.
+    ///
+    /// # Note to Users
+    ///
+    /// A handle produced by this function will not stop the underlying allocation
+    /// from being deallocated when all owning handles are dropped.
+    /// Attempting a parse on a dropped parser results in a [`ParseOutcome::Fatal`] parse failure.
+    ///
+    /// This typically entails that there is one "primary" parser,
+    /// which keeps its group of mutually-recursive combinators alive.
+    /// [`Self::weaken`] should only be invoked for recursive back edges to this primary parser.
+    pub fn weaken(&self) -> Self {
+        Recursive {
+            inner: RecursiveInner::Unowned(self.inner.name(), self.inner.as_weak()),
+        }
+    }
 }
 
+/// # Note on First Field: Why `ArcStr`?
+///
+/// Recursive constructs are cloned a lot. This makes that cheaper.
+/// Since the name is an important field supplied as `Cow<'static, str>`,
+/// where the literal string is the (extremely) common case,
+/// `ArcStr` can be zero-copy and no-atomic.
+///
+/// This is to be converted at API boundaries.
 #[derive(Debug)]
 enum RecursiveInner<P: ?Sized> {
     /// Owned. What users get during direct construction, declaration and definition.
-    Owned(Rc<P>),
+    Owned(Option<ArcStr>, Rc<P>),
     /// Unowned, supplied to the inner closure for the back-edge of self-recursion.
-    /// A user should never be able to construct this.
-    Unowned(Weak<P>),
+    /// A user may construct this via [`Recursive::weaken`].
+    Unowned(Option<ArcStr>, Weak<P>),
 }
 impl<P: ?Sized> Clone for RecursiveInner<P> {
     fn clone(&self) -> Self {
         match self {
-            Self::Owned(owned) => Self::Owned(owned.clone()),
-            Self::Unowned(weak) => Self::Unowned(weak.clone()),
+            Self::Owned(name, owned) => Self::Owned(name.clone(), owned.clone()),
+            Self::Unowned(name, weak) => Self::Unowned(name.clone(), weak.clone()),
         }
     }
 }
 impl<P: ?Sized> RecursiveInner<P> {
     fn as_ptr(&self) -> *const P {
         match self {
-            RecursiveInner::Owned(owned) => owned as &P as *const P,
-            RecursiveInner::Unowned(weak) => weak.as_ptr(),
+            RecursiveInner::Owned(_, owned) => owned as &P as *const P,
+            RecursiveInner::Unowned(_, weak) => weak.as_ptr(),
         }
     }
     fn recursive_id(&self) -> RecursiveId {
@@ -202,14 +241,31 @@ impl<P: ?Sized> RecursiveInner<P> {
 
     fn as_weak(&self) -> Weak<P> {
         match self {
-            RecursiveInner::Owned(rc) => Rc::downgrade(rc),
-            RecursiveInner::Unowned(weak) => weak.clone(),
+            RecursiveInner::Owned(_, rc) => Rc::downgrade(rc),
+            RecursiveInner::Unowned(_, weak) => weak.clone(),
         }
     }
-    fn as_rc(&self) -> Option<Rc<P>> {
+    // fn as_rc(&self) -> Option<Rc<P>> {
+    //     match self {
+    //         RecursiveInner::Owned(_, rc) => Some(rc.clone()),
+    //         RecursiveInner::Unowned(_, weak) => weak.upgrade(),
+    //     }
+    // }
+
+    fn name(&self) -> Option<ArcStr> {
         match self {
-            RecursiveInner::Owned(rc) => Some(rc.clone()),
-            RecursiveInner::Unowned(weak) => weak.upgrade(),
+            RecursiveInner::Owned(name, _) | RecursiveInner::Unowned(name, _) => name.clone(),
+        }
+    }
+    fn name_cow(&self) -> Option<Cow<'static, str>> {
+        match self {
+            RecursiveInner::Owned(Some(named), _) | RecursiveInner::Unowned(Some(named), _) => {
+                Some(
+                    ArcStr::as_static(named)
+                        .map_or_else(|| Cow::Owned(named.to_string()), Cow::Borrowed),
+                )
+            }
+            _ => None,
         }
     }
 }
@@ -223,7 +279,7 @@ pub type Direct<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> =
 
 /// The inner type for mutually-recursive combinators formed via [`Recursive::declare`] and [`Recursive::define`].
 pub struct Indirect<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> {
-    description: Option<Cow<'static, str>>,
+    name: Option<ArcStr>,
     inner: OnceCell<Box<dyn Parser<'src, I, A, E> + 'p>>,
 }
 
@@ -254,7 +310,7 @@ macro_rules! recursive_growth {
         let input = ($input);
         let state = ($state);
 
-        debug_log!("ENTER: {} @ {:?}", &this.name(), input.byte_offset(state.cursor));
+        debug_log!("ENTER: {} @ {:?}", &this.given_or_diagnostic_name(), input.byte_offset(state.cursor));
 
         // Check the recursive state on whether or not this recursive function has been entered.
         match state.recursive_state.get(this.recursive_id(), state.cursor) {
@@ -278,7 +334,7 @@ macro_rules! recursive_growth {
                         );
 
                         debug_log!("CACHED SEED: {} @ {:?} -> {:?}",
-                            &this.name(),
+                            &this.given_or_diagnostic_name(),
                             input.byte_offset(state.cursor),
                             input.byte_offset(seed_state.cursor)
                         );
@@ -315,7 +371,7 @@ macro_rules! recursive_growth {
                     }
 
                     None => {
-                        debug_log!("NO SEED: {} @ {:?}", &this.name(), input.byte_offset(state.cursor));
+                        debug_log!("NO SEED: {} @ {:?}", &this.given_or_diagnostic_name(), input.byte_offset(state.cursor));
 
                         // Speculative error for left-recursion.
                         // No need to record failure dependency, because either:
@@ -325,7 +381,7 @@ macro_rules! recursive_growth {
                             input,
                             state.cursor,
                             UnboundedRecursion {
-                                name: this.description.clone(),
+                                name: this.name_cow(),
                                 from: this.recursive_id()
                             }
                         );
@@ -344,7 +400,7 @@ macro_rules! recursive_growth {
             }
 
             None => {
-                debug_log!("FIRST ENTRY!: {} @ {:?}", &this.name(), input.byte_offset(state.cursor));
+                debug_log!("FIRST ENTRY!: {} @ {:?}", &this.given_or_diagnostic_name(), input.byte_offset(state.cursor));
                 recompute!(this, input, state, $method)
             }
         }
@@ -369,7 +425,7 @@ macro_rules! recompute {
         let mut recursive_state = state.recursive_state.clone();
         recursive_state.push_to_top(this.recursive_id(), state.cursor,
             RecursiveFrame {
-                description: this.description.clone(),
+                description: this.name(),
                 diagnostic_name: this.diagnostic_name(),
                 allocation_store: Box::new(this.inner.as_weak()),
                 seed_result: None,
@@ -396,7 +452,7 @@ macro_rules! recompute {
 
                 // check if the failure is due to unbounded recursion. If yes, promote.
                 if failure.is_unbounded_recursion_at(input, state.cursor, UnboundedRecursion {
-                    name: this.description.clone(),
+                    name: this.name_cow(),
                     from: this.recursive_id()
                 }) {
                     // Unbounded recursion identified as primary failure mode.
@@ -431,7 +487,7 @@ macro_rules! recompute {
             frame.dependencies = rec_seed_state.recursive_state.current_dependencies.clone();
             frame.generation += 1;
 
-            debug_log!("GENERATION {}: {} @ {:?}", frame.generation, &this.name(), input.byte_offset(state.cursor));
+            debug_log!("GENERATION {}: {} @ {:?}", frame.generation, &this.given_or_diagnostic_name(), input.byte_offset(state.cursor));
             rec_seed_state.recursive_state.push_to_top(this.recursive_id(), state.cursor, frame);
 
             // Subsequent iteration.
@@ -447,7 +503,7 @@ macro_rules! recompute {
                 ParseOutcome::Success(_) => {
                     // Grow the seed and continue, if not zero-progress.
                     debug_log!("{} @ {:?}: Best: {:?}; Candidate: {:?}",
-                        &this.name(),
+                        &this.given_or_diagnostic_name(),
                         input.byte_offset(state.cursor),
                         input.byte_offset(current_best_cursor),
                         input.byte_offset(next_sprout_state.cursor)
@@ -543,9 +599,9 @@ where
         recursive_growth!(self, input, state, check, ())
     }
     fn hint(&self) -> ParseHint {
-        if let Some(inner) = &self.description {
+        if let Some(inner) = &self.name() {
             ParseHint::Named {
-                name: inner.clone().into_owned(),
+                name: inner.to_string(),
                 inner: Box::new(ParseHint::Opaque),
             }
         } else {
@@ -569,11 +625,27 @@ where
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         match self {
-            RecursiveInner::Owned(owned) => owned.as_ref().parse(input, state),
-            RecursiveInner::Unowned(weak) => weak
-                .upgrade()
-                .expect("Weak pointer is unconstructible by users; source must be alive!")
-                .parse(input, state),
+            RecursiveInner::Owned(_, owned) => owned.as_ref().parse(input, state),
+            RecursiveInner::Unowned(_, weak) => weak.upgrade().map_or_else(
+                || {
+                    // Parser dropped!
+                    let failure = E::Failure::failure_at(
+                        input,
+                        state.cursor,
+                        FailureKind::DroppedParser {
+                            name: self.name_cow(),
+                        },
+                    );
+                    (
+                        state.clone(),
+                        ParseOutput {
+                            ast: ParseOutcome::Fatal(failure),
+                            cst: AssociatedGreenCst::new(),
+                        },
+                    )
+                },
+                |inner| inner.parse(input, state.clone()),
+            ),
         }
     }
 
@@ -584,14 +656,31 @@ where
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         match self {
-            RecursiveInner::Owned(owned) => owned.as_ref().check(input, state),
-            RecursiveInner::Unowned(weak) => weak
-                .upgrade()
-                .expect("Weak pointer is unconstructible by users; source must be alive!")
-                .check(input, state),
+            RecursiveInner::Owned(_, owned) => owned.as_ref().check(input, state),
+            RecursiveInner::Unowned(_, weak) => weak.upgrade().map_or_else(
+                || {
+                    // Parser dropped!
+                    let failure = E::Failure::failure_at(
+                        input,
+                        state.cursor,
+                        FailureKind::DroppedParser {
+                            name: self.name_cow(),
+                        },
+                    );
+                    (
+                        state.clone(),
+                        ParseOutput {
+                            ast: ParseOutcome::Fatal(failure),
+                            cst: AssociatedGreenCst::new(),
+                        },
+                    )
+                },
+                |inner| inner.check(input, state.clone()),
+            ),
         }
     }
 }
+
 impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E>
     for Indirect<'p, 'src, I, A, E>
 where
@@ -603,19 +692,24 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
-        match self.inner.get(){
+        match self.inner.get() {
             Some(parser) => parser.parse(input, state),
             None => {
-                let failure = E::Failure::failure_at(input, state.cursor, 
+                let failure = E::Failure::failure_at(
+                    input,
+                    state.cursor,
                     FailureKind::UndefinedParser {
-                        name: self.description.clone()
-                    }
+                        name: self.name.clone().map(Into::into),
+                    },
                 );
-                (state, ParseOutput {
-                    ast: ParseOutcome::Fatal(failure),
-                    cst: AssociatedGreenCst::new(),
-                })
-            },
+                (
+                    state,
+                    ParseOutput {
+                        ast: ParseOutcome::Fatal(failure),
+                        cst: AssociatedGreenCst::new(),
+                    },
+                )
+            }
         }
     }
 
@@ -625,19 +719,24 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        match self.inner.get(){
+        match self.inner.get() {
             Some(parser) => parser.check(input, state),
             None => {
-                let failure = E::Failure::failure_at(input, state.cursor, 
+                let failure = E::Failure::failure_at(
+                    input,
+                    state.cursor,
                     FailureKind::UndefinedParser {
-                        name: self.description.clone()
-                    }
+                        name: self.name.clone().map(Into::into),
+                    },
                 );
-                (state, ParseOutput {
-                    ast: ParseOutcome::Fatal(failure),
-                    cst: AssociatedGreenCst::new(),
-                })
-            },
+                (
+                    state,
+                    ParseOutput {
+                        ast: ParseOutcome::Fatal(failure),
+                        cst: AssociatedGreenCst::new(),
+                    },
+                )
+            }
         }
     }
 }

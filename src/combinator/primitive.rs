@@ -61,10 +61,13 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        let failure = E::Failure::failure_at(input, state.cursor, 
+        let failure = E::Failure::failure_at(
+            input,
+            state.cursor,
             FailureKind::FailPrimitive {
                 message: self.0.clone(),
-            });
+            },
+        );
         (
             state,
             ParseOutput {

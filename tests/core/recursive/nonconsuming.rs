@@ -55,7 +55,7 @@ proptest! {
         let mut rec_a : Rec<'_, '_> = Recursive::declare_as("rec_a");
         let mut rec_b : Rec<'_, '_> = Recursive::declare_as("rec_b");
         rec_a.define(rec_b.clone());
-        rec_b.define(rec_a.clone());
+        rec_b.define(rec_a.weaken());
 
         let (state, result) = rec_a.parse(
             &s,

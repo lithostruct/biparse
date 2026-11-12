@@ -5,7 +5,9 @@
 use thiserror::Error;
 
 use crate::{
-    combinator::RecursiveId, failure::{Descriptor, ParseHint}, input::{Input, LineColumn},
+    combinator::RecursiveId,
+    failure::{Descriptor, ParseHint},
+    input::{Input, LineColumn},
 };
 use std::{borrow::Cow, fmt::Debug};
 
@@ -24,7 +26,7 @@ pub trait ParseFailure: Clone {
     /// Branch failures may contain different locations than the one supplied in this call.
     /// Branch failures are symmetrical but provided in order of occurence.
     /// Maintain iteration order where applicable.
-    /// 
+    ///
     /// Note that [`Self::is_unbounded_recursion_at`] invariants must be maintained.
     fn composite<I: Input + ?Sized>(
         input: &I,
@@ -36,14 +38,18 @@ pub trait ParseFailure: Clone {
     fn supplement(self, additional: Self) -> Self;
 
     /// Construct the failure corresponding to unbounded recursion.
-    /// 
+    ///
     /// Unlike [`Self::failure_at`], unbounded recursion information *must* be retained in the failure payload generated,
     /// and be available for checking via [`Self::is_unbounded_recursion_at`].
     /// This is used to determine whether unbounded recursion failure should be promoted as fatal.
-    fn unbounded_recursion<I: Input + ?Sized>(input: &I, cursor: I::Cursor, info: UnboundedRecursion) -> Self;
+    fn unbounded_recursion<I: Input + ?Sized>(
+        input: &I,
+        cursor: I::Cursor,
+        info: UnboundedRecursion,
+    ) -> Self;
     /// Checks whether `self` is an unbounded recursion failure
     /// constructed by the corresponding [`Self::unbounded_recursion(input, cursor, info)`](Self::unbounded_recursion).
-    /// 
+    ///
     /// Unbounded recursion identification must observe:
     /// - Descriptions are not solely unique. Identify combinator identity by [`RecursiveId`]
     ///   or by applying [`Eq`] onto [`UnboundedRecursion`].
@@ -51,7 +57,12 @@ pub trait ParseFailure: Clone {
     ///   their constituent branches are all unbounded recursions,
     ///   which may originate from different provenances.
     /// - Supplementary information is irrelevant.
-    fn is_unbounded_recursion_at<I: Input + ?Sized>(&self, input: &I, cursor: I::Cursor, info: UnboundedRecursion) -> bool;
+    fn is_unbounded_recursion_at<I: Input + ?Sized>(
+        &self,
+        input: &I,
+        cursor: I::Cursor,
+        info: UnboundedRecursion,
+    ) -> bool;
 }
 
 /// The struct that carries additional information on what kind of failure is encountered by the parser,
@@ -68,6 +79,8 @@ pub enum FailureKind<I: Input + ?Sized> {
 
     /// Undefined parser. This is always fatal.
     UndefinedParser { name: Option<Cow<'static, str>> },
+    /// Dropped parser. This is always fatal.
+    DroppedParser { name: Option<Cow<'static, str>> },
     /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
     NonGrowingRepetition { inner_hint: ParseHint },
 }
@@ -78,7 +91,6 @@ pub struct UnboundedRecursion {
     pub name: Option<Cow<'static, str>>,
     pub from: RecursiveId,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
 #[error("{}", if .0.is_empty() { String::from("parse failure") } else {
@@ -102,7 +114,7 @@ impl ParseFailure for Minimal {
         _: I::Cursor,
         branches: impl IntoIterator<Item = Self>,
     ) -> Self {
-        let mut recursive_info : Vec<(usize, UnboundedRecursion)> = Vec::new();
+        let mut recursive_info: Vec<(usize, UnboundedRecursion)> = Vec::new();
         for branch in branches {
             if branch.0.is_empty() {
                 return Minimal(Vec::new());
@@ -116,10 +128,19 @@ impl ParseFailure for Minimal {
         self
     }
 
-    fn unbounded_recursion<I: Input + ?Sized>(input: &I, cursor: I::Cursor, info: UnboundedRecursion) -> Self {
+    fn unbounded_recursion<I: Input + ?Sized>(
+        input: &I,
+        cursor: I::Cursor,
+        info: UnboundedRecursion,
+    ) -> Self {
         Minimal(vec![(input.byte_offset(cursor), info)])
     }
-    fn is_unbounded_recursion_at<I: Input + ?Sized>(&self, input: &I, cursor: I::Cursor, info: UnboundedRecursion) -> bool {
+    fn is_unbounded_recursion_at<I: Input + ?Sized>(
+        &self,
+        input: &I,
+        cursor: I::Cursor,
+        info: UnboundedRecursion,
+    ) -> bool {
         let offset = input.byte_offset(cursor);
         self.0.contains(&(offset, info))
     }
@@ -157,28 +178,43 @@ impl ParseFailure for PositionOnly {
         branches: impl IntoIterator<Item = Self>,
     ) -> Self {
         let line_col = input.to_line_col(cursor);
-        let mut recursive_info : Vec<(LineColumn, UnboundedRecursion)> = Vec::new();
+        let mut recursive_info: Vec<(LineColumn, UnboundedRecursion)> = Vec::new();
         for branch in branches {
             if branch.recursive_info.is_empty() {
-                return PositionOnly{ line_col, recursive_info: Vec::new()};
+                return PositionOnly {
+                    line_col,
+                    recursive_info: Vec::new(),
+                };
             } else {
                 recursive_info.extend(branch.recursive_info);
             }
         }
-        PositionOnly{ line_col, recursive_info }
+        PositionOnly {
+            line_col,
+            recursive_info,
+        }
     }
     fn supplement(self, _: Self) -> Self {
         self
     }
 
-    fn unbounded_recursion<I: Input + ?Sized>(input: &I, cursor: I::Cursor, info: UnboundedRecursion) -> Self {
+    fn unbounded_recursion<I: Input + ?Sized>(
+        input: &I,
+        cursor: I::Cursor,
+        info: UnboundedRecursion,
+    ) -> Self {
         let line_col = input.to_line_col(cursor);
         PositionOnly {
             recursive_info: vec![(line_col, info)],
             line_col,
         }
     }
-    fn is_unbounded_recursion_at<I: Input + ?Sized>(&self, input: &I, cursor: I::Cursor, info: UnboundedRecursion) -> bool {
+    fn is_unbounded_recursion_at<I: Input + ?Sized>(
+        &self,
+        input: &I,
+        cursor: I::Cursor,
+        info: UnboundedRecursion,
+    ) -> bool {
         let line_col = input.to_line_col(cursor);
         self.recursive_info.contains(&(line_col, info))
     }
@@ -301,6 +337,10 @@ pub enum RichKind {
     #[error("undefined parser{}", name.as_ref().map_or_else(String::new, |inner| format!(": {inner}")))]
     UndefinedParser { name: Option<Cow<'static, str>> },
 
+    /// Dropped parser. This is always fatal.
+    #[error("dropped parser{}", name.as_ref().map_or_else(String::new, |inner| format!(": {inner}")))]
+    DroppedParser { name: Option<Cow<'static, str>> },
+
     /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
     #[error("primitive failure{}", {
         let mut tree = inner_hint.to_expectation();
@@ -359,7 +399,10 @@ impl ParseFailure for Rich {
             },
             FailureKind::FailPrimitive { message } => RichKind::FailPrimitive { message },
             FailureKind::UndefinedParser { name } => RichKind::UndefinedParser { name },
-            FailureKind::NonGrowingRepetition { inner_hint } => RichKind::NonGrowingRepetition { inner_hint },
+            FailureKind::DroppedParser { name } => RichKind::DroppedParser { name },
+            FailureKind::NonGrowingRepetition { inner_hint } => {
+                RichKind::NonGrowingRepetition { inner_hint }
+            }
         };
         Self {
             kind,
@@ -396,12 +439,16 @@ impl ParseFailure for Rich {
                 RichKind::UnboundedRecursion { info } => {
                     acc.extend_from_slice(info);
                     Ok(acc)
-                },
+                }
                 _ => Err(()),
             }
         });
         if let Ok(info) = try_fold {
-            return Rich { position, kind: RichKind::UnboundedRecursion { info }, supplemental }
+            return Rich {
+                position,
+                kind: RichKind::UnboundedRecursion { info },
+                supplemental,
+            };
         }
 
         // Attempt unification of the common expected-found speculative error.
@@ -458,15 +505,26 @@ impl ParseFailure for Rich {
         self
     }
 
-    fn unbounded_recursion<I: Input + ?Sized>(input: &I, cursor: I::Cursor, info: UnboundedRecursion) -> Self {
+    fn unbounded_recursion<I: Input + ?Sized>(
+        input: &I,
+        cursor: I::Cursor,
+        info: UnboundedRecursion,
+    ) -> Self {
         let line_col = input.to_line_col(cursor);
         Rich {
             position: line_col,
-            kind: RichKind::UnboundedRecursion { info: vec![(line_col, info)] },
-            supplemental: Vec::new(), 
+            kind: RichKind::UnboundedRecursion {
+                info: vec![(line_col, info)],
+            },
+            supplemental: Vec::new(),
         }
     }
-    fn is_unbounded_recursion_at<I: Input + ?Sized>(&self, input: &I, cursor: I::Cursor, info: UnboundedRecursion) -> bool {
+    fn is_unbounded_recursion_at<I: Input + ?Sized>(
+        &self,
+        input: &I,
+        cursor: I::Cursor,
+        info: UnboundedRecursion,
+    ) -> bool {
         if let RichKind::UnboundedRecursion { info: existing } = &self.kind {
             existing.contains(&(input.to_line_col(cursor), info))
         } else {

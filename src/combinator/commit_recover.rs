@@ -32,7 +32,9 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         let (state, output) = self.0.parse(input, state);
         match output.ast {
-            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => (state, output),
+            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
+                (state, output)
+            }
             ParseOutcome::Speculative(failure) => (
                 state,
                 ParseOutput {
@@ -50,7 +52,9 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let (state, output) = self.0.check(input, state);
         match output.ast {
-            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => (state, output),
+            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
+                (state, output)
+            }
             ParseOutcome::Speculative(failure) => (
                 state,
                 ParseOutput {
@@ -121,7 +125,9 @@ where
         let (state, output) = self.fallible.parse(input, state);
         // Catching committed failure.
         let failure = match output.ast {
-            ParseOutcome::Success(_) | ParseOutcome::Speculative(_) | ParseOutcome::Fatal(_) => return (state, output),
+            ParseOutcome::Success(_) | ParseOutcome::Speculative(_) | ParseOutcome::Fatal(_) => {
+                return (state, output);
+            }
             ParseOutcome::Committed(failure) => failure,
         };
 

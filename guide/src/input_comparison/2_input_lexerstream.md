@@ -5,7 +5,8 @@ Integration with `logos` based lexing, based on `logos::Lexer`. Enabled by defau
 ## Usage
 A producer of parser combinators expecting this input type should have the signature:
 ```rs,ignore
-fn make_parser<'parse, 'source, E: ParserEnvironment>(...) -> impl Parser<'parse, LexerStream<'source, T>, A, E>
+fn make_parser<'parse, 'source, E: ParserEnvironment>(...)
+    -> impl Parser<'parse, LexerStream<'source, T>, A, E>
 where
     'source : 'parse,
 {...}
@@ -39,11 +40,12 @@ T where
 
 There are a few major limitations within `LexerStream` that does not cover the full feature set of `logos`:
 - The source supported for lexing grammar `T` *must* be a UTF-8 string.
-- Due to diagnostic generation and the inability to dispatch dynamically on trait implementation, `T : Debug`.
 - Due to internal implementation constraints, `T : Clone`.
 - The natively supported `Pattern` types typically require `T : Eq`.
+- A function producing a string representation from a token reference is required for error reporting.
+  - This defaults to the `Display` implementation for `LexerStream::new`, but may be weakened to `Debug` or a user-supplied function via constructor functions `LexerStream::new_via_debug` and `LexerStream::new_with_descriptor`.
 
-Furthermore, `logos` imposes the constraint that each token must be produced in a stateless manner. This means that lexing grammars must be globally unambiguous (eg. regex patterns `r"[a-zA-Z0-9_ ]+"` and `r"[ \t\r\n]+"` overlap, and hence must have a specified priority ordering or be rejected), whereas `str`-based parsing may disambugate between the two via control flow.
+Furthermore, `logos` imposes the constraint that each token must be produced in a stateless manner. This means that lexing grammars must be globally unambiguous (eg. regex patterns `r"[a-zA-Z0-9_ ]+"` and `r"[ \t\r\n]+"` overlap eg `" "`, and hence must have a specified priority ordering or be rejected), whereas `str`-based parsing may disambugate between the two via control flow.
 
 In exchange, `LexerStream` provides various correctness and ergonomic advantages:
 - `Pattern`-matching constructs and lexing are vastly simplified due to `#[derive(Logos)]` syntax.

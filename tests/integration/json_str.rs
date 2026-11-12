@@ -150,14 +150,14 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
         .clone()
         .then(just((Kind::Comma, ',')))
         .then(optional_whitespace.clone()))
-    .ignore_then(value.clone())
+    .ignore_then(value.weaken())
     .many();
 
     // Corresponds to array ::= '[' (value (',' value)*)? ']'
     let array = (just((Kind::LeftBracket, '[')).then(optional_whitespace.clone()))
         .ignore_then(
             value
-                .clone()
+                .weaken()
                 .then_ignore(optional_whitespace.clone())
                 .then(values)
                 .map(|(first, mut rest)| {
@@ -184,7 +184,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
                 .then(just((Kind::Colon, ':')))
                 .then(optional_whitespace.clone()),
         )
-        .then(value.clone())
+        .then(value.weaken())
         .node(Kind::Pair);
 
     // Corresponds to (',' pair)*

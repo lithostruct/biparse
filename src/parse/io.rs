@@ -1,6 +1,9 @@
 pub use crate::combinator::RecursiveState;
 use crate::{
-    cst::{AssociatedGreenCst, IdSupply}, green::GreenInterner, input::Input, parse::ParseEnvironment,
+    cst::{AssociatedGreenCst, IdSupply},
+    green::GreenInterner,
+    input::Input,
+    parse::ParseEnvironment,
 };
 use std::{cell::RefCell, fmt::Debug, hash::Hash, rc::Rc};
 

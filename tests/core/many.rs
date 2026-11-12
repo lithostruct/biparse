@@ -69,7 +69,6 @@ proptest! {
 #[test]
 fn non_growing_termination() {
     let fatal_parser = success().many();
-    let (_, outcome) = fatal_parser.parse("",
-        ParseState::<str, DefaultParseEnvironment>::new(""));
+    let (_, outcome) = fatal_parser.parse("", ParseState::<str, DefaultParseEnvironment>::new(""));
     assert!(matches!(outcome.ast, ParseOutcome::Fatal(_)))
 }

@@ -1,9 +1,10 @@
 use std::{
-    borrow::Cow,
     fmt::Debug,
     hash::Hash,
     rc::{Rc, Weak},
 };
+
+use arcstr::ArcStr;
 
 use crate::parse::{ParseEnvironment, ParseOutput, ParseStateData};
 
@@ -113,7 +114,7 @@ impl<'src, C: Clone + Hash + Eq, E: ParseEnvironment> RecursiveState<'src, C, E>
 pub(super) struct RecursiveFrame<'src, C, E: ParseEnvironment> {
     // IDENTIFYING INFORMATION
     /// The user-given name for this recursive combinator.
-    pub(super) description: Option<Cow<'static, str>>,
+    pub(super) description: Option<ArcStr>,
     /// Diagnostic name, for use in debugging. Typically a string representation of the pointer address.
     pub(super) diagnostic_name: String,
 

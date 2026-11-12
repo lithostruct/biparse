@@ -171,13 +171,13 @@ where
 
     // Corresponds to (',' value)*.
     // This used to be implemented with recursion, but has since been supplanted by the `Many` combinator.
-    let values = just(Kind::Comma).ignore_then(value.clone()).many();
+    let values = just(Kind::Comma).ignore_then(value.weaken()).many();
 
     // Corresponds to array ::= '[' (value (',' value)*)? ']'
     let array = just(Kind::LeftBracket)
         .ignore_then(
             value
-                .clone()
+                .weaken()
                 .then(values)
                 .map(|(first, mut rest)| {
                     rest.insert(0, first);
@@ -194,7 +194,7 @@ where
     let key_value = string
         .clone()
         .then_ignore(just(Kind::Colon))
-        .then(value.clone())
+        .then(value.weaken())
         .node(Kind::Pair);
 
     // Corresponds to (',' pair)*

@@ -64,12 +64,10 @@ where
         just((Kind::String, regex::Regex::new(r"[a-zA-Z0-9_-]+").unwrap()))
             .into_owned()
             .associate(Kind::Symbol, SExp::Symbol)
-            .or(
-                just((Kind::LeftParen, "("))
-                    .ignore_then(this.many())
-                    .then_ignore(just((Kind::RightParen, ")")))
-                    .associate_as("list", Kind::List, SExp::List),
-            )
+            .or(just((Kind::LeftParen, "("))
+                .ignore_then(this.many())
+                .then_ignore(just((Kind::RightParen, ")")))
+                .associate_as("list", Kind::List, SExp::List))
     })
 }
 

@@ -1,7 +1,10 @@
 use derive_more::From;
 
 use crate::{
-    cst::AssociatedGreenCst, failure::{FailureKind, ParseFailure}, input::Input, parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
+    cst::AssociatedGreenCst,
+    failure::{FailureKind, ParseFailure},
+    input::Input,
+    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
 /// Parser combinator that executes a given parser zero, one or more than one times.
@@ -36,8 +39,13 @@ where
                 ParseOutcome::Success(element) => {
                     // If no progress made, terminal error.
                     if new_state.cursor == state.cursor {
-                        let failure = E::Failure::failure_at(input, state.cursor,
-                            FailureKind::NonGrowingRepetition { inner_hint: self.inner.hint() });
+                        let failure = E::Failure::failure_at(
+                            input,
+                            state.cursor,
+                            FailureKind::NonGrowingRepetition {
+                                inner_hint: self.inner.hint(),
+                            },
+                        );
                         return (
                             state,
                             ParseOutput {
@@ -63,8 +71,7 @@ where
                         },
                     );
                 }
-                ast @ ParseOutcome::Committed(_)
-                | ast @ ParseOutcome::Fatal(_) => {
+                ast @ ParseOutcome::Committed(_) | ast @ ParseOutcome::Fatal(_) => {
                     // Propagate committed or fatal failure.
                     return (
                         new_state,
@@ -88,8 +95,13 @@ where
             match new_output.ast {
                 ParseOutcome::Success(()) => {
                     if new_state.cursor <= state.cursor {
-                        let failure = E::Failure::failure_at(input, state.cursor,
-                            FailureKind::NonGrowingRepetition { inner_hint: self.inner.hint() });
+                        let failure = E::Failure::failure_at(
+                            input,
+                            state.cursor,
+                            FailureKind::NonGrowingRepetition {
+                                inner_hint: self.inner.hint(),
+                            },
+                        );
                         return (
                             state,
                             ParseOutput {
@@ -114,8 +126,7 @@ where
                         },
                     );
                 }
-                ast @ ParseOutcome::Committed(_)
-                | ast @ ParseOutcome::Fatal(_) => {
+                ast @ ParseOutcome::Committed(_) | ast @ ParseOutcome::Fatal(_) => {
                     // Propagate committed or fatal failure.
                     return (
                         new_state,

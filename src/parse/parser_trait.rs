@@ -108,6 +108,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to then sequentially execute the second parser.
+    ///
+    /// Underlying combinator object: [`Then`].
     fn then<P, B>(self, next: P) -> With<E, Then<Self, P>>
     where
         P: Parser<'src, I, B, E>,
@@ -116,6 +118,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         With::new(Then::new(self, next))
     }
     /// Chains `self` as an alternative, falling through to the second parser.
+    ///
+    /// Underlying combinator object: [`Or`].
     fn or<P>(self, other: P) -> With<E, Or<Self, P>>
     where
         P: Parser<'src, I, A, E>,
@@ -123,7 +127,9 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     {
         With::new(Or::new(self, other))
     }
-    /// Chains `self` to execute `map` on the success payload.
+    /// Chains `self` to transform the success payload.
+    ///
+    /// Underlying combinator object: [`Map`].
     fn map<F, B>(self, closure: F) -> With<E, Map<Self, F, A>>
     where
         F: Fn(A) -> B,
@@ -132,6 +138,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         With::new(Map::new(self, closure))
     }
     /// Chains `self` to add a new parent to the current CST forest.
+    ///
+    /// Underlying combinator object: [`Node`].
     fn node(self, kind: impl Into<SyntaxKind>) -> With<E, Node<Self>>
     where
         Self: Sized,
@@ -140,6 +148,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self` to add a new parent to the current CST forest.
     /// Additionally provides a name to the parser object for use in diagnostics.
+    ///
+    /// Underlying combinator object: [`Node`].
     fn named(
         self,
         name: impl Into<Cow<'static, str>>,
@@ -152,6 +162,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
+    ///
+    /// Underlying combinator object: [`Associate`].
     fn associate<F, B>(
         self,
         kind: impl Into<SyntaxKind>,
@@ -166,6 +178,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
     /// Additionally provides a name to the parser object for use in diagnostics.
+    ///
+    /// Underlying combinator object: [`Associate`].
     fn associate_as<F, B>(
         self,
         name: impl Into<Cow<'static, str>>,
@@ -180,6 +194,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to repeat zero or more times, returning [`Vec<A>`].
+    ///
+    /// Underlying combinator object: [`Many`].
     fn many(self) -> With<E, Many<Self>>
     where
         Self: Sized,
@@ -206,6 +222,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
 
     /// Chains `self` to attempt fallible mapping on the success payload,
     /// signalling a committed failure if conversion fails.
+    ///
+    /// Underlying combinator object: [`TryMap`].
     fn try_map<F, B, Error>(self, closure: F) -> With<E, TryMap<Self, F, A>>
     where
         F: Fn(A) -> Result<B, Error>,
@@ -215,6 +233,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         With::new(TryMap::new(self, closure))
     }
     /// Chains `self` to commit, promoting speculative failure into committed failure.
+    ///
+    /// Underlying combinator object: [`Commit`].
     fn commit(self) -> With<E, Commit<Self>>
     where
         Self: Sized,
@@ -224,8 +244,10 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     /// Chains `self` to a recovery strategy, handling and transforming committed failure
     /// into an associated diagnostic upon success.
     ///
-    /// Common recovery strategies include parsing up to a set of recognized "safe characters",
+    /// Common recovery strategies include parsing up to a set of recognized "safe characters" or end-of-input,
     /// where regular parsing can then resume.
+    ///
+    /// Underlying combinator object: [`Recover`].
     ///
     /// # Note on Recovery Parser Failure
     ///
@@ -278,7 +300,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         P: Parser<'src, I, B, E>,
         Self: Sized,
     {
-        self.map(Either::Left as fn(A) -> Either<A, B>).or(other.map(Either::Right))
+        self.map(Either::Left as fn(A) -> Either<A, B>)
+            .or(other.map(Either::Right))
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E> for T where
@@ -310,20 +333,24 @@ pub mod composite {
     pub type ThenIgnore<E, L, R, A, B> = With<E, Map<With<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
     pub type IgnoreThen<E, L, R, A, B> = With<E, Map<With<E, Then<L, R>>, fn((A, B)) -> B, (A, B)>>;
 
-    pub type EitherOr<E, L, R, A, B> =
-        With<E, Or<
-            With<E, Map<L, fn(A) -> Either<A, B>, A>>,
-            With<E, Map<R, fn(B) -> Either<A, B>, B>>,
-        >>;
+    pub type EitherOr<E, L, R, A, B> = With<
+        E,
+        Or<With<E, Map<L, fn(A) -> Either<A, B>, A>>, With<E, Map<R, fn(B) -> Either<A, B>, B>>>,
+    >;
 }
 
 /// Convenience trait for [`.into_owned()`](Self::into_owned) method chaining.
-pub trait ParserOwnedExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment>:
-    Parser<'src, I, &'src A, E>
-where
+pub trait ParserIntoOwnedExt<
+    'src,
+    I: Input + ?Sized,
+    A,
+    E: ParseEnvironment = DefaultParseEnvironment,
+>: Parser<'src, I, &'src A, E> where
     A: ToOwned + ?Sized + 'src,
 {
     /// Chains `self` by turning an AST payload reference into owned data.
+    ///
+    /// Underlying combinator object: [`IntoOwned`].
     fn into_owned(self) -> With<E, IntoOwned<Self, A>>
     where
         Self: Sized,
@@ -331,7 +358,7 @@ where
         With::new(IntoOwned::new(self))
     }
 }
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserOwnedExt<'src, I, A, E> for T
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserIntoOwnedExt<'src, I, A, E> for T
 where
     T: Parser<'src, I, &'src A, E>,
     A: ToOwned + ?Sized + 'src,

@@ -28,26 +28,33 @@ pub use self::{
     primitive::{End, Fail, Success},
     recursive::{
         combinator::{Direct, Indirect, Recursive},
-        frame::{RecursiveState, RecursiveId},
+        frame::{RecursiveId, RecursiveState},
     },
     repetition::Many,
 };
 
 // Constants and functions.
 
+/// Constructs the primitive [`Success`] combinator that unconditionally succeeds on any input.
 pub fn success<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, Success> {
     As::from(Success)
 }
+/// Constructs the primitive [`Fail`] combinator that unconditionally fails on any input.
 pub fn fail<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, Fail> {
     As::from(Fail::new())
 }
-pub fn fail_with<'src, I: Input + ?Sized, E: ParseEnvironment>(msg: impl Into<Cow<'static, str>>) -> As<'src, I, (), E, Fail> {
+/// Constructs the primitive [`Fail`] combinator that unconditionally succeeds on any input, with the given message.
+pub fn fail_with<'src, I: Input + ?Sized, E: ParseEnvironment>(
+    msg: impl Into<Cow<'static, str>>,
+) -> As<'src, I, (), E, Fail> {
     As::from(Fail::new_with(msg))
 }
+/// Constructs the primitive [`End`] combinator that succeeds iff end of input is reached.
 pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, End> {
     As::from(End)
 }
 
+/// Constructs the [`Just`] combinator that matches the current input on some [`Pattern`].
 pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<'src, I> + 'src>(
     pattern: P,
 ) -> As<'src, I, P::Payload, E, Just<P>> {

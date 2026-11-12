@@ -67,7 +67,7 @@ fn too_many_a() {
 }
 
 /// # Note:
-/// 
+///
 /// The maximum value that is proptest-ed here is lower than that of left-recursion and repetition (50).
 /// This is because right-recursion inherently consumes unbounded stack space,
 /// which means that the more complex the inner body, the more likely stack overflow becomes.

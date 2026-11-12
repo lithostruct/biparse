@@ -246,11 +246,9 @@ where
 
     let terminal = num
         .clone()
-        .or(
-            just(Kind::LeftParen)
-                .ignore_then(expr.clone())
-                .then_ignore(just(Kind::RightParen)),
-        )
+        .or(just(Kind::LeftParen)
+            .ignore_then(expr.weaken())
+            .then_ignore(just(Kind::RightParen)))
         .shared();
 
     let mult = Recursive::new_as("multiplication", |this| {
