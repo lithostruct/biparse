@@ -4,7 +4,7 @@ use crate::{
     input::Input,
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
-use std::fmt::Debug;
+use std::{borrow::Cow, fmt::Debug};
 
 /// Parser combinator that consumes no input and succeeds.
 ///
@@ -46,10 +46,13 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Su
 ///
 /// The zero identity for choices.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Fail;
+pub struct Fail(Option<Cow<'static, str>>);
 impl Fail {
     pub fn new() -> Self {
-        Self
+        Self(None)
+    }
+    pub fn new_with(msg: impl Into<Cow<'static, str>>) -> Self {
+        Self(Some(msg.into()))
     }
 }
 impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fail {
@@ -58,7 +61,10 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        let failure = E::Failure::failure_at(input, state.cursor, FailureKind::FailPrimitive);
+        let failure = E::Failure::failure_at(input, state.cursor, 
+            FailureKind::FailPrimitive {
+                message: self.0.clone(),
+            });
         (
             state,
             ParseOutput {

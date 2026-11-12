@@ -1,9 +1,7 @@
 use derive_more::From;
 
 use crate::{
-    cst::AssociatedGreenCst,
-    input::Input,
-    parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
+    cst::AssociatedGreenCst, failure::{FailureKind, ParseFailure}, input::Input, parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
 /// Parser combinator that executes a given parser zero, one or more than one times.
@@ -36,6 +34,18 @@ where
             let (new_state, new_output) = self.inner.parse(input, state.clone());
             match new_output.ast {
                 ParseOutcome::Success(element) => {
+                    // If no progress made, terminal error.
+                    if new_state.cursor == state.cursor {
+                        let failure = E::Failure::failure_at(input, state.cursor,
+                            FailureKind::NonGrowingRepetition { inner_hint: self.inner.hint() });
+                        return (
+                            state,
+                            ParseOutput {
+                                ast: ParseOutcome::Fatal(failure),
+                                cst,
+                            },
+                        );
+                    }
                     // Combine and continue.
                     accumulative.push(element);
                     state = new_state;
@@ -53,12 +63,13 @@ where
                         },
                     );
                 }
-                ParseOutcome::Committed(failure) => {
-                    // Propagate committed failure.
+                ast @ ParseOutcome::Committed(_)
+                | ast @ ParseOutcome::Fatal(_) => {
+                    // Propagate committed or fatal failure.
                     return (
                         new_state,
                         ParseOutput {
-                            ast: ParseOutcome::Committed(failure),
+                            ast: ast.map(|_| unreachable!() as Vec<A>),
                             cst: new_output.cst,
                         },
                     );
@@ -76,6 +87,18 @@ where
             let (new_state, new_output) = self.inner.check(input, state.clone());
             match new_output.ast {
                 ParseOutcome::Success(()) => {
+                    if new_state.cursor <= state.cursor {
+                        let failure = E::Failure::failure_at(input, state.cursor,
+                            FailureKind::NonGrowingRepetition { inner_hint: self.inner.hint() });
+                        return (
+                            state,
+                            ParseOutput {
+                                ast: ParseOutcome::Fatal(failure),
+                                cst,
+                            },
+                        );
+                    }
+                    // Combine and continue
                     state = new_state;
                     cst = cst.merge_with(new_output.cst);
                     continue;
@@ -91,13 +114,14 @@ where
                         },
                     );
                 }
-                ParseOutcome::Committed(failure) => {
-                    // Propagate committed failure.
+                ast @ ParseOutcome::Committed(_)
+                | ast @ ParseOutcome::Fatal(_) => {
+                    // Propagate committed or fatal failure.
                     return (
                         new_state,
                         ParseOutput {
-                            ast: ParseOutcome::Committed(failure),
-                            cst,
+                            ast,
+                            cst: new_output.cst,
                         },
                     );
                 }

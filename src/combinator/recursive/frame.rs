@@ -183,9 +183,14 @@ impl<'src, C: Clone, E: ParseEnvironment> Clone for RecursiveFrame<'src, C, E> {
     }
 }
 
-/// Newtype around the pointer address of a recursive combinator.
+/// Opaque newtype identifying a recursive combinator within a parse session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) struct RecursiveId(pub(super) *const ());
+pub struct RecursiveId(pub(super) *const ());
+impl RecursiveId {
+    pub fn as_str(&self) -> String {
+        format!("<{:p}>", self.0)
+    }
+}
 
 /// Trait erasure for storing heterogeneous [`ParseOutput<A, E>`] within [`RecursiveFrame`].
 /// Basically a specialty implementation of [`std::any::Any`].

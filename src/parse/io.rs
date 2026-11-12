@@ -1,9 +1,6 @@
 pub use crate::combinator::RecursiveState;
 use crate::{
-    cst::{AssociatedGreenCst, IdSupply},
-    green::GreenInterner,
-    input::Input,
-    parse::ParseEnvironment,
+    cst::{AssociatedGreenCst, IdSupply}, green::GreenInterner, input::Input, parse::ParseEnvironment,
 };
 use std::{cell::RefCell, fmt::Debug, hash::Hash, rc::Rc};
 
@@ -163,7 +160,7 @@ impl<A, E: ParseEnvironment> ParseOutput<A, E> {
             Ok(ast) => Ok(ParseArtifact { ast, cst: self.cst }),
             Err(terminating) => Err(TerminalFailure {
                 terminating: Box::new(terminating),
-                supplemental: self.cst.into_raw_diagnostics(),
+                recovered_diagnostics: self.cst.into_raw_diagnostics(),
             }),
         }
     }
@@ -182,6 +179,11 @@ pub enum ParseOutcome<A, F> {
     /// The combinator system may not try other alternatives.
     /// This failure is propagated outwards until explicitly handled.
     Committed(F),
+    /// Fatal failure.
+    /// This results from combinator system invariant violations.
+    /// The combinator system *must* not resume parsing or catch this error,
+    /// propagating it outwards until it is converted into a top-level parse failure.
+    Fatal(F),
 }
 impl<A, F> ParseOutcome<A, F> {
     /// Converts `self` into a [`Result`], erasing the outcome distinction between speculative and committed failure.
@@ -190,7 +192,9 @@ impl<A, F> ParseOutcome<A, F> {
     pub fn into_result(self) -> Result<A, F> {
         match self {
             ParseOutcome::Success(success) => Ok(success),
-            ParseOutcome::Speculative(failure) | ParseOutcome::Committed(failure) => Err(failure),
+            ParseOutcome::Speculative(failure)
+            | ParseOutcome::Committed(failure)
+            | ParseOutcome::Fatal(failure) => Err(failure),
         }
     }
     /// Transforms the [`Self::Success`] payload via the given closure.
@@ -199,14 +203,16 @@ impl<A, F> ParseOutcome<A, F> {
             ParseOutcome::Success(inner) => ParseOutcome::Success(f(inner)),
             ParseOutcome::Speculative(failure) => ParseOutcome::Speculative(failure),
             ParseOutcome::Committed(failure) => ParseOutcome::Committed(failure),
+            ParseOutcome::Fatal(failure) => ParseOutcome::Fatal(failure),
         }
     }
-    /// Transforms the [`Self::Speculative`] and [`Self::Committed`] failure payloads via the given closure.
+    /// Transforms the [`Self::Speculative`], [`Self::Committed`] and [`Self::Fatal`] failure payloads via the given closure.
     pub fn map_err<F2>(self, f: impl FnOnce(F) -> F2) -> ParseOutcome<A, F2> {
         match self {
             ParseOutcome::Success(inner) => ParseOutcome::Success(inner),
             ParseOutcome::Speculative(failure) => ParseOutcome::Speculative(f(failure)),
             ParseOutcome::Committed(failure) => ParseOutcome::Committed(f(failure)),
+            ParseOutcome::Fatal(failure) => ParseOutcome::Fatal(f(failure)),
         }
     }
 }
@@ -220,7 +226,7 @@ pub struct TerminalFailure<T> {
     /// The main parse failure that caused termination of parsing.
     pub terminating: Box<T>,
     /// Supplemental diagnostics from normal parsing prior to termination.
-    pub supplemental: Vec<T>,
+    pub recovered_diagnostics: Vec<T>,
 }
 
 /// The top-level payload of a successful parse.

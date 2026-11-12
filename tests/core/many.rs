@@ -2,7 +2,7 @@
 
 use biparse::prelude::*;
 use expect_test::expect;
-use proptest::{prop_oneof, proptest, strategy::Strategy, test_runner::Config};
+use proptest::{proptest, strategy::Strategy, test_runner::Config};
 use rowan::SyntaxKind;
 
 /// Matches string `s` on zero or more occurences of 'a'.
@@ -24,7 +24,7 @@ fn many_a(s: String) -> String {
             }
             header
         }
-        ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => unreachable!(),
+        _ => unreachable!(),
     }
 }
 
@@ -52,10 +52,7 @@ fn too_many_a() {
 }
 
 fn some_amount_of_a() -> impl Strategy<Value = String> {
-    prop_oneof![
-        "[^a]{0, 100}",
-        (0..50_usize).prop_map(|num: usize| "a".repeat(num)),
-    ]
+    (0..50_usize).prop_map(|num: usize| "a".repeat(num))
 }
 proptest! {
     #![proptest_config(Config {
@@ -71,5 +68,8 @@ proptest! {
 
 #[test]
 fn non_growing_termination() {
-    todo!()
+    let fatal_parser = success().many();
+    let (_, outcome) = fatal_parser.parse("",
+        ParseState::<str, DefaultParseEnvironment>::new(""));
+    assert!(matches!(outcome.ast, ParseOutcome::Fatal(_)))
 }

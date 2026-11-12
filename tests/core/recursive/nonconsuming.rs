@@ -45,7 +45,7 @@ proptest! {
             &s,
             ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
-        assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
+        assert!(matches!(result.ast, ParseOutcome::Fatal(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 
@@ -61,7 +61,7 @@ proptest! {
             &s,
             ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
-        assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
+        assert!(matches!(result.ast, ParseOutcome::Fatal(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 }

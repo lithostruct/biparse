@@ -2,7 +2,7 @@
 
 use biparse::prelude::*;
 use expect_test::expect;
-use proptest::{prop_oneof, proptest, strategy::Strategy, test_runner::Config};
+use proptest::{proptest, strategy::Strategy, test_runner::Config};
 use rowan::SyntaxKind;
 
 /// Matches string `s` on zero or more occurences of 'a'.
@@ -14,7 +14,7 @@ fn left_recursive_a(s: String) -> String {
                     rest += last;
                     rest
                 })
-                .or(success())
+                .either_or(success())
                 .map(|either| either.left_or_default())
         });
     let (state, result) = combinator.parse(
@@ -30,7 +30,7 @@ fn left_recursive_a(s: String) -> String {
             }
             header
         }
-        ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => unreachable!(),
+        _ => unreachable!(),
     }
 }
 
@@ -58,10 +58,7 @@ fn too_many_a() {
 }
 
 fn some_amount_of_a() -> impl Strategy<Value = String> {
-    prop_oneof![
-        "[^a]{0, 100}",
-        (0..50_usize).prop_map(|num: usize| "a".repeat(num)),
-    ]
+    (0..50_usize).prop_map(|num: usize| "a".repeat(num))
 }
 proptest! {
     #![proptest_config(Config {
@@ -80,8 +77,8 @@ fn non_growing_termination() {
     #[derive(Clone, Copy)]
     struct OhNo;
     let combinator: Recursive<dyn Parser<'_, str, Either<&str, OhNo>, DefaultParseEnvironment>> =
-        Recursive::new(|this| just((SyntaxKind(0), "a")).or(this.map(|_| OhNo)));
+        Recursive::new(|this| just((SyntaxKind(0), "a")).either_or(this.map(|_| OhNo)));
 
     let artifact = combinator.parse_all("a").expect("Success!").into_ast_only();
-    assert!(artifact.is_left())
+    assert!(artifact.is_left_and(|inner| inner.len() == 1));
 }

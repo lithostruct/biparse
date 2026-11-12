@@ -1,3 +1,5 @@
+//! Testing of the correctness of the core combinators offered by Biparse.
+
 mod end;
 mod fail;
 mod just;

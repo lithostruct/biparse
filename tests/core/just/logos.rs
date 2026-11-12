@@ -246,7 +246,7 @@ where
 
     let terminal = num
         .clone()
-        .or_same(
+        .or(
             just(Kind::LeftParen)
                 .ignore_then(expr.clone())
                 .then_ignore(just(Kind::RightParen)),
@@ -263,7 +263,7 @@ where
                     right,
                 })
             })
-            .or_same(terminal)
+            .or(terminal)
     });
 
     let add = Recursive::new_as("addition", |this| {
@@ -276,7 +276,7 @@ where
                     right,
                 })
             })
-            .or_same(mult)
+            .or(mult)
     });
 
     expr.define(add);

@@ -122,7 +122,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
 
     let null = just((Kind::Null, "null")).map(|_| Json::Null);
     let boolean = just((Kind::True, "true"))
-        .or(just((Kind::False, "false")))
+        .either_or(just((Kind::False, "false")))
         .map(|either: Either<&str, &str>| Json::Boolean(either.is_left()));
 
     // Simplifying assumption:
@@ -219,11 +219,11 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
 
     // Finally!
     value.define(
-        null.or_same(boolean)
-            .or_same(string.map(Json::String))
-            .or_same(number.map(Json::Number))
-            .or_same(array)
-            .or_same(object),
+        null.or(boolean)
+            .or(string.map(Json::String))
+            .or(number.map(Json::Number))
+            .or(array)
+            .or(object),
     );
 
     // Strip leading and trailing whitespace

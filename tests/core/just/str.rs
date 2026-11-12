@@ -27,7 +27,7 @@ fn char_a(s: String) -> Option<String> {
             assert_eq!(state.cursor.into_usize(), 0);
             None
         }
-        ParseOutcome::Committed(_) => unreachable!(),
+        _ => unreachable!(),
     }
 }
 proptest! {
@@ -53,7 +53,7 @@ fn str_a(s: String) -> Option<String> {
             assert_eq!(state.cursor.into_usize(), 0);
             None
         }
-        ParseOutcome::Committed(_) => unreachable!(),
+        _ => unreachable!(),
     }
 }
 
@@ -84,7 +84,7 @@ proptest! {
             ParseOutcome::Speculative(_) => {
                 assert_eq!(state.cursor.into_usize(), 0);
             }
-            ParseOutcome::Committed(_) => unreachable!(),
+            _ => unreachable!(),
         }
     }
     /// Tests that well-formed `Just` string patterns are non-panicking.
@@ -105,7 +105,7 @@ proptest! {
             ParseOutcome::Speculative(_) => {
                 assert_eq!(state.cursor.into_usize(), 0);
             }
-            ParseOutcome::Committed(_) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }

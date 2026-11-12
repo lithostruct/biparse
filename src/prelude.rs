@@ -12,6 +12,7 @@ pub use crate::{
     },
 };
 pub use either::Either;
+pub use rowan::SyntaxKind;
 
 #[cfg(feature = "logos")]
 pub use crate::input::logos::{LexerStream, WithText};

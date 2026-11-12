@@ -50,7 +50,9 @@ impl SExp {
                     acc.merge_with(child.to_cst(interner, supply))
                 });
                 if let Some(supply) = supply {
-                    forest.associate_new_parent(*kind, supply.next_id(), interner)
+                    let fresh_id = supply.next_id();
+                    forest.associate_new_parent(*kind, fresh_id, interner)
+                        .diagnose_root_at(0, fresh_id, ())
                 } else {
                     forest.attach_parent(*kind, interner)
                 }
@@ -117,7 +119,7 @@ impl SExp {
                 ))
                 .into_owned()
                 .map(SExp::Symbol)
-                .or_same(
+                .or(
                     // recursive case:
                     // list ::= '(' u16 (this)* ')'
                     just((SyntaxKind(1), '('))
@@ -165,7 +167,7 @@ impl rowan::Language for Lang {
     }
 }
 
-pub fn arbitrary_sexp() -> impl Strategy<Value = SExp> {
+pub fn sexp_strategy() -> impl Strategy<Value = SExp> {
     let symbol = r"[a-zA-Z][a-zA-Z0-9_-]{0,15}".prop_map(SExp::Symbol);
     let kind = any::<u16>().prop_map(|inner| SyntaxKind(inner.saturating_sub(1)));
     symbol.prop_recursive(8, 256, 10, move |inner| {
@@ -304,7 +306,7 @@ fn sexp_roundtrip() {
 
 proptest! {
     #[test]
-    fn sexp_arb_roundtrip(sexp in arbitrary_sexp()) {
+    fn sexp_arb_roundtrip(sexp in sexp_strategy()) {
         assert_eq!(sexp, SExp::from_str(&sexp.to_text()).unwrap())
     }
 }

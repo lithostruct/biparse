@@ -18,7 +18,7 @@ enum SExp {
 
 struct IdParseEnvironment;
 impl ParseEnvironment for IdParseEnvironment {
-    type Failure = biparse::failure::Simple;
+    type Failure = biparse::failure::Rich;
     type Supply = biparse::cst::NewtypeSupply<Id>;
     type ErrorSupply = usize;
 }
@@ -64,7 +64,7 @@ where
         just((Kind::String, regex::Regex::new(r"[a-zA-Z0-9_-]+").unwrap()))
             .into_owned()
             .associate(Kind::Symbol, SExp::Symbol)
-            .or_same(
+            .or(
                 just((Kind::LeftParen, "("))
                     .ignore_then(this.many())
                     .then_ignore(just((Kind::RightParen, ")")))

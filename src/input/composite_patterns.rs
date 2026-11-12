@@ -7,9 +7,35 @@ use crate::{
 };
 
 /// Token matching for any `Input` type.
+/// 
+/// While it is preferred to use `Input`-specific `Pattern` implementors,
+/// this provides a way to work with any `Input` implementor.
+/// This may be helpful for downstream implementations.
+/// 
+/// `K` should be `Into<rowan::SyntaxKind>`, and
+/// `P` should be a closure or function implementing `Fn(&I::Token<'src>) -> bool`
+/// for some [`Input`] implementor `I` over some lifetime `'src`.
+/// 
+/// # Note on Type Inference
+/// 
+/// Due to type inference limitations, an annotation on the closure argument is typically required,
+/// especially if the argument is unused.
+/// 
+/// A common usage pattern where this limitation arises is in the predicate function that always returns true or false.
+/// 
+/// ```
+/// use biparse::{input::Matches, prelude::*};
+/// 
+/// // Matches any character in a `str` input.
+/// let parser : Box<dyn Parser<'_, str, char, DefaultParseEnvironment>> = 
+///     just(Matches(SyntaxKind(1), |_ : &char| true)).boxed();
+///                                   /* ^ type annotation required here! */
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, AsRef, AsMut)]
 pub struct Matches<K, P>(
-    K,
+    /// The syntax kind corresponding to a successful match. Fixed.
+    pub K,
+    /// A token predicate. Meaningful for `P : Fn(&I::Token<'src>) -> bool` for some `I : Input` only.
     #[as_ref]
     #[as_mut]
     pub P,

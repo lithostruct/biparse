@@ -32,7 +32,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         let (state, output) = self.0.parse(input, state);
         match output.ast {
-            ParseOutcome::Success(_) | ParseOutcome::Committed(_) => (state, output),
+            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => (state, output),
             ParseOutcome::Speculative(failure) => (
                 state,
                 ParseOutput {
@@ -50,7 +50,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let (state, output) = self.0.check(input, state);
         match output.ast {
-            ParseOutcome::Success(_) | ParseOutcome::Committed(_) => (state, output),
+            ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => (state, output),
             ParseOutcome::Speculative(failure) => (
                 state,
                 ParseOutput {
@@ -121,7 +121,7 @@ where
         let (state, output) = self.fallible.parse(input, state);
         // Catching committed failure.
         let failure = match output.ast {
-            ParseOutcome::Success(_) | ParseOutcome::Speculative(_) => return (state, output),
+            ParseOutcome::Success(_) | ParseOutcome::Speculative(_) | ParseOutcome::Fatal(_) => return (state, output),
             ParseOutcome::Committed(failure) => failure,
         };
 
@@ -143,7 +143,7 @@ where
                     recovery_state,
                     ParseOutput {
                         ast: ParseOutcome::Success(recovery_payload),
-                        cst: recovered_cst,
+                        cst: output.cst.merge_with(recovered_cst),
                     },
                 )
             }
@@ -154,6 +154,16 @@ where
                     recovery_state,
                     ParseOutput {
                         ast: ParseOutcome::Committed(failure.supplement(recovery_failure)),
+                        cst: recovery_output.cst,
+                    },
+                )
+            }
+            ParseOutcome::Fatal(recovery_failure) => {
+                // Bigger fish to fry. Report this error as principal.
+                (
+                    recovery_state,
+                    ParseOutput {
+                        ast: ParseOutcome::Fatal(recovery_failure.supplement(failure)),
                         cst: recovery_output.cst,
                     },
                 )

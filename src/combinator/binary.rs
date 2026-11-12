@@ -5,7 +5,6 @@ use crate::{
     input::Input,
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
-use either::Either;
 
 /// Parser combinator that sequentially executes two parsers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,7 +37,9 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(A, B), E>) {
         let (state, first_result) = self.first.parse(input, state);
         let payload_a = match first_result.ast {
-            ast @ ParseOutcome::Speculative(_) | ast @ ParseOutcome::Committed(_) => {
+            ast @ ParseOutcome::Speculative(_)
+            | ast @ ParseOutcome::Committed(_)
+            | ast @ ParseOutcome::Fatal(_) => {
                 // Do not continue, exit with error.
                 let typed_result = ast.map(|_| unreachable!("In failure!") as (A, B));
                 return (
@@ -55,7 +56,9 @@ where
         let (state, second_result) = self.second.parse(input, state);
         let cst_union = first_result.cst.merge_with(second_result.cst);
         match second_result.ast {
-            ast @ ParseOutcome::Speculative(_) | ast @ ParseOutcome::Committed(_) => {
+            ast @ ParseOutcome::Speculative(_)
+            | ast @ ParseOutcome::Committed(_)
+            | ast @ ParseOutcome::Fatal(_) => {
                 // Discard payload_a, exit with error.
                 let typed_result = ast.map(|_| unreachable!("In failure!") as (A, B));
                 (
@@ -85,7 +88,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let (state, first_result) = self.first.check(input, state);
         match &first_result.ast {
-            ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => {
+            ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 return (state, first_result);
             }
             ParseOutcome::Success(()) => (),
@@ -105,39 +108,35 @@ pub struct Or<First, Second> {
     second: Second,
 }
 impl<First, Second> Or<First, Second> {
-    pub fn new<'src, I: Input + ?Sized, A, B, E: ParseEnvironment>(
+    pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         first: First,
         second: Second,
     ) -> Self
     where
         First: Parser<'src, I, A, E>,
-        Second: Parser<'src, I, B, E>,
+        Second: Parser<'src, I, A, E>,
     {
         Or { first, second }
     }
 }
-impl<'src, I: Input + ?Sized, First, Second, A, B, E: ParseEnvironment>
-    Parser<'src, I, Either<A, B>, E> for Or<First, Second>
+impl<'src, I: Input + ?Sized, First, Second, A, E: ParseEnvironment>
+    Parser<'src, I, A, E> for Or<First, Second>
 where
     First: Parser<'src, I, A, E>,
-    Second: Parser<'src, I, B, E>,
+    Second: Parser<'src, I, A, E>,
 {
     fn parse(
         &self,
         input: &'src I,
         state: ParseState<'src, I, E>,
-    ) -> (ParseState<'src, I, E>, ParseOutput<Either<A, B>, E>) {
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         let (first_state, first_result) = self.first.parse(input, state.clone());
         let first_speculative_error = match first_result.ast {
-            ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
+            ParseOutcome::Success(_)
+            | ParseOutcome::Committed(_)
+            | ParseOutcome::Fatal(_) => {
                 // Early termination.
-                return (
-                    first_state,
-                    ParseOutput {
-                        ast: ast.map(Either::Left),
-                        cst: first_result.cst,
-                    },
-                );
+                return (first_state, first_result);
             }
             // Continue.
             ParseOutcome::Speculative(error) => error,
@@ -145,15 +144,11 @@ where
 
         let (second_state, second_result) = self.second.parse(input, state.clone());
         let second_speculative_error = match second_result.ast {
-            ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
+            ParseOutcome::Success(_)
+            | ParseOutcome::Committed(_)
+            | ParseOutcome::Fatal(_) => {
                 // Termination, discard first speculative error.
-                return (
-                    second_state,
-                    ParseOutput {
-                        ast: ast.map(Either::Right),
-                        cst: second_result.cst,
-                    },
-                );
+                return (second_state, second_result);
             }
             // Continue.
             ParseOutcome::Speculative(error) => error,
@@ -177,22 +172,24 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        let (first_state, mut first_result) = self.first.check(input, state.clone());
+        let (first_state, first_result) = self.first.check(input, state.clone());
         let first_speculative_error = match first_result.ast {
-            ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
+            ParseOutcome::Success(_)
+            | ParseOutcome::Committed(_)
+            | ParseOutcome::Fatal(_) => {
                 // Early termination.
-                first_result.ast = ast;
                 return (first_state, first_result);
             }
             // Continue.
             ParseOutcome::Speculative(error) => error,
         };
 
-        let (second_state, mut second_result) = self.second.check(input, state.clone());
+        let (second_state, second_result) = self.second.check(input, state.clone());
         let second_speculative_error = match second_result.ast {
-            ast @ ParseOutcome::Success(_) | ast @ ParseOutcome::Committed(_) => {
+            ParseOutcome::Success(_)
+            | ParseOutcome::Committed(_)
+            | ParseOutcome::Fatal(_) => {
                 // Termination, discard first speculative error.
-                second_result.ast = ast;
                 return (second_state, second_result);
             }
             // Continue.

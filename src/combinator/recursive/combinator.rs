@@ -11,7 +11,7 @@ use crate::{
         recursive::frame::{ErasedOutput, RecursiveFrame, RecursiveId},
     },
     cst::AssociatedGreenCst,
-    failure::{FailureKind, ParseFailure},
+    failure::{FailureKind, ParseFailure, UnboundedRecursion},
     input::Input,
     parse::{
         ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, ParseStateData, Parser,
@@ -94,7 +94,9 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
 }
 
 impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p, 'src, I, A, E>> {
-    /// Declares a new recursive combinator.
+    /// Declares a new recursive combinator to be later defined.
+    /// 
+    /// Attempting a parse with a declared but undefined recursive parser results in a fatal error.
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
     /// and a named object is required to define mutual recursion between related combinators.
@@ -107,8 +109,10 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
             description: None,
         }
     }
-    /// Declares a new recursive combinator with the given name.
+    /// Declares a new recursive combinator to be later defined, with the given name.
     /// Combinator names are used for error reporting and better diagnostics.
+    /// 
+    /// Attempting a parse with a declared but undefined recursive parser results in a fatal error.
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
     /// and a named object is required to define mutual recursion between related combinators.
@@ -317,12 +321,13 @@ macro_rules! recursive_growth {
                         // No need to record failure dependency, because either:
                         // - speculative failure: replaced by alternative, or propagated.
                         // - committed failure: propagated, seed value not used.
-                        let failure = E::Failure::failure_at(
+                        let failure = E::Failure::unbounded_recursion(
                             input,
                             state.cursor,
-                            FailureKind::UnboundedRecursion {
-                                name: this.description.as_ref().map(|s| s.clone().into_owned())
-                            },
+                            UnboundedRecursion {
+                                name: this.description.clone(),
+                                from: this.recursive_id()
+                            }
                         );
 
                         // Overwrite seed state's recursive state with that discovered from the current state.
@@ -368,7 +373,7 @@ macro_rules! recompute {
                 diagnostic_name: this.diagnostic_name(),
                 allocation_store: Box::new(this.inner.as_weak()),
                 seed_result: None,
-                active_fixpoint: true,
+                active_fixpoint: false,
                 dependencies: im::Vector::new(),
                 generation: 0,
             });
@@ -381,14 +386,32 @@ macro_rules! recompute {
 
         // Check if the initial sprout encountered failures.
         // If yes, there is no point in seed growing, and the failure should be propagated.
-        let (mut sprout_state, sprout_result) = parser.$method(input, seed_state);
+        let (mut sprout_state, mut sprout_result) = parser.$method(input, seed_state);
         match &sprout_result.ast {
-            ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => {
+            ParseOutcome::Speculative(failure)
+            | ParseOutcome::Committed(failure) => {
                 // failure to sprout.
+                sprout_state.recursive_state.current_enclosing = outer_enclosure;
+                sprout_state.recursive_state.current_dependencies = outer_dependencies;
+
+                // check if the failure is due to unbounded recursion. If yes, promote.
+                if failure.is_unbounded_recursion_at(input, state.cursor, UnboundedRecursion {
+                    name: this.description.clone(),
+                    from: this.recursive_id()
+                }) {
+                    // Unbounded recursion identified as primary failure mode.
+                    sprout_result.ast = ParseOutcome::Fatal(failure.clone());
+                }
+
+                return (sprout_state, sprout_result);
+            }
+            ParseOutcome::Fatal(_) => {
+                // fatal failure to sprout.
                 sprout_state.recursive_state.current_enclosing = outer_enclosure;
                 sprout_state.recursive_state.current_dependencies = outer_dependencies;
                 return (sprout_state, sprout_result);
             }
+
             // Succcessful seed.
             // Any speculative errors now would be an indication to halt.
             // Committed errors should still be propagated though.
@@ -403,6 +426,7 @@ macro_rules! recompute {
             let mut frame = rec_seed_state.recursive_state
                 .get_mut(this.recursive_id(), state.cursor).cloned()
                 .expect("Frame must have been allocated from above!");
+            frame.active_fixpoint = true;
             frame.seed_result = Some((rec_seed_state.clone(), rec_seed_result.clone_erased()));
             frame.dependencies = rec_seed_state.recursive_state.current_dependencies.clone();
             frame.generation += 1;
@@ -448,7 +472,7 @@ macro_rules! recompute {
                     // It's time to stop.
                     break (rec_seed_state, rec_seed_result);
                 }
-                ParseOutcome::Committed(_) => {
+                ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                     // Propagate failure.
                     break (next_sprout_state, next_sprout_result);
                 }
@@ -471,6 +495,7 @@ macro_rules! recompute {
 }
 impl<P: ?Sized> Recursive<P> {
     /// Invariant: self at this cursor must not be actively participating in fixpoint calculation.
+    #[inline]
     fn entry_is_stale_or_absent<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         &self,
         cursor: I::Cursor,
@@ -537,6 +562,7 @@ where
     P: Parser<'src, I, A, E>,
     A: Clone + 'static,
 {
+    #[inline(always)]
     fn parse(
         &self,
         input: &'src I,
@@ -550,6 +576,8 @@ where
                 .parse(input, state),
         }
     }
+
+    #[inline(always)]
     fn check(
         &self,
         input: &'src I,
@@ -569,40 +597,47 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E>
 where
     A: Clone + 'static,
 {
+    #[inline(always)]
     fn parse(
         &self,
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
-        self.inner
-            .get()
-            .unwrap_or_else(|| {
-                panic!(
-                    "Called Parser::parse on undefined combinator{}!",
-                    self.description
-                        .as_ref()
-                        .map(|s| format!(" '{s}'"))
-                        .unwrap_or("".into())
-                )
-            })
-            .parse(input, state)
+        match self.inner.get(){
+            Some(parser) => parser.parse(input, state),
+            None => {
+                let failure = E::Failure::failure_at(input, state.cursor, 
+                    FailureKind::UndefinedParser {
+                        name: self.description.clone()
+                    }
+                );
+                (state, ParseOutput {
+                    ast: ParseOutcome::Fatal(failure),
+                    cst: AssociatedGreenCst::new(),
+                })
+            },
+        }
     }
+
+    #[inline(always)]
     fn check(
         &self,
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        self.inner
-            .get()
-            .unwrap_or_else(|| {
-                panic!(
-                    "Called Parser::check on undefined combinator{}!",
-                    self.description
-                        .as_ref()
-                        .map(|s| format!(" '{s}'"))
-                        .unwrap_or("".into())
-                )
-            })
-            .check(input, state)
+        match self.inner.get(){
+            Some(parser) => parser.check(input, state),
+            None => {
+                let failure = E::Failure::failure_at(input, state.cursor, 
+                    FailureKind::UndefinedParser {
+                        name: self.description.clone()
+                    }
+                );
+                (state, ParseOutput {
+                    ast: ParseOutcome::Fatal(failure),
+                    cst: AssociatedGreenCst::new(),
+                })
+            },
+        }
     }
 }

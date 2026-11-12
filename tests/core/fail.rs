@@ -48,7 +48,7 @@ proptest! {
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         let (state2, result2): (_, ParseOutput<Either<(), &str>, DefaultParseEnvironment>)
             = fail()
-                .or(just((SyntaxKind(kind), pattern)))
+                .either_or(just((SyntaxKind(kind), pattern)))
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         match (result1.ast, result2.ast) {
@@ -72,7 +72,7 @@ proptest! {
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         let (state2, result2): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern))
-                .or(fail())
+                .either_or(fail())
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         match (result1.ast, result2.ast) {

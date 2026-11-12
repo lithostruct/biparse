@@ -116,9 +116,9 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         With::new(Then::new(self, next))
     }
     /// Chains `self` as an alternative, falling through to the second parser.
-    fn or<P, B>(self, other: P) -> With<E, Or<Self, P>>
+    fn or<P>(self, other: P) -> With<E, Or<Self, P>>
     where
-        P: Parser<'src, I, B, E>,
+        P: Parser<'src, I, A, E>,
         Self: Sized,
     {
         With::new(Or::new(self, other))
@@ -197,11 +197,11 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         })
     }
     /// Chains `self` to match on zero or one occurence, returning [`Option<A>`].
-    fn optional(self) -> composite::Optional<'src, I, A, E, Self>
+    fn optional(self) -> composite::Optional<'src, Self, I, A, E>
     where
         Self: Sized,
     {
-        self.or(success()).map(Either::left)
+        self.either_or(success()).map(Either::left)
     }
 
     /// Chains `self` to attempt fallible mapping on the success payload,
@@ -271,14 +271,14 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Speculatively parses `self` and the given parser.
-    /// Both parsers are of the same type,
-    /// and the resulting [`Either<A, A>`] is converted to an `A` payload.
-    fn or_same<P>(self, other: P) -> composite::OrSame<E, Self, P, A>
+    /// Unlike [`Self::or`], the payloads of `self` and `other` may be different,
+    /// producing an [`Either<A, B>`] payload.
+    fn either_or<P, B>(self, other: P) -> composite::EitherOr<E, Self, P, A, B>
     where
-        P: Parser<'src, I, A, E>,
+        P: Parser<'src, I, B, E>,
         Self: Sized,
     {
-        self.or(other).map(Either::into_inner)
+        self.map(Either::Left as fn(A) -> Either<A, B>).or(other.map(Either::Right))
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E> for T where
@@ -297,10 +297,10 @@ pub mod composite {
 
     pub type Some<E, P, A> =
         With<E, Map<With<E, Then<P, With<E, Many<P>>>>, fn((A, Vec<A>)) -> Vec<A>, (A, Vec<A>)>>;
-    pub type Optional<'src, I, A, E, P> = With<
+    pub type Optional<'src, SELF, I, A, E> = With<
         E,
         Map<
-            With<E, Or<P, As<'src, I, (), E, Success>>>,
+            composite::EitherOr<E, SELF, As<'src, I, (), E, Success>, A, ()>,
             fn(Either<A, ()>) -> Option<A>,
             Either<A, ()>,
         >,
@@ -310,8 +310,11 @@ pub mod composite {
     pub type ThenIgnore<E, L, R, A, B> = With<E, Map<With<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
     pub type IgnoreThen<E, L, R, A, B> = With<E, Map<With<E, Then<L, R>>, fn((A, B)) -> B, (A, B)>>;
 
-    pub type OrSame<E, L, R, A> =
-        With<E, Map<With<E, Or<L, R>>, fn(Either<A, A>) -> A, Either<A, A>>>;
+    pub type EitherOr<E, L, R, A, B> =
+        With<E, Or<
+            With<E, Map<L, fn(A) -> Either<A, B>, A>>,
+            With<E, Map<R, fn(B) -> Either<A, B>, B>>,
+        >>;
 }
 
 /// Convenience trait for [`.into_owned()`](Self::into_owned) method chaining.

@@ -151,7 +151,7 @@ where
                     ParseOutcome::Committed(E::Failure::custom_failure_at(input, state.cursor, e))
                 }
             },
-            ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => {
+            ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 output.ast.map(|_| unreachable!() as B)
             }
         };

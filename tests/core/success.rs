@@ -51,7 +51,7 @@ proptest! {
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         let (state2, result2): (_, ParseOutput<Either<(), &str>, DefaultParseEnvironment>)
             = success()
-                .or(just((SyntaxKind(kind), pattern)))
+                .either_or(just((SyntaxKind(kind), pattern)))
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         assert_eq!(result1, result2);
         assert_eq!(state1.cursor, state2.cursor);
@@ -64,7 +64,7 @@ proptest! {
         // so this is more of a stress test than anything.
         let (state, result): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern.clone()))
-                .or(success())
+                .either_or(success())
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         let ParseOutcome::Success(inner) = result.ast else {panic!()};

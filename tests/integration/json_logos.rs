@@ -141,7 +141,7 @@ where
 
     let null = just(Kind::Null).map(|_| Json::Null);
     let boolean = just(Kind::True)
-        .or(just(Kind::False))
+        .either_or(just(Kind::False))
         .map(|either| Json::Boolean(either.is_left()));
 
     // Simplifying assumption:
@@ -218,11 +218,11 @@ where
         .named("object", Kind::Object);
 
     value.define(
-        null.or_same(boolean)
-            .or_same(string.map(Json::String))
-            .or_same(number.map(Json::Number))
-            .or_same(array)
-            .or_same(object),
+        null.or(boolean)
+            .or(string.map(Json::String))
+            .or(number.map(Json::Number))
+            .or(array)
+            .or(object),
     );
 
     value

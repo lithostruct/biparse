@@ -2,7 +2,7 @@
 
 use biparse::prelude::*;
 use expect_test::expect;
-use proptest::{prop_oneof, proptest, strategy::Strategy, test_runner::Config};
+use proptest::{proptest, strategy::Strategy, test_runner::Config};
 use rowan::SyntaxKind;
 
 /// Matches string `s` on zero or more occurences of 'a'.
@@ -15,8 +15,8 @@ fn right_recursive_a(s: String) -> String {
                     rest.insert_str(0, first);
                     rest
                 })
-                .or(success())
-                .map(|either| either.map_right(|_| String::new()).into_inner())
+                .either_or(success())
+                .map(Either::left_or_default)
         });
     let (state, result) = combinator.parse(
         &s,
@@ -31,7 +31,7 @@ fn right_recursive_a(s: String) -> String {
             }
             header
         }
-        ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) => unreachable!(),
+        _ => unreachable!(),
     }
 }
 
@@ -52,7 +52,7 @@ fn other_string() {
     expect![""].assert_eq(&right_recursive_a("lorem ipsum dolor sit amet".to_string()));
 }
 
-/// Regression:
+/// # Regression:
 ///
 /// Previous versions of the seed-growing algorithm discard each fixpoint growth after its invocation,
 /// and the seed and growth phases ran at least twice, leading to recurrence relation:
@@ -66,11 +66,13 @@ fn too_many_a() {
     expect!["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"].assert_eq(&right_recursive_a("a".repeat(30)));
 }
 
+/// # Note:
+/// 
+/// The maximum value that is proptest-ed here is lower than that of left-recursion and repetition (50).
+/// This is because right-recursion inherently consumes unbounded stack space,
+/// which means that the more complex the inner body, the more likely stack overflow becomes.
 fn some_amount_of_a() -> impl Strategy<Value = String> {
-    prop_oneof![
-        "[^a]{0, 100}",
-        (0..50_usize).prop_map(|num: usize| "a".repeat(num)),
-    ]
+    (0..30_usize).prop_map(|num: usize| "a".repeat(num))
 }
 proptest! {
     #![proptest_config(Config {

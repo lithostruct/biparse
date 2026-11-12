@@ -7,7 +7,7 @@ use biparse::{
 use proptest::{arbitrary::any, proptest};
 use rowan::{GreenNode, SyntaxKind};
 
-use super::arbitrary_sexp;
+use super::sexp_strategy;
 
 #[test]
 fn zero_identity() {
@@ -19,7 +19,7 @@ fn zero_identity() {
 
 proptest! {
     #[test]
-    fn left_identity(sexp in arbitrary_sexp()) {
+    fn left_identity(sexp in sexp_strategy()) {
         let mut supply = Some(0_usize);
         let left = AssociatedGreenCst::new();
         let right = sexp.to_cst(&mut GreenInterner::new(), &mut supply);
@@ -28,7 +28,7 @@ proptest! {
     }
 
     #[test]
-    fn right_identity(sexp in arbitrary_sexp()) {
+    fn right_identity(sexp in sexp_strategy()) {
         let mut supply = Some(0_usize);
         let left = sexp.to_cst(&mut GreenInterner::new(), &mut supply);
         let right = AssociatedGreenCst::new();
@@ -37,7 +37,7 @@ proptest! {
     }
 
     #[test]
-    fn associativity(s1 in arbitrary_sexp(), s2 in arbitrary_sexp(), s3 in arbitrary_sexp()) {
+    fn associativity(s1 in sexp_strategy(), s2 in sexp_strategy(), s3 in sexp_strategy()) {
         let mut interner = GreenInterner::new();
         let mut supply = Some(0_usize);
         let a = s1.to_cst(&mut interner, &mut supply);
@@ -51,7 +51,7 @@ proptest! {
     }
 
     #[test]
-    fn merge_conserves_paths(s1 in arbitrary_sexp(), s2 in arbitrary_sexp()) {
+    fn merge_conserves_paths(s1 in sexp_strategy(), s2 in sexp_strategy()) {
         let mut interner = GreenInterner::new();
         let mut supply = Some(0_usize);
         let a = s1.to_cst(&mut interner, &mut supply);
@@ -73,7 +73,7 @@ proptest! {
     }
 
     #[test]
-    fn attachment_conserves_paths(sexp in arbitrary_sexp(), u in any::<u16>()) {
+    fn attachment_conserves_paths(sexp in sexp_strategy(), u in any::<u16>()) {
         let mut interner = GreenInterner::new();
         let mut supply = Some(0_usize);
         let cst = sexp.to_cst(&mut interner, &mut supply);

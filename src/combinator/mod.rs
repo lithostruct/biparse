@@ -11,6 +11,8 @@ mod primitive;
 mod recursive;
 mod repetition;
 
+use std::borrow::Cow;
+
 use crate::{
     input::{Input, Pattern},
     parse::ParseEnvironment,
@@ -26,7 +28,7 @@ pub use self::{
     primitive::{End, Fail, Success},
     recursive::{
         combinator::{Direct, Indirect, Recursive},
-        frame::RecursiveState,
+        frame::{RecursiveState, RecursiveId},
     },
     repetition::Many,
 };
@@ -37,7 +39,10 @@ pub fn success<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, ()
     As::from(Success)
 }
 pub fn fail<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, Fail> {
-    As::from(Fail)
+    As::from(Fail::new())
+}
+pub fn fail_with<'src, I: Input + ?Sized, E: ParseEnvironment>(msg: impl Into<Cow<'static, str>>) -> As<'src, I, (), E, Fail> {
+    As::from(Fail::new_with(msg))
 }
 pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, End> {
     As::from(End)
