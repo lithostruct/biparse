@@ -3,6 +3,9 @@ title = "Biparse Documentation"
 authors = ["GiveMe30Dollars"]
 language = "en"
 
+[rust]
+edition = "2024"
+
 [output.html]
 mathjax-support = true
 playground.runnable = false

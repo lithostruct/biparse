@@ -2,10 +2,11 @@
 
 mod input_trait;
 
-mod cached_str;
 mod composite_patterns;
 mod matches;
-mod skipping_str;
+
+pub mod cached_str;
+pub mod skipping_str;
 pub mod str;
 
 pub use self::{

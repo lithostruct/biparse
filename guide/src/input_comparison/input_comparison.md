@@ -18,22 +18,38 @@ All `Pattern<'_, I>` implementors may use `AllOf` and `AnyOf` to compose sequent
 
 ## Note on Lifetime-Bound Inputs
 
-Due to the constructed parser object capturing the lifetime of the input in its `I: Input` field, it *must* be deallocated before the input object itself. This also means that following Rust's default drop order, the input object should be constructed *before* the parser object.
+Due to the constructed parser object capturing the lifetime of the input in its `I: Input` field, it *must* be deallocated before the input object itself.
 
-This is particularly relevant of `str`-derived input types [`CachedStr`](./1_input_str.md/#variant-cachedstrsource) and [`SkippingStr`](./3_input_skippingstr.md). This won't compile:
+This also means that following Rust's default drop order, the input object should be constructed *before* the parser object. This is particularly relevant of `str`-derived input types [`CachedStr`](./1_input_str.md/#variant-cachedstrsource) and [`SkippingStr`](./3_input_skippingstr.md), which are constructed from `&str` references.
 
-```rs,compile_fail
+Rather counterintuitively, this won't compile:
+
+```rust,ignore
+extern crate biparse;
 use biparse::{
     prelude::*,
     input::skipping_str::SkippingStr,
 };
+use std::rc::Rc;
 
 struct Ast {
     // ...
 }
-
+```
+```rust,ignore
 fn parse(text: &str) {
-    let parser : Rc<dyn Parser<'_, SkippingStr<'_>, Ast, DefaultParseEnvironment>> = todo!();
-    parser.parse_all(SkippingStr::whitespace(text))
+    let parser : Rc<dyn Parser<'_, SkippingStr<'_>, Ast, DefaultParseEnvironment>> = /* ... */ ;
+    let input = SkippingStr::whitespace(text, SyntaxKind(0));
+    parser.parse_all(&input);
+}
+```
+
+But this will:
+
+```rust,ignore
+fn parse(text: &str) {
+    let input = SkippingStr::whitespace(text, SyntaxKind(0));
+    let parser : Rc<dyn Parser<'_, SkippingStr<'_>, Ast, DefaultParseEnvironment>> = /* ... */ ;
+    parser.parse_all(&input);
 }
 ```

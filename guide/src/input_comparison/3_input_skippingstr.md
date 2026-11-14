@@ -6,7 +6,7 @@ This type is not exported by the prelude. It may be accessed via module path `bi
 
 ## Usage
 A producer of parser combinators expecting this input type should have the signature:
-```rs
+```rust,ignore
 fn make_parser<'parse, 'source, E: ParserEnvironment>(...) -> impl Parser<'parse, SkippingStr<'source>, A, E>
 where
     'source : 'parse,

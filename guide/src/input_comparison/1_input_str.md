@@ -4,7 +4,7 @@ The textbook input type, natively supported.
 
 ## Usage
 A producer of parser combinators expecting this input type should have the signature:
-```rs,ignore
+```rust,ignore
 fn make_parser<'src, E: ParseEnvironment>(...) -> impl Parser<'src, str, A, E> {...}
 ```
 where `A` is the desired AST payload type.
@@ -31,7 +31,7 @@ This type is mainly used internally for other input types. You should prefer `st
 This type is not exported by the prelude. It may be accessed via module path `biparse::input::str::CachedStr`.
 
 A producer of parser combinators expecting this input type should have the signature:
-```rs,ignore
+```rust,ignore
 fn make_parser<'parse, 'source, E: ParserEnvironment>(...) -> impl Parser<'parse, CachedStr<'source>, A, E>
 where
     'source : 'parse,

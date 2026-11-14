@@ -10,7 +10,6 @@ logos = ["dep:logos"]
 
 [dependencies]
 derive_more = { version = "2.1.1", features = ["from", "into", "display", "deref", "deref_mut", "as_ref"] }
-expect-test = "1.5.1"
 hashbrown = "0.17.1"
 im = "15.1.0"
 rowan = "0.17.0"
@@ -27,8 +26,14 @@ logos = {version = "0.16.1", optional = true}
 arcstr = "1.2.0"
 
 [dev-dependencies]
+expect-test = "1.5.1"
 indoc = "2.0.7"
 num-bigint = "0.5.1"
 num-derive = "0.5.1"
 num-traits = "0.2.19"
 proptest = "1.11.0"
+
+[package.metadata.mdbook]
+targets = [
+    "guide",
+]

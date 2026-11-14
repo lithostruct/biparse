@@ -4,7 +4,7 @@ Integration with `logos` based lexing, based on `logos::Lexer`. Enabled by defau
 
 ## Usage
 A producer of parser combinators expecting this input type should have the signature:
-```rs,ignore
+```rust,ignore
 fn make_parser<'parse, 'source, E: ParserEnvironment>(...)
     -> impl Parser<'parse, LexerStream<'source, T>, A, E>
 where
@@ -15,7 +15,7 @@ where `A` is the desired AST payload type.
 Note the two distinct lifetimes: `'source` refers to the lifetime of the underlying `str` data that `LexerStream` borrows upon construction, and `'parse` represents the borrow on the input type `LexerStream<'source, T>` throughout a single parse.
 
 `T` implements the lexing grammar using the `logos` ecosystem, and must adhere to the following bounds:
-```rs,ignore
+```rust,ignore
 impl<'source, T> Input for LexerStream<'source, T>
 where
     T: Debug + Clone + Logos<'source, Source = str>,
@@ -24,13 +24,13 @@ where
 
 ## Supported Patterns
 `Pattern<'src, LexerStream<'source, T>>` implementors include:
-```rs,ignore
+```rust,ignore
 (K, T) where
     'source: 'src,
     K: Clone + Into<SyntaxKind>,
     T: Debug + Clone + Eq + Logos<'source, Source = str> + 'src,
 ```
-```rs,ignore
+```rust,ignore
 T where
     'source: 'src,
     T: Debug + Clone + Eq + Logos<'source, Source = str> + Into<SyntaxKind> + 'src,
@@ -61,7 +61,7 @@ Take this example of a JSON parser for objects, describing the grammar rule:
 
 Compare and contrast the `str`-based and `LexerStream`-based implementation.
 
-```rs,ignore
+```rust,ignore
 // `str`-based implementation.
 let object = (just((Kind::LeftBrace, '{')).then(optional_whitespace.clone()))
     .ignore_then(
@@ -83,7 +83,7 @@ let object = (just((Kind::LeftBrace, '{')).then(optional_whitespace.clone()))
     .map(Json::Object)
     .node(Kind::Object);
 ```
-```rs,ignore
+```rust,ignore
 // `LexerStream`-based implementation.
 let object = just(Kind::LeftBrace)
     .ignore_then(

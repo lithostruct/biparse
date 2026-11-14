@@ -16,7 +16,7 @@ Syntactic sugar over `a.then(b.commit())`, which resembles a Prolog-like cut bou
 
 Note that eg. `a.then_commit_to(b).then(c)` will only enforce commitment in constituent `b`; `c` may fail speculatively if `a` and `b` succeed, returning a speculative error. If `b` fails, it returns a committed failure, and `c` is not tried at all.
 
-## Recovery Parsing
+## Recovery Parsing (`recover`)
 
 The `recover` combinator takes in:
 - The upstream combinator via method chaining,

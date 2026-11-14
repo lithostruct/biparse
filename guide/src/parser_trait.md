@@ -40,7 +40,7 @@ You may note the unusually minimal definition of the `Parser` trait. As it turns
 
 To maintain `dyn`-compatibility, the main `Parser` trait does not include method chaining options. Instead, a `ParserExt` trait is used for this purpose, and it extends and is blanket-implemented for all implementors of `Parser`:
 
-```rs,ignore
+```rust,ignore
 /// Convenience methods available to all implementors of [`Parser<'src, I, A, E>`]. Enables combinator method chaining.
 pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment>:
     Parser<'src, I, A, E>

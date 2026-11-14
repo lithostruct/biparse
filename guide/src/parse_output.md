@@ -53,7 +53,7 @@ As a simplistic but illustrative example regarding AST outcome semantics:
 ## Concrete Syntax Tree (CST)
 
 The CST component, `AssociatedGreenCst` consists of a `rowan` CST forest, along with coupled path information for both associations and diagnostics. The structure of `AssociatedGreenCst` can be thought of as:
-```rs,ignore
+```rust,ignore
 pub struct AssociatedGreenCst<Id, EId, E>
 where
     Id: Eq + Hash,
