@@ -55,12 +55,12 @@ impl Fail {
         Self(Some(msg.into()))
     }
 }
-impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fail {
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E> for Fail {
     fn parse(
         &self,
         input: &'src I,
         state: ParseState<'src, I, E>,
-    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         let failure = E::Failure::failure_at(
             input,
             state.cursor,
@@ -81,7 +81,20 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Fa
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        self.parse(input, state)
+        let failure = E::Failure::failure_at(
+            input,
+            state.cursor,
+            FailureKind::FailPrimitive {
+                message: self.0.clone(),
+            },
+        );
+        (
+            state,
+            ParseOutput {
+                ast: ParseOutcome::Speculative(failure),
+                cst: AssociatedGreenCst::new(),
+            },
+        )
     }
     fn hint(&self) -> ParseHint {
         ParseHint::Fails

@@ -212,7 +212,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
             rest
         })
     }
-    /// Chains `self` to match on zero or one occurence, returning [`Option<A>`].
+    /// Chains `self` to match on zero or one occurrence, returning [`Option<A>`].
     fn optional(self) -> composite::Optional<'src, Self, I, A, E>
     where
         Self: Sized,
@@ -227,7 +227,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     fn try_map<F, B, Error>(self, closure: F) -> With<E, TryMap<Self, F, A>>
     where
         F: Fn(A) -> Result<B, Error>,
-        Error: std::error::Error,
+        Error: std::error::Error + 'static,
         Self: Sized,
     {
         With::new(TryMap::new(self, closure))
@@ -251,9 +251,9 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     ///
     /// # Note on Recovery Parser Failure
     ///
-    /// Speculative or committed failure surfacing from the recovery parser will result in
-    /// propagation of the failure from the fallible `self` parser.
-    /// It is recommended to keep recovery simple relative to the fallible parser.
+    /// Failures surfacing from the recovery parser will result in
+    /// resuming propagation of the failure from the fallible `self` parser.
+    /// Hence, it is recommended to keep recovery simple relative to the fallible parser.
     fn recover<R, B, C>(
         self,
         with: R,
@@ -303,6 +303,18 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         self.map(Either::Left as fn(A) -> Either<A, B>)
             .or(other.map(Either::Right))
     }
+
+    /// Establishes a commitment point where subsequent speculative failure in the `other` parser
+    /// is promoted to a committed failure.
+    /// 
+    /// Note that chaining `a.then_commit_to(b).then(c)` will only cause `b` to commit, but not `c`.
+    fn then_commit_to<P, B>(self, other: P) -> composite::ThenCommitTo<E, Self, P>
+    where
+        P: Parser<'src, I, B, E>,
+        Self: Sized,
+    {
+        self.then(other.commit())
+    }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E> for T where
     T: Parser<'src, I, A, E>
@@ -336,6 +348,10 @@ pub mod composite {
     pub type EitherOr<E, L, R, A, B> = With<
         E,
         Or<With<E, Map<L, fn(A) -> Either<A, B>, A>>, With<E, Map<R, fn(B) -> Either<A, B>, B>>>,
+    >;
+    pub type ThenCommitTo<E, L, R> = With<
+        E,
+        Then<L, With<E, Commit<R>>>
     >;
 }
 

@@ -40,13 +40,13 @@ pub fn success<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, ()
     As::from(Success)
 }
 /// Constructs the primitive [`Fail`] combinator that unconditionally fails on any input.
-pub fn fail<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E, Fail> {
+pub fn fail<'src, I: Input + ?Sized, A, E: ParseEnvironment>() -> As<'src, I, A, E, Fail> {
     As::from(Fail::new())
 }
 /// Constructs the primitive [`Fail`] combinator that unconditionally succeeds on any input, with the given message.
-pub fn fail_with<'src, I: Input + ?Sized, E: ParseEnvironment>(
+pub fn fail_with<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
     msg: impl Into<Cow<'static, str>>,
-) -> As<'src, I, (), E, Fail> {
+) -> As<'src, I, A, E, Fail> {
     As::from(Fail::new_with(msg))
 }
 /// Constructs the primitive [`End`] combinator that succeeds iff end of input is reached.

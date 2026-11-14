@@ -104,7 +104,9 @@ impl<'src, C, E: ParseEnvironment> ParseStateData<'src, C, E> {
     }
 }
 
-/// Parse output produced by [`Parser`](crate::parse::Parser) implementors.
+/// Parse output produced by intermediate [`Parser`](crate::parse::Parser) operations.
+/// 
+/// May be lifted into a [`Result`] type via [`ParseOutput::into_lifted`].
 pub struct ParseOutput<A, E: ParseEnvironment> {
     pub ast: ParseOutcome<A, E::Failure>,
     pub cst: AssociatedGreenCst<
@@ -153,7 +155,7 @@ where
 
 impl<A, E: ParseEnvironment> ParseOutput<A, E> {
     /// Consumes `self`, lifting parse failure out of the AST component into a [`Result`] value.
-    /// Speculative and commited failure are promoted to [`TerminalFailure`].
+    /// Speculative, committed and fatal failure are lifted to [`TerminalFailure`].
     ///
     /// This is typically used for top-level parser output;
     /// see [`ParserExt::parse_all`](crate::parse::ParserExt::parse_all)
@@ -184,12 +186,13 @@ pub enum ParseOutcome<A, F> {
     Committed(F),
     /// Fatal failure.
     /// This results from combinator system invariant violations.
-    /// The combinator system *must* not resume parsing or catch this error,
-    /// propagating it outwards until it is converted into a top-level parse failure.
+    /// Upon receiving this from any parsing path,
+    /// the combinator system *must* halt subsequent parsing or recovery attempts,
+    /// and propagate it outwards until it is converted into a top-level parse failure.
     Fatal(F),
 }
 impl<A, F> ParseOutcome<A, F> {
-    /// Converts `self` into a [`Result`], erasing the outcome distinction between speculative and committed failure.
+    /// Converts `self` into a [`Result`], erasing the outcome distinction between failures.
     ///
     /// This is typically used for top-level parser output.
     pub fn into_result(self) -> Result<A, F> {
@@ -221,7 +224,7 @@ impl<A, F> ParseOutcome<A, F> {
 }
 
 /// The top-level error of a failed parse.
-/// Represents irrevocable and premature termination of parsing.
+/// Represents irrevocable termination of parsing.
 ///
 /// Converted from [`ParseOutput::into_lifted`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

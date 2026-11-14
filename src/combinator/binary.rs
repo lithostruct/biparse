@@ -35,8 +35,8 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(A, B), E>) {
-        let (state, first_result) = self.first.parse(input, state);
-        let payload_a = match first_result.ast {
+        let (state, first_output) = self.first.parse(input, state);
+        let payload_a = match first_output.ast {
             ast @ ParseOutcome::Speculative(_)
             | ast @ ParseOutcome::Committed(_)
             | ast @ ParseOutcome::Fatal(_) => {
@@ -46,16 +46,16 @@ where
                     state,
                     ParseOutput {
                         ast: typed_result,
-                        cst: first_result.cst,
+                        cst: first_output.cst,
                     },
                 );
             }
             ParseOutcome::Success(payload_a) => payload_a,
         };
 
-        let (state, second_result) = self.second.parse(input, state);
-        let cst_union = first_result.cst.merge_with(second_result.cst);
-        match second_result.ast {
+        let (state, second_output) = self.second.parse(input, state);
+        let cst_union = first_output.cst.merge_with(second_output.cst);
+        match second_output.ast {
             ast @ ParseOutcome::Speculative(_)
             | ast @ ParseOutcome::Committed(_)
             | ast @ ParseOutcome::Fatal(_) => {
@@ -86,15 +86,15 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        let (state, first_result) = self.first.check(input, state);
-        match &first_result.ast {
+        let (state, first_output) = self.first.check(input, state);
+        match &first_output.ast {
             ParseOutcome::Speculative(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
-                return (state, first_result);
+                return (state, first_output);
             }
             ParseOutcome::Success(()) => (),
         }
-        let (state, second_result) = self.second.check(input, state);
-        (state, second_result)
+        let (state, second_output) = self.second.check(input, state);
+        (state, second_output)
     }
     fn hint(&self) -> ParseHint {
         ParseHint::sequence([self.first.hint(), self.second.hint()])
@@ -130,21 +130,21 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
-        let (first_state, first_result) = self.first.parse(input, state.clone());
-        let first_speculative_error = match first_result.ast {
+        let (first_state, first_output) = self.first.parse(input, state.clone());
+        let first_speculative_error = match first_output.ast {
             ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 // Early termination.
-                return (first_state, first_result);
+                return (first_state, first_output);
             }
             // Continue.
             ParseOutcome::Speculative(error) => error,
         };
 
-        let (second_state, second_result) = self.second.parse(input, state.clone());
-        let second_speculative_error = match second_result.ast {
+        let (second_state, second_output) = self.second.parse(input, state.clone());
+        let second_speculative_error = match second_output.ast {
             ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 // Termination, discard first speculative error.
-                return (second_state, second_result);
+                return (second_state, second_output);
             }
             // Continue.
             ParseOutcome::Speculative(error) => error,
@@ -159,7 +159,7 @@ where
             second_state,
             ParseOutput {
                 ast: ParseOutcome::Speculative(overall_speculation),
-                cst: second_result.cst,
+                cst: second_output.cst,
             },
         )
     }
@@ -168,21 +168,21 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        let (first_state, first_result) = self.first.check(input, state.clone());
-        let first_speculative_error = match first_result.ast {
+        let (first_state, first_output) = self.first.check(input, state.clone());
+        let first_speculative_error = match first_output.ast {
             ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 // Early termination.
-                return (first_state, first_result);
+                return (first_state, first_output);
             }
             // Continue.
             ParseOutcome::Speculative(error) => error,
         };
 
-        let (second_state, second_result) = self.second.check(input, state.clone());
-        let second_speculative_error = match second_result.ast {
+        let (second_state, second_output) = self.second.check(input, state.clone());
+        let second_speculative_error = match second_output.ast {
             ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 // Termination, discard first speculative error.
-                return (second_state, second_result);
+                return (second_state, second_output);
             }
             // Continue.
             ParseOutcome::Speculative(error) => error,
@@ -197,7 +197,7 @@ where
             second_state,
             ParseOutput {
                 ast: ParseOutcome::Speculative(overall_speculation),
-                cst: second_result.cst,
+                cst: second_output.cst,
             },
         )
     }

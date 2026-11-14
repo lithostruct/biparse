@@ -14,4 +14,26 @@ A type implementing `Pattern<'src, I>` for some `I : Input` describes a predicat
 
 All `I : Input` implementors may use `Matches<impl Into<SyntaxKind>, impl Fn(&I::Token<'_>) -> bool>` as a universal `Pattern<'_, I>` implementor. This fills the role of the boolean predicate for whether a token should be accepted as a match.
 
-All `Pattern<'_, I>` implementors may use `AllOf` and `AnyOf` to compose sequential and alternative matching. 
+All `Pattern<'_, I>` implementors may use `AllOf` and `AnyOf` to compose sequential and alternative matching.
+
+## Note on Lifetime-Bound Inputs
+
+Due to the constructed parser object capturing the lifetime of the input in its `I: Input` field, it *must* be deallocated before the input object itself. This also means that following Rust's default drop order, the input object should be constructed *before* the parser object.
+
+This is particularly relevant of `str`-derived input types [`CachedStr`](./1_input_str.md/#variant-cachedstrsource) and [`SkippingStr`](./3_input_skippingstr.md). This won't compile:
+
+```rs,compile_fail
+use biparse::{
+    prelude::*,
+    input::skipping_str::SkippingStr,
+};
+
+struct Ast {
+    // ...
+}
+
+fn parse(text: &str) {
+    let parser : Rc<dyn Parser<'_, SkippingStr<'_>, Ast, DefaultParseEnvironment>> = todo!();
+    parser.parse_all(SkippingStr::whitespace(text))
+}
+```

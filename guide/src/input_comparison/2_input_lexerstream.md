@@ -59,7 +59,7 @@ This tends to lead to less noise within parser combinator definition.
 Take this example of a JSON parser for objects, describing the grammar rule:
 > `object ::= '{' (pair members)? '}'`
 
-Compare and constrast the `str`-based and `LexerStream`-based implementation.
+Compare and contrast the `str`-based and `LexerStream`-based implementation.
 
 ```rs,ignore
 // `str`-based implementation.

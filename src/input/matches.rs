@@ -48,7 +48,7 @@ impl<'src, T> Matches<SyntaxKind, fn(&T) -> bool> {
     /// # Note on Type Inference
     ///
     /// The type of `I` *must* be supplied at the callsite.
-    /// Type inference fails othewise when used directly in `just` combinators.
+    /// Type inference fails otherwise when used directly in `just` combinators.
     ///
     /// ```
     /// # use biparse::input::Matches;

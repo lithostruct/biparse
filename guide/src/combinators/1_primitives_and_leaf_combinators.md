@@ -2,7 +2,7 @@
 
 ## Note on `AsParser<...>` Wrapping
 
-Type inference tends to have a hard time inferring the correct trait implementation for leaf combinators due to their wide applicability, particularly all primitive combinators which work on *any* input and parse environment. Hence, the transparent `AsParser<'src, I, A, E, P>` wrapper is often used when construcing leaf combinators through the construction functions (eg. `success()` rather than the `Success` type), which fixes the inner value to a specific `Parser` implementation.
+Type inference tends to have a hard time inferring the correct trait implementation for leaf combinators due to their wide applicability, particularly all primitive combinators which work on *any* input and parse environment. Hence, the transparent `AsParser<'src, I, A, E, P>` wrapper is often used when constructing leaf combinators through the construction functions (eg. `success()` rather than the `Success` type), which fixes the inner value to a specific `Parser` implementation.
 
 ### `success`
 
@@ -12,7 +12,7 @@ Unconditionally succeeds, returning the unit value `()`.
 
 Unconditionally fails, returning a speculative failure.
 
-This parser is considered to have an AST payload type of `()`.
+The output type of this parser is unconstrained, and must be specified upon construction. It can be any type, up to and including the never type `!`.
 
 ### `end`
 

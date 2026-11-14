@@ -24,7 +24,7 @@ Due to type requirements being stricter than most `Parser` implementors, using t
 
 Uses a fallible Rust function or closure returning `Result` to transform the AST payload.
 
-On success producing the `Ok` branch, the inner value is taken and used as the AST payload. On failure producing the `Err` branch, the inner value is transformed into a failure payload according to `ParseFailure::custom_failure_at`, which is then propagated as a `Committed` failure. The type `E` contained within the `Err` branch must implement [`std::error::Error`].
+On success producing the `Ok` branch, the inner value is taken and used as the AST payload. On failure producing the `Err` branch, the inner value is transformed into a failure payload according to `ParseFailure::custom_failure_at`, which is then propagated as a `Committed` failure. The type `E` contained within the `Err` branch must implement [`std::error::Error`] and be `'static`.
 
 As an example, a parser of `a.try_map(<B as TryFrom>::try_from)` produces an AST payload of `B` on success.
 
@@ -50,6 +50,6 @@ Use this to associate AST and CST constructs for easy readback from the AST repr
 
 ### `recover`
 
-True only in a technical sense. Performs an `associate`-like operation onto the AST and CST upon recovery success, using
+True only in a technical sense. Performs an [`associate`](#associate)-like operation onto the AST and CST upon recovery success, using `ParseEnvironment::ErrorSupply::Id`.
 
 Refer to the [next section](./4_commitment_and_error_recovery.md) for elaboration on commitment and error recovery.

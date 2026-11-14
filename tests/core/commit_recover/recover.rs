@@ -56,9 +56,9 @@ fn recovery_success() {
 /// Asserts that recovery parser failure propagates the committed failure.
 #[test]
 fn recovery_nested_failure() {
-    let bad_recovery = fail::<str, DefaultParseEnvironment>().commit().recover(
+    let bad_recovery = fail::<str, !, DefaultParseEnvironment>().commit().recover(
         fail(), // Speculative failure in recovery parser!
-        |_, _| unreachable!(),
+        |_, _: !| unreachable!(),
         SyntaxKind(999),
     );
     const INPUT: &str = "Lorem ipsum dolor sit amet";

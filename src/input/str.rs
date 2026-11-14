@@ -127,7 +127,7 @@ where
     }
 }
 
-/// Contigious matching on [`str`] for [`&str`].
+/// Contiguous matching on [`str`] for [`&str`].
 impl<'src, K> Pattern<'src, str> for (K, &str)
 where
     K: Clone + Into<SyntaxKind>,

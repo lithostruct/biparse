@@ -122,7 +122,7 @@ impl<P, F, A> TryMap<P, F, A> {
     where
         P: Parser<'src, I, A, E>,
         F: Fn(A) -> Result<B, Error>,
-        Error: std::error::Error,
+        Error: std::error::Error + 'static,
     {
         TryMap {
             inner,
@@ -136,7 +136,7 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P, F, B, Error> Parser<'sr
 where
     P: Parser<'src, I, A, E>,
     F: Fn(A) -> Result<B, Error>,
-    Error: std::error::Error,
+    Error: std::error::Error + 'static,
 {
     fn parse(
         &self,

@@ -109,7 +109,7 @@ pub trait Pattern<'src, I: Input + ?Sized + 'src> {
     ///
     /// - [`Ok`]: The match is successful, and the contained cursor is the position right after the match is consumed.
     /// - [`Err`]: The match is unsuccessful.
-    ///   The cursor points to the token where the mismatch occured, such information is available.
+    ///   The cursor points to the token where the mismatch occurred, such information is available.
     ///
     /// Matching must not backtrack;
     /// The field `next_cursor` must be strictly be [`Ordering::Greater`](std::cmp::Ordering::Greater) than the `input` cursor.

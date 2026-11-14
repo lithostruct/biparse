@@ -11,6 +11,10 @@ The `parse_all` and `check_all` top-level parsing methods lift parse failure out
 
 The type of failures may be configured by changing the `ParseEnvironment` threaded throughout a parse operation. This allows the end user to control how much failure information to retain for error reporting purposes.
 
+Three failure payload types are provided:
+- `Minimal`, which discards all error information.
+- `PositionOnly`, which retains the 
+
 ### `Success`
 
 Successful parse results in the AST value `A`. These may be constructed and transformed via input matching, composition and mapping.
@@ -23,7 +27,7 @@ Speculative failure is the default failure mode of the combinator ecosystem. Thi
 
 Committed failure indicates that speculative parsing should *not* be attempted. This usually results from explicit commitment points via `commit`, where sufficient syntax is recognized to commit to a specific parsing branch, or from fallible transformation of the success value via `try_map`.
 
-Commited failure follows exception semantics, and propagate outwards until explicitly handled using an enclosing `recover` combinator. Upon recovery, committed failures are transformed into [diagnostics](#concrete-syntax-tree-cst).
+Committed failure follows exception semantics, and propagate outwards until explicitly handled using an enclosing `recover` combinator. Upon recovery, committed failures are transformed into [diagnostics](#concrete-syntax-tree-cst).
 
 ### `Fatal`
 

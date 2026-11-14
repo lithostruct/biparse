@@ -64,7 +64,7 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
     /// The closure taken will be provided a reference to the created combinator (`self`).
     pub fn new<F, P>(closure: F) -> Self
     where
-        F: FnOnce(Recursive<Direct<'p, 'src, I, A, E>>) -> P,
+        F: FnOnce(Self) -> P,
         P: Parser<'src, I, A, E> + 'p,
     {
         let rc: Rc<P> = Rc::new_cyclic(|weak| {
@@ -86,7 +86,7 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
     /// The closure taken will be provided a reference to the created combinator (`self`).
     pub fn new_as<F, P>(name: impl Into<Cow<'static, str>>, closure: F) -> Self
     where
-        F: FnOnce(Recursive<Direct<'p, 'src, I, A, E>>) -> P,
+        F: FnOnce(Self) -> P,
         P: Parser<'src, I, A, E> + 'p,
     {
         let name: Option<ArcStr> = Some(name.into().into());
@@ -106,12 +106,13 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
 }
 
 impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p, 'src, I, A, E>> {
-    /// Declares a new recursive combinator to be later defined.
-    ///
-    /// Attempting a parse with a declared but undefined recursive parser results in a fatal error.
+    /// Declares a new recursive combinator to be later defined via [`Recursive::define`].
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
     /// and a named object is required to define mutual recursion between related combinators.
+    ///
+    /// Attempting a parse or check with a declared but undefined recursive parser
+    /// immediately results in a [`ParseOutcome::Fatal`] failure.
     pub fn declare() -> Self {
         Recursive {
             inner: RecursiveInner::Owned(
@@ -123,13 +124,14 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
             ),
         }
     }
-    /// Declares a new recursive combinator to be later defined, with the given name.
+    /// Declares a new recursive combinator to be later defined via [`Recursive::define`], with the given name.
     /// Combinator names are used for error reporting and better diagnostics.
-    ///
-    /// Attempting a parse with a declared but undefined recursive parser results in a fatal error.
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
     /// and a named object is required to define mutual recursion between related combinators.
+    ///
+    /// Attempting a parse or check with a declared but undefined recursive parser
+    /// immediately results in a [`ParseOutcome::Fatal`] failure.
     pub fn declare_as(name: impl Into<Cow<'static, str>>) -> Self {
         let name: Option<ArcStr> = Some(name.into().into());
         Recursive {
@@ -148,17 +150,17 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
     ///
     /// # Panics
     ///
-    /// Panics on multiple or re-entrant definition of the same parser object, or on a weak handle.
+    /// Panics on multiple or re-entrant definition of the same parser object,
+    /// or attempting to define a weak handle as produced by [`Recursive::weaken`].
     ///
     /// # Limitation on Strong Cycles
     ///
     /// Strong reference cycles formed by [`Recursive<Indirect<...>>`] groups (including `self` cycles)
     /// *never* deallocate, even after becoming inaccessible, throughout the lifetime of the program.
     ///
-    /// This is currently considered acceptable, if undesirable,
-    /// because the space leak is bounded to the creation of a mutually-recursive combinator group.
+    /// Use [`Recursive::weaken`] where applicable to break recursive back-edges.
     ///
-    /// Future mitigation of this would entail a explicit group-like structure
+    /// This may be addressed more completely in the future with explicit group-like structure
     /// involving either n-variadic type arguments or payload type erasure.
     pub fn define<P>(&mut self, parser: P)
     where
@@ -196,7 +198,8 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
     ///
     /// This typically entails that there is one "primary" parser,
     /// which keeps its group of mutually-recursive combinators alive.
-    /// [`Self::weaken`] should only be invoked for recursive back edges to this primary parser.
+    /// [`Recursive::weaken`] need only be invoked for recursive back edges to this primary parser
+    /// to ensure the group may be deallocated.
     pub fn weaken(&self) -> Self {
         Recursive {
             inner: RecursiveInner::Unowned(self.inner.name(), self.inner.as_weak()),
@@ -361,7 +364,7 @@ macro_rules! recursive_growth {
                         };
 
                         // Overwrite seed state's recursive state with that discovered from the current state,
-                        // therefore preserving any recursive evaulation progress made after the seed is cached.
+                        // therefore preserving any recursive evaluation progress made after the seed is cached.
                         // Hence, update dependency to the enclosure.
                         let mut return_state = seed_state.clone();
                         return_state.recursive_state = state.recursive_state.clone();
@@ -442,8 +445,8 @@ macro_rules! recompute {
 
         // Check if the initial sprout encountered failures.
         // If yes, there is no point in seed growing, and the failure should be propagated.
-        let (mut sprout_state, mut sprout_result) = parser.$method(input, seed_state);
-        match &sprout_result.ast {
+        let (mut sprout_state, mut sprout_output) = parser.$method(input, seed_state);
+        match &sprout_output.ast {
             ParseOutcome::Speculative(failure)
             | ParseOutcome::Committed(failure) => {
                 // failure to sprout.
@@ -456,34 +459,34 @@ macro_rules! recompute {
                     from: this.recursive_id()
                 }) {
                     // Unbounded recursion identified as primary failure mode.
-                    sprout_result.ast = ParseOutcome::Fatal(failure.clone());
+                    sprout_output.ast = ParseOutcome::Fatal(failure.clone());
                 }
 
-                return (sprout_state, sprout_result);
+                return (sprout_state, sprout_output);
             }
             ParseOutcome::Fatal(_) => {
                 // fatal failure to sprout.
                 sprout_state.recursive_state.current_enclosing = outer_enclosure;
                 sprout_state.recursive_state.current_dependencies = outer_dependencies;
-                return (sprout_state, sprout_result);
+                return (sprout_state, sprout_output);
             }
 
-            // Succcessful seed.
+            // Successful seed.
             // Any speculative errors now would be an indication to halt.
             // Committed errors should still be propagated though.
             ParseOutcome::Success(_) => (),
         }
 
-        let (mut rec_seed_state, mut rec_seed_result) = (sprout_state, sprout_result);
+        let (mut rec_seed_state, mut rec_seed_output) = (sprout_state, sprout_output);
 
-        let (mut fixpoint_state, fixpoint_result) = loop {
+        let (mut fixpoint_state, fixpoint_output) = loop {
             // Entering from previous success:
             // Modify the seed result, dependencies, and add to generation.
             let mut frame = rec_seed_state.recursive_state
                 .get_mut(this.recursive_id(), state.cursor).cloned()
                 .expect("Frame must have been allocated from above!");
             frame.active_fixpoint = true;
-            frame.seed_result = Some((rec_seed_state.clone(), rec_seed_result.clone_erased()));
+            frame.seed_result = Some((rec_seed_state.clone(), rec_seed_output.clone_erased()));
             frame.dependencies = rec_seed_state.recursive_state.current_dependencies.clone();
             frame.generation += 1;
 
@@ -512,7 +515,7 @@ macro_rules! recompute {
                     if next_sprout_state.cursor > current_best_cursor {
                         // Assign to the recursive seed state.
                         rec_seed_state = next_sprout_state;
-                        rec_seed_result = next_sprout_result;
+                        rec_seed_output = next_sprout_result;
                         continue;
                     } else {
                         // Zero (or negative) progress encountered.
@@ -520,13 +523,13 @@ macro_rules! recompute {
                         // reached fixpoint and break.
                         //
                         // This returns the previous result prior to encountering zero/negative progress.
-                        break (rec_seed_state, rec_seed_result);
+                        break (rec_seed_state, rec_seed_output);
                     }
                 }
                 ParseOutcome::Speculative(_) => {
                     // The previous iteration has consumed as much as we can without speculative failure.
                     // It's time to stop.
-                    break (rec_seed_state, rec_seed_result);
+                    break (rec_seed_state, rec_seed_output);
                 }
                 ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                     // Propagate failure.
@@ -546,7 +549,7 @@ macro_rules! recompute {
         fixpoint_state.recursive_state.current_dependencies
             .push_back((this.recursive_id(), state.cursor, generation));
 
-        (fixpoint_state, fixpoint_result)
+        (fixpoint_state, fixpoint_output)
     }};
 }
 impl<P: ?Sized> Recursive<P> {

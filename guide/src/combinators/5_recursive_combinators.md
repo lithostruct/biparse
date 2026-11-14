@@ -12,9 +12,13 @@ Self-recursive parsers may be constructed via the `Recursive::new` and `Recursiv
 
 A set of grammar constructs that may refer to each other.
 
-`Recursive::declare` and `Recursive::declare_as` creates a new mutually-recursive parser with an undefined body. This body is filled upon calling `Recursive::define`. Each parser must be defined exactly *once*; attempting to define a parser multiple times result in an immediate panic, and attempting a parse with an undefined parser returns a [`Fatal` error](../parse_output.md/#fatal).
+`Recursive::declare` and `Recursive::declare_as` creates a new mutually-recursive parser with an undefined body. This body is filled upon calling `Recursive::define`. Each parser must be defined exactly *once*; attempting to define a parser multiple times result in an immediate panic, and attempting a parse with an undefined parser results in a [`Fatal` failure](../parse_output.md/#fatal).
 
-A major limitation of the current implementation is that strong reference cycles formed by mutually-recursive parsers causes them to *never* deallocate when inaccessible, persisting until the end of program execution. Strategic use of `Recursive::weaken` may be required to break recursive back edges of strong cycles where applicable.
+### Limitations
+
+[Strong reference cycles](https://doc.rust-lang.org/std/rc/index.html) formed by mutually-recursive parsers causes them to *never* deallocate when inaccessible, persisting until the end of program execution.
+
+Strategic use of `Recursive::weaken` may be required to break strong cycles where applicable, by constructing a non-owning handle to a recursive combinator. This is typically applied to the recursive back-edges to a "primary" combinator, which keeps its group of related constructs alive. Attempting a parse on a dropped parser results in a [`Fatal` failure](../parse_output.md/#fatal).
 
 This may be addressed more completely in the future with dedicated recursive group semantics.
 

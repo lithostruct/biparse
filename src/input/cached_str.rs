@@ -184,7 +184,7 @@ where
     }
 }
 
-/// Contigious matching on [`str`] for [`&str`].
+/// Contiguous matching on [`str`] for [`&str`].
 impl<'src, 'source, K> Pattern<'src, CachedStr<'source>> for (K, &str)
 where
     'source: 'src,

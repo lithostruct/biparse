@@ -7,10 +7,10 @@ use rowan::SyntaxKind;
 proptest! {
     #[test]
     fn single_empty(s in any::<String>()) {
-        let (state, result): (_, ParseOutput<(), DefaultParseEnvironment>) = success()
+        let (state, output): (_, ParseOutput<(), DefaultParseEnvironment>) = success()
             .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
         assert_eq!(state.cursor.into_usize(), 0);
-        assert_eq!(result.ast, ParseOutcome::Success(()));
+        assert_eq!(output.ast, ParseOutcome::Success(()));
     }
 
     #[test]
@@ -62,12 +62,12 @@ proptest! {
     fn just_or_empty(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
         // Currently no way of recovering from a failed `just` to get an `Either::Right(())`,
         // so this is more of a stress test than anything.
-        let (state, result): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
+        let (state, output): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern.clone()))
                 .either_or(success())
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
-        let ParseOutcome::Success(inner) = result.ast else {panic!()};
+        let ParseOutcome::Success(inner) = output.ast else { unreachable!() };
         match inner {
             Either::Left(atom) => assert_eq!(state.cursor.into_usize(), atom.len()),
             Either::Right(()) => assert_eq!(state.cursor.into_usize(), 0),

@@ -1,6 +1,8 @@
 //! Test regarding non-consuming input for recursive combinators.
 //! These focus less on correctness (thought that is important too),
-//! and moreso on termination of parsing.
+//! and more on termination of parsing.
+//! 
+//! In other words, the failure case is timeout or spinning.
 
 use biparse::prelude::*;
 use proptest::{arbitrary::any, proptest};
@@ -12,11 +14,11 @@ proptest! {
             Recursive::new(
                 |this| this.or(success()).map(|_| ())
             );
-        let (state, result) = combinator.parse(
+        let (state, output) = combinator.parse(
             &s,
             ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
-        assert!(matches!(result.ast, ParseOutcome::Success(_)));
+        assert!(matches!(output.ast, ParseOutcome::Success(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 
@@ -26,11 +28,11 @@ proptest! {
             Recursive::new(
                 |this| success().or(this).map(|_| ())
             );
-        let (state, result) = combinator.parse(
+        let (state, output) = combinator.parse(
             &s,
             ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
-        assert!(matches!(result.ast, ParseOutcome::Success(_)));
+        assert!(matches!(output.ast, ParseOutcome::Success(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 
@@ -41,11 +43,11 @@ proptest! {
                 |this| this
             );
 
-        let (state, result) = combinator.parse(
+        let (state, output) = combinator.parse(
             &s,
             ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
-        assert!(matches!(result.ast, ParseOutcome::Fatal(_)));
+        assert!(matches!(output.ast, ParseOutcome::Fatal(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 
@@ -57,11 +59,11 @@ proptest! {
         rec_a.define(rec_b.clone());
         rec_b.define(rec_a.weaken());
 
-        let (state, result) = rec_a.parse(
+        let (state, output) = rec_a.parse(
             &s,
             ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
         );
-        assert!(matches!(result.ast, ParseOutcome::Fatal(_)));
+        assert!(matches!(output.ast, ParseOutcome::Fatal(_)));
         assert_eq!(state.cursor.into_usize(), 0);
     }
 }

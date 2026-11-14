@@ -5,7 +5,7 @@ use expect_test::expect;
 use proptest::{proptest, strategy::Strategy, test_runner::Config};
 use rowan::SyntaxKind;
 
-/// Matches string `s` on zero or more occurences of 'a'.
+/// Matches string `s` on zero or more occurrences of 'a'.
 fn right_recursive_a(s: String) -> String {
     let combinator: Recursive<Direct<'_, '_, str, String, DefaultParseEnvironment>> =
         Recursive::new(|this| {
@@ -18,11 +18,11 @@ fn right_recursive_a(s: String) -> String {
                 .either_or(success())
                 .map(Either::left_or_default)
         });
-    let (state, result) = combinator.parse(
+    let (state, output) = combinator.parse(
         &s,
         ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
     );
-    match result.ast {
+    match output.ast {
         ParseOutcome::Success(header) => {
             if state.cursor.into_usize() == 0 {
                 assert_eq!(&header, "");

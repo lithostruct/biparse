@@ -5,17 +5,17 @@ use expect_test::expect;
 use proptest::{proptest, strategy::Strategy, test_runner::Config};
 use rowan::SyntaxKind;
 
-/// Matches string `s` on zero or more occurences of 'a'.
+/// Matches string `s` on zero or more occurrences of 'a'.
 fn many_a(s: String) -> String {
     let parser = just::<'_, str, DefaultParseEnvironment, _>((SyntaxKind(0), 'a'))
         .many()
         .map(|vec| vec.join(""));
-    let (state, result) = parser.node(SyntaxKind(1)).parse(
+    let (state, output) = parser.node(SyntaxKind(1)).parse(
         &s,
         ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
     );
 
-    match result.ast {
+    match output.ast {
         ParseOutcome::Success(header) => {
             if state.cursor.into_usize() == 0 {
                 assert_eq!(&header, "");
@@ -69,6 +69,7 @@ proptest! {
 #[test]
 fn non_growing_termination() {
     let fatal_parser = success().many();
-    let (_, outcome) = fatal_parser.parse("", ParseState::<str, DefaultParseEnvironment>::new(""));
+    let (_, outcome) = fatal_parser
+        .parse("", ParseState::<str, DefaultParseEnvironment>::new(""));
     assert!(matches!(outcome.ast, ParseOutcome::Fatal(_)))
 }

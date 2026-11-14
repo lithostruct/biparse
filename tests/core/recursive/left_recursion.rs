@@ -1,11 +1,11 @@
 //! Test regarding left-recursion of parser combinators involving the seed-growing algorithm.
 
-use biparse::prelude::*;
+use biparse::{input::Matches, prelude::*};
 use expect_test::expect;
 use proptest::{proptest, strategy::Strategy, test_runner::Config};
 use rowan::SyntaxKind;
 
-/// Matches string `s` on zero or more occurences of 'a'.
+/// Matches string `s` on zero or more occurrences of 'a'.
 fn left_recursive_a(s: String) -> String {
     let combinator: Recursive<Direct<'_, '_, str, String, DefaultParseEnvironment>> =
         Recursive::new_as("left-recursive-a", |this| {
@@ -17,11 +17,11 @@ fn left_recursive_a(s: String) -> String {
                 .either_or(success())
                 .map(|either| either.left_or_default())
         });
-    let (state, result) = combinator.parse(
+    let (state, output) = combinator.parse(
         &s,
         ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
     );
-    match result.ast {
+    match output.ast {
         ParseOutcome::Success(header) => {
             if state.cursor.into_usize() == 0 {
                 assert_eq!(&header, "");
@@ -81,4 +81,37 @@ fn non_growing_termination() {
 
     let artifact = combinator.parse_all("a").expect("Success!").into_ast_only();
     assert!(artifact.is_left_and(|inner| inner.len() == 1));
+}
+
+/// Asserting that saving/loading of state during seed-growing maintains association uniqueness.
+#[test]
+fn left_recursion_with_association() {
+    let combinator: Recursive<dyn Parser<'_, str, Vec<(usize, char)>, DefaultParseEnvironment>> =
+        Recursive::new(|this: Recursive<dyn Parser<'_, str, Vec<(usize, char)>>>| {
+            this.then(just(Matches::always::<str>(SyntaxKind(0))))
+                .associate(SyntaxKind(0), |u, (mut acc, c)| {
+                    acc.push((u, c));
+                    acc
+                })
+                .or(success().map(|_| Vec::new()))
+        });
+
+    let artifact = combinator
+        .parse_all("Lorem ipsum dolor sit amet")
+        .expect("Parse success!");
+    let associations = artifact.cst().associations();
+
+    for id in associations.keys() {
+        // Following construction order, the first key corresponds to the first character,
+        // second key includes first and second,
+        // nth key includes all previous characters and nth character etc.
+        //
+        // This is a stronger promise than that documented in the API:
+        // `Id`s used need not come from contiguous allocations.
+        // This is true for the native combinators though.
+        assert_eq!(
+            artifact.cst().search(id).map(|node| node.text_len().into()),
+            Some(id + 1)
+        )
+    }
 }

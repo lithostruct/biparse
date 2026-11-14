@@ -206,9 +206,9 @@ fn mismatched_token() {
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
     expect![[r#"
-        (1, 1) expected:
-        └─ token Root
-        found: token Plus at (1, 1)"#]]
+        (1, 1): expected:
+              | └─ token Root
+              | found: token Plus at (1, 1)"#]]
     .assert_eq(&result.unwrap_err().terminating.to_string());
 }
 #[test]
@@ -220,13 +220,13 @@ fn unrecognized_token() {
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
     expect![[r#"
-        (1, 1) expected:
-        └─ token Root
-        found: lex error () at (1, 1)"#]]
+        (1, 1): expected:
+              | └─ token Root
+              | found: lex error () at (1, 1)"#]]
     .assert_eq(&result.unwrap_err().terminating.to_string());
 }
 
-/// Parser that parses an arithmatic equation involving parentheses, addition and multipliciation.
+/// Parser that parses an arithmetic equation involving parentheses, addition and multipliciation.
 /// Note on Usage:
 /// - The parser constructor *must* be made *after* the stream is constructed due to drop order.
 /// - `'source : 'src` and that `LexerStream<'source>` must *not* be `LexerStream<'src, _>`.

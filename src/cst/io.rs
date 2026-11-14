@@ -183,7 +183,7 @@ where
                 // The span (byte_offset)..(next_offset) contains skipped trivia, which should be included.
                 let Some(trivia_kind) = input.skipped_trivia_kind() else {
                     panic!(
-                        "Byte span ({byte_offset}..{}) not covered by contigious input of type {}!",
+                        "Byte span ({byte_offset}..{}) not covered by contiguous input of type {}!",
                         next_offset,
                         std::any::type_name::<I>()
                     );
@@ -390,7 +390,7 @@ where
     diagnostics: DiagnosticsTable<EId, E>,
 }
 
-// Can't derive because that places an unecessary bound on `L`. Yeah.
+// Can't derive because that places an unnecessary bound on `L`. Yeah.
 impl<Id, EId, E, L> Debug for AssociatedRedCst<Id, EId, E, L>
 where
     Id: Debug + Eq + Hash,

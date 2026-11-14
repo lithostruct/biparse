@@ -78,14 +78,17 @@ mod test {
         let a = interner.token(IDENT, "a");
         let b = interner.token(IDENT, "b");
 
-        let ab = interner.node(
+        let a_b = interner.node(
             PAIR,
             vec![NodeOrToken::Token(a.clone()), NodeOrToken::Token(b.clone())],
         );
 
-        let ba = interner.node(PAIR, vec![NodeOrToken::Token(b), NodeOrToken::Token(a)]);
+        let b_a = interner.node(
+            PAIR, 
+            vec![NodeOrToken::Token(b), NodeOrToken::Token(a)]
+        );
 
-        assert!(!std::ptr::eq::<GreenNodeData>(ab.borrow(), ba.borrow()))
+        assert!(!std::ptr::eq::<GreenNodeData>(a_b.borrow(), b_a.borrow()))
     }
 
     /// 6. Nested bottom-up construction deduplicates.

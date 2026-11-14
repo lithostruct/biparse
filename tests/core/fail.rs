@@ -7,34 +7,34 @@ use rowan::SyntaxKind;
 proptest! {
     #[test]
     fn single_fail(s in any::<String>()) {
-        let (state, result): (_, ParseOutput<(), DefaultParseEnvironment>) = fail()
+        let (state, output): (_, ParseOutput<!, DefaultParseEnvironment>) = fail()
             .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         assert_eq!(state.cursor.into_usize(), 0);
-        assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
+        assert!(matches!(output.ast, ParseOutcome::Speculative(_)));
     }
 
     #[test]
     fn fail_then_just(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (state, result): (_, ParseOutput<&str, DefaultParseEnvironment>)
+        let (state, output): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = fail()
                 .then(just((SyntaxKind(kind), pattern.clone())))
-                .map(|(_, s)| s)
+                .map(|(_, s) : (!, &str)| s)
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         // No input should be consumed.
         assert_eq!(state.cursor.into_usize(), 0);
-        assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
+        assert!(matches!(output.ast, ParseOutcome::Speculative(_)));
     }
 
     #[test]
     fn just_then_fail(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (_, result): (_, ParseOutput<&str, DefaultParseEnvironment>)
+        let (_, output): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern))
-                .then(fail()).map(|(s, _)| s)
+                .then(fail()).map(|(s, _) : (&str, !)| s)
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
-        assert!(matches!(result.ast, ParseOutcome::Speculative(_)));
+        assert!(matches!(output.ast, ParseOutcome::Speculative(_)));
         // Regression: this assert doesn't make sense and hence removed
         // because the `Just` will consume input if it succeeds regardless of downstream failure.
         // assert_eq!(state.cursor.into_usize(), 0);
@@ -42,16 +42,15 @@ proptest! {
 
     #[test]
     fn fail_or_just(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (state1, result1): (_, ParseOutput<Either<(), &str>, DefaultParseEnvironment>)
+        let (state1, output1): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern.clone()))
-                .map(Either::Right)
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
-        let (state2, result2): (_, ParseOutput<Either<(), &str>, DefaultParseEnvironment>)
+        let (state2, output2): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = fail()
-                .either_or(just((SyntaxKind(kind), pattern)))
+                .or(just((SyntaxKind(kind), pattern)))
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
-        match (result1.ast, result2.ast) {
+        match (output1.ast, output2.ast) {
             (ParseOutcome::Success(val1), ParseOutcome::Success(val2))
                 => assert_eq!(val1, val2),
             (ParseOutcome::Speculative(err1), ParseOutcome::Speculative(err2))
@@ -66,11 +65,11 @@ proptest! {
 
     #[test]
     fn just_or_fail(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (state1, result1): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
+        let (state1, result1): (_, ParseOutput<Either<&str, !>, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern.clone()))
                 .map(Either::Left)
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
-        let (state2, result2): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
+        let (state2, result2): (_, ParseOutput<Either<&str, !>, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern))
                 .either_or(fail())
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));

@@ -15,13 +15,13 @@ fn commit_semantics() {
             .is_ok()
     );
     assert!(
-        fail::<str, DefaultParseEnvironment>()
+        fail::<str, !, DefaultParseEnvironment>()
             .commit()
             .parse_all("")
             .is_err()
     );
 
-    let combinator = fail::<str, DefaultParseEnvironment>().commit();
+    let combinator = fail::<str, !, DefaultParseEnvironment>().commit();
     let (_, output) = combinator.parse("", ParseState::<str, _>::new(""));
     assert!(matches!(output.ast, ParseOutcome::Committed(_)));
 }
@@ -116,13 +116,15 @@ fn commit_within_many() {
         provenance: usize,
         discarded: String,
     }
-    // Expects a whitespace-separated list delimited by parentheses,
-    // where elements are any alphanumeric identifier OTHER THAN that beginning with "FAIL:".
+    /// Expects a whitespace-separated list delimited by parentheses,
+    /// where elements are any alphanumeric identifier OTHER THAN that beginning with "FAIL:".
+    ///
+    /// If '(' is first identified, ')' becomes a checkpoint, and is recovered until then.
     fn make_parser<'src>()
     -> impl Parser<'src, str, Result<Vec<String>, FailReason>, DefaultParseEnvironment> {
         let whitespace = just((SyntaxKind(20), regex::Regex::new(r"[ \t\r\n]+").unwrap())).shared();
         let identifier: Rc<dyn Parser<'_, _, String, _>> = just((SyntaxKind(10), "FAIL:"))
-            .then_ignore(fail().commit())
+            .then_ignore(fail::<_, !, _>().commit())
             .or(just((
                 SyntaxKind(11),
                 regex::Regex::new(r"[a-zA-Z0-9_]+").unwrap(),
@@ -147,7 +149,7 @@ fn commit_within_many() {
             .then_ignore(whitespace.clone().optional())
             .then_ignore(just((SyntaxKind(1), ')')).commit())
             .map(Result::Ok)
-            // RECOVERY: up to and including safe character ')'.
+            // RECOVERY: up to and including checkpoint character ')'.
             .recover(
                 just(Matches(SyntaxKind(99), |c: &char| *c != ')'))
                     .many()
@@ -218,9 +220,9 @@ fn commit_within_many() {
     // Missing closing parenthesis. This failure is terminal.
     const TERMINAL: &str = "( missing paren";
     expect![[r#"
-        (1, 16) expected:
-        └─ character ')'
-        found: end of input at (1, 16)"#]]
+        (1, 16): expected:
+               | └─ character ')'
+               | found: end of input at (1, 16)"#]]
     .assert_eq(
         &make_parser()
             .parse_all(TERMINAL)
