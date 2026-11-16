@@ -7,7 +7,9 @@ use hashbrown::HashTable;
 use rowan::{GreenNode, GreenNodeData, GreenToken, GreenTokenData, NodeOrToken, SyntaxKind};
 use rustc_hash::FxHasher;
 
+/// Alias to refer to a green child element.
 pub type GreenElement = NodeOrToken<GreenNode, GreenToken>;
+/// Alias to refer to a reference of a green child element.
 pub type GreenElementRef<'a> = NodeOrToken<&'a GreenNodeData, &'a GreenTokenData>;
 
 #[inline]

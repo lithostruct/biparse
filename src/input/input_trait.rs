@@ -157,7 +157,7 @@ pub struct LineColumn {
     /// 1-indexed line number.
     pub line: usize,
     /// 1-indexed column number.
-    /// 
+    ///
     /// For most [`Input`] implementors, this is determined via [`str::chars`] rather than using Unicode width.
     pub column: usize,
 }

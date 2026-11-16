@@ -101,14 +101,22 @@ impl ParseHint {
                     hint => ParseHint::Peek(Box::new(hint)),
                 }
             }
-            ParseHint::Repetition { minimum, maximum, inner } => {
+            ParseHint::Repetition {
+                minimum,
+                maximum,
+                inner,
+            } => {
                 match inner.canonize() {
                     // Leaf propagation.
                     ParseHint::Empty => ParseHint::Empty,
                     ParseHint::Fails => ParseHint::Empty,
                     // Inner de-nesting.
-                    ParseHint::Repetition { minimum: min2, maximum: max2, inner } => {
-                        let total_minimum =  minimum * min2;
+                    ParseHint::Repetition {
+                        minimum: min2,
+                        maximum: max2,
+                        inner,
+                    } => {
+                        let total_minimum = minimum * min2;
                         let total_maximum = match (maximum, max2) {
                             (Some(inner), Some(inner2)) => Some(inner * inner2),
                             _ => None,
@@ -116,9 +124,9 @@ impl ParseHint {
                         ParseHint::Repetition {
                             minimum: total_minimum,
                             maximum: total_maximum,
-                            inner 
+                            inner,
                         }
-                    },
+                    }
                     hint => ParseHint::Repetition {
                         minimum,
                         maximum,
@@ -241,9 +249,14 @@ impl TreeItem for ParseHint {
             ParseHint::Peek(_) => "peek:",
             ParseHint::Sequence(_) => "all of:",
             ParseHint::Choice(_) => "any of:",
-            ParseHint::Repetition { minimum, maximum, inner: _ } => {
-                &format!("repeat ({minimum}..{}):", maximum.map_or_default(|max| format!("={max}")))
-            },
+            ParseHint::Repetition {
+                minimum,
+                maximum,
+                inner: _,
+            } => &format!(
+                "repeat ({minimum}..{}):",
+                maximum.map_or_default(|max| format!("={max}"))
+            ),
             ParseHint::Named { name, inner: _ } => name,
         };
         write!(f, "{}", style.paint(text))

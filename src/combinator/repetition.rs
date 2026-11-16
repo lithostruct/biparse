@@ -171,7 +171,7 @@ where
         mut state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         let mut cst = AssociatedGreenCst::new();
-        
+
         let iterator = (1_usize..).take_while(|&u| match self.maximum_repetitions {
             Some(maximum) => u <= maximum,
             None => true,
@@ -206,7 +206,10 @@ where
                     // Do we have sufficient repetition?
                     // If yes, construct and return.
                     // If not, return a speculative error.
-                    let ast = if iteration < self.minimum_repetitions {
+
+                    // The check is inclusive here;
+                    // eg. minimum_repetitions = 3 requires iteration (1-indexed) to > 3 for correctness.
+                    let ast = if iteration <= self.minimum_repetitions {
                         let supplemental = E::Failure::failure_at(
                             input,
                             new_state.cursor,

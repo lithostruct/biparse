@@ -7,7 +7,7 @@ Therefore, the intended usage pattern is that of a parser-producing function:
 fn make_parser() -> impl Parser<...> { ... }
 ```
 
-Refer to the [`Input Types`](./../input_comparison/input_comparison.md) chapter for further details and the exact form of the function signatures for each input type.
+Refer to the [`Input Types`](../input_comparison/index.md) chapter for further details and the exact form of the function signatures for each input type.
 
 ## Note on Method Chaining and Nesting
 

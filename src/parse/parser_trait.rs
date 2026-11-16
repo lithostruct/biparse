@@ -186,7 +186,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to repeat zero or more times, returning a [`Vec<A>`].
-    /// 
+    ///
     /// Underlying combinator object: [`Repetition`].
     fn many(self) -> Repetition<Self>
     where
@@ -195,7 +195,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         Repetition::new(self, 0..).expect("Range valid!")
     }
     /// Chains `self` to repeat one or more times, returning a non-empty [`Vec<A>`].
-    /// 
+    ///
     /// Underlying combinator object: [`Repetition`].
     fn some(self) -> Repetition<Self>
     where
@@ -296,7 +296,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to repeat exactly `n` times, returning a [`Vec<A>`] with exactly `n` elements.
-    /// 
+    ///
     /// Underlying combinator object: [`Repetition`].
     fn repeat(self, n: usize) -> Repetition<Self>
     where
@@ -306,11 +306,11 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self` to repeat for the minimum and maximum bounds described by `range`,
     /// returning a [`Vec<A>`] with the number of elements bounded to `range`.
-    /// 
+    ///
     /// Underlying combinator object: [`Repetition`].
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if `range` is empty.
     fn repeat_by(self, range: impl RangeBounds<usize>) -> Repetition<Self>
     where

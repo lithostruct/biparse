@@ -1,7 +1,7 @@
 # Parse Output, Parse Outcomes and Parse Artifacts
 
 Parse outputs (`ParseOutput`) refer to the intermediate output of a parse, which consists of an AST and CST component. 
-Both components are vital to the functionality of the Biparse combinator library. It is intended to be used primarily by [`Parser`](./parser_trait.md) implementors and those that interact with `Parser` functionality.
+Both components are vital to the functionality of the Biparse combinator library. It is intended to be used primarily by [`Parser`](./parser_trait.md#main-parser-trait) implementors and those that interact with `Parser` functionality.
 
 Parse artifacts (`ParseArtifact`), on the other hand, are finalized from `ParseOutput`, containing the same information but in a more ergonomic form for end-users. They are produced by the top-level `parse_all` and `check_all` methods.
 
@@ -35,7 +35,7 @@ Committed failure follows exception semantics, and propagate outwards until expl
 ### `Fatal`
 
 Fatal failures arise from ecosystem invariant violations, including but not limited to:
-- Non-growing repetition in repetition composites such as `many` and `some`. [(read more)](./combinators/2_composite_combinators.md#repetition)
+- Non-growing repetition in repetition composites. [(read more)](./combinators/2_composite_combinators/23_repetition.md#repeat_by)
 - Unbounded recursion in recursive constructs eg. `self ::= self`.
 - Undefined parsers from `Recursive::declare`. [(read more)](./combinators/5_recursive_combinators.md#mutual-recursion)
 

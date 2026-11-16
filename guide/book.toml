@@ -1,11 +1,23 @@
 [book]
 title = "Biparse Documentation"
-authors = ["GiveMe30Dollars"]
+authors = ["lithostruct"]
 language = "en"
 
 [rust]
 edition = "2024"
 
+[preprocessor.rustdoc-links]
+after = ["links"]
+build.packages = [
+  "either",
+  "rust_sitter",
+  "tree_sitter",
+]
+
 [output.html]
 mathjax-support = true
 playground.runnable = false
+
+[output.linkcheck2]
+follow-web-links = false
+traverse-parent-directories = true

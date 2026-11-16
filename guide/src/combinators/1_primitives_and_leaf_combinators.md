@@ -1,6 +1,6 @@
 # Primitives and Leaf Combinators
 
-The leaves or terminals upon which [composite combinators](./2_composite_combinators.md) build upon.
+The leaves or terminals upon which [composite combinators](./2_composite_combinators/index.md) build upon.
 
 ## Note on `As<...>` Wrapping
 
@@ -26,4 +26,4 @@ Succeeds upon a pattern match by a compatible `Pattern` implementor, returning a
 
 For example, a regex pattern matching against a `str` input returns a `&str` substring into the borrowed input on success.
 
-Refer to [`Input Comparison`](../input_comparison/input_comparison.md) for more details on specific `Input` and `Pattern` implementors.
+Refer to the [`Input Types`](../input_comparison/index.md) chapter for more details on specific `Input` and `Pattern` implementors.

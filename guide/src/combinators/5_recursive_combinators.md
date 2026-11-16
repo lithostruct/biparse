@@ -115,4 +115,4 @@ b ::= a
 
 ### Native Repetition
 
-Prefer using the [native repetition composites](./2_composite_combinators.md#repetition) `many`, `some` and `optional` over recursive grammars where applicable. This is particularly true for right-recursive grammars, which may consume unbounded stack space proportional to the recursive depth.
+Prefer using the [native repetition composites](./2_composite_combinators/23_repetition.md) `many`, `some` and `optional` over recursive grammars where applicable. This is particularly true for right-recursive grammars, which may consume unbounded stack space proportional to the recursive depth.

@@ -11,6 +11,4 @@ This project makes two contributions:
 - Despite being a parser combinator ecosystem comparable to `chumsky` in its intuitive use, all parser combinators natively support CST construction and do so automatically. You essentially get a CST without even trying.
 - `associate` combinators provide AST-CST correspondence through a configurable `Id` embedding, making it trivial to track which AST constructs correspond to the text and spans the CST node contains.
 
-If you want top speed and incremental parsing for an industrial-grade compiler, you're probably better off learning how to use `rust_sitter` or any of the battle-tested parser generators.
-
-If you want something a bit friendlier that's quick to pick up and hack on? This crate may be just for you.
+If you want something that's quick to pick up and hack on, this crate may be just for you.

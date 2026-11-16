@@ -1,5 +1,5 @@
 //! Module for the implementation of [`Input`] on arbitrary [`Logos`] grammars.
-//! 
+//!
 //! Requires default feature [`logos`].
 
 use std::{

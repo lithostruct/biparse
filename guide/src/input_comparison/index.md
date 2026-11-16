@@ -29,7 +29,6 @@ This also means that following Rust's default drop order, the input object shoul
 Hence, rather counterintuitively, this won't compile:
 
 ```rust,ignore
-extern crate biparse;
 use biparse::{
     prelude::*,
     input::skipping_str::SkippingStr,
@@ -44,7 +43,9 @@ struct Ast {
 fn parse(text: &str) {
     let parser : Rc<dyn Parser<'_, SkippingStr<'_>, Ast, DefaultParseEnvironment>> = /* ... */ ;
     let input = SkippingStr::whitespace(text, SyntaxKind(0));
+
     parser.parse_all(&input);
+    // input dropped before parser!
 }
 ```
 
@@ -52,8 +53,11 @@ But this will:
 
 ```rust,ignore
 fn parse(text: &str) {
+    // reversed order:
     let input = SkippingStr::whitespace(text, SyntaxKind(0));
     let parser : Rc<dyn Parser<'_, SkippingStr<'_>, Ast, DefaultParseEnvironment>> = /* ... */ ;
+
     parser.parse_all(&input);
+    // parser dropped, then input dropped. Fine.
 }
 ```

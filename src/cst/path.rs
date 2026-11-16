@@ -74,15 +74,27 @@ impl IntoIterator for CstPath {
     }
 }
 
+/// Error describing failure to navigate to a specific node via [`Pathfind::search`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum PathfindError {
+    /// Expecting a node, but found a token.
     #[error("expected node, got token")]
-    TokenNotNode { path: CstPath, depth: usize },
+    TokenNotNode {
+        /// The path searched.
+        path: CstPath,
+        /// The depth at which search terminated.
+        depth: usize,
+    },
+    /// Path represents an out-of-bounds or non-existent item.
     #[error("index of {indexed:} at {depth:} but got forest of width {got_width:}")]
     OutOfBounds {
+        /// The path searched.
         path: CstPath,
+        /// The depth at which search terminated.
         depth: usize,
+        /// The offending index, which points out-of-bounds for this node's children.
         indexed: usize,
+        /// The number of children in this node.
         got_width: usize,
     },
 }
