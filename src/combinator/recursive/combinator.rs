@@ -22,6 +22,12 @@ use arcstr::ArcStr;
 
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.
 
+/// The type of recursive constructs.
+/// - `Recursive<Direct<...>>` or `Recursive<dyn Parser<...>>`: direct self-recursion.
+///   Constructed via [`Recursive::new`] and [`Recursive::new_as`].
+/// - `Recursive<Indirect<...>>`: mutual recursion.
+///   Constructed uninitialized via [`Recursive::declare`] and [`Recursive::declare_as`],
+///   the filed with [`Recursive::define`].
 #[derive(Debug)]
 pub struct Recursive<P: ?Sized> {
     /// Inner payload.

@@ -12,10 +12,13 @@ use crate::{
 /// Parser combinator that matches on a pattern compatible with the input type.
 /// `P` should implement `Pattern<I>` for some `I : Input` for this combinator to be meaningful.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Just<P> {
-    pattern: P,
+    /// The inner pattern, which this parser matches onto the input via [`Pattern::matches_at`].
+    pub pattern: P,
 }
 impl<P> Just<P> {
+    /// Constructs a new [`Just`] parser.
     pub fn new<'src, I>(pattern: P) -> Self
     where
         P: Pattern<'src, I>,

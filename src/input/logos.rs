@@ -1,3 +1,7 @@
+//! Module for the implementation of [`Input`] on arbitrary [`Logos`] grammars.
+//! 
+//! Requires default feature [`logos`].
+
 use std::{
     borrow::Cow,
     fmt::{Debug, Display},
@@ -120,6 +124,7 @@ where
         }
     }
 
+    /// Returns the underlying source string.
     pub fn source(&self) -> &str {
         &self.source
     }

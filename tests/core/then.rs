@@ -1,7 +1,14 @@
+//! Notes:
+//!
+//! `then` is such a fundamental operator in Biparse that plenty of tests have been done in other files.
+//! This mostly targets the combinations of potential parse outcomes in the first or second payload.
+
+use biparse::prelude::*;
 
 #[test]
 fn double_success() {
-    todo!()
+    let combinator = success::<_, DefaultParseEnvironment>().then(success());
+    combinator.parse_all("").expect("Success!");
 }
 
 #[test]

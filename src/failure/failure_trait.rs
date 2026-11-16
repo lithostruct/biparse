@@ -8,7 +8,7 @@ use std::{borrow::Cow, fmt::Debug};
 /// Trait that [`Parser`](crate::parse::Parser) implementors interface with
 /// to construct owned failure payload values,
 /// arising from
-pub trait ParseFailure: Clone {
+pub trait ParseFailure: Clone + Debug {
     /// Constructs the failure value given its location and error information.
     /// Information need not be retained.
     fn failure_at<I: Input + ?Sized>(input: &I, cursor: I::Cursor, kind: FailureKind<I>) -> Self;
@@ -72,23 +72,48 @@ pub enum FailureKind<I: Input + ?Sized> {
     /// Expected a certain pattern, failed to match.
     /// This may correspond to a cursor location in which the input diverges.
     ExpectedFound {
+        /// The expected input value, as returned by [`Parser::hint`](crate::parse::Parser::hint).
         hint: ParseHint,
+        /// The cursor location at which the input diverges from the hint, if applicable.
         difference_at: Option<I::Cursor>,
     },
     /// Failure caused by the [`Fail`](crate::combinator::Fail) primitive combinator.
-    FailPrimitive { message: Option<Cow<'static, str>> },
+    FailPrimitive {
+        /// Optional message to be transmitted.
+        message: Option<Cow<'static, str>>,
+    },
 
-    /// Undefined parser. This is always fatal.
-    UndefinedParser { name: Option<Cow<'static, str>> },
-    /// Dropped parser. This is always fatal.
-    DroppedParser { name: Option<Cow<'static, str>> },
-    /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
-    NonGrowingRepetition { inner_hint: ParseHint },
+    /// Undefined recursive parser. This is always fatal.
+    UndefinedParser {
+        /// Optional name of the recursive parser.
+        name: Option<Cow<'static, str>>,
+    },
+    /// Dropped recursive parser. This is always fatal.
+    DroppedParser {
+        /// Optional name of the recursive parser.
+        name: Option<Cow<'static, str>>,
+    },
+    /// Non-growing repetition in [`Repetition`](crate::combinator::Repetition) combinators. This is always fatal.
+    NonGrowingRepetition {
+        /// The hint of the inner parser, which admits unconditional success without advancing the input.
+        inner_hint: ParseHint,
+    },
+
+    /// Insufficient repetition in [`Repetition`](crate::combinator::Repetition) combinators.
+    /// Typically supplied as supplementary information for a failure.
+    InsufficientRepetition {
+        /// The minimum number of repetitions expected.
+        minimum_repetitions: usize,
+        /// The repetition count at which this error is produced.
+        in_repetition: usize,
+    },
 }
 
 /// The struct that carries unbounded recursion failure information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnboundedRecursion {
+    /// Optional name of the recursive parser.
     pub name: Option<Cow<'static, str>>,
+    /// The [`RecursiveId`] of the originating recursive parser.
     pub from: RecursiveId,
 }

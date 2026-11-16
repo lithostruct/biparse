@@ -1,3 +1,5 @@
+//! Module for the [`SkippingStr`] type, which automatically skips trivia characters.
+
 use std::borrow::Cow;
 
 use rowan::SyntaxKind;

@@ -44,6 +44,7 @@ pub struct Matches<K, P>(
 );
 impl<'src, T> Matches<SyntaxKind, fn(&T) -> bool> {
     /// Constructs a predicate that unconditionally accepts any token in some input `I`.
+    /// For unconditional rejection, see [`Matches::never`].
     ///
     /// # Note on Type Inference
     ///
@@ -62,6 +63,20 @@ impl<'src, T> Matches<SyntaxKind, fn(&T) -> bool> {
     {
         Matches(kind.into(), |_| true)
     }
+    /// Constructs a predicate that unconditionally *rejects* any token in some input `I`.
+    /// For unconditional acceptance, see [`Matches::always`].
+    ///
+    /// # Note on Type Inference
+    ///
+    /// The type of `I` *must* be supplied at the callsite.
+    /// Type inference fails otherwise when used directly in `just` combinators.
+    ///
+    /// ```
+    /// # use biparse::input::Matches;
+    /// use rowan::SyntaxKind;
+    /// // Unconditionally accepts any `char` token from a string input.
+    /// let _ = Matches::always::<str>(SyntaxKind(0));
+    /// ```
     pub fn never<I>(kind: impl Into<SyntaxKind>) -> Self
     where
         I: Input<Token<'src> = T> + ?Sized + 'src,

@@ -9,6 +9,7 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> f
 where
     P: Parser<'src, I, A, E> + ?Sized,
 {
+    #[inline(always)]
     fn parse(
         &self,
         input: &'src I,
@@ -16,6 +17,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         <P as Parser<'src, I, A, E>>::parse(*self, input, state)
     }
+    #[inline(always)]
     fn check(
         &self,
         input: &'src I,
@@ -23,6 +25,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         <P as Parser<'src, I, A, E>>::check(*self, input, state)
     }
+    #[inline(always)]
     fn hint(&self) -> ParseHint {
         <P as Parser<'src, I, A, E>>::hint(self)
     }
@@ -32,6 +35,7 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> f
 where
     P: Parser<'src, I, A, E> + ?Sized,
 {
+    #[inline(always)]
     fn parse(
         &self,
         input: &'src I,
@@ -39,6 +43,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         (&**self as &P).parse(input, state)
     }
+    #[inline(always)]
     fn check(
         &self,
         input: &'src I,
@@ -46,6 +51,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
     }
+    #[inline(always)]
     fn hint(&self) -> ParseHint {
         <P as Parser<'src, I, A, E>>::hint(self as &P)
     }
@@ -55,6 +61,7 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> f
 where
     P: Parser<'src, I, A, E> + ?Sized,
 {
+    #[inline(always)]
     fn parse(
         &self,
         input: &'src I,
@@ -62,6 +69,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         (&**self as &P).parse(input, state)
     }
+    #[inline(always)]
     fn check(
         &self,
         input: &'src I,
@@ -69,6 +77,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
     }
+    #[inline(always)]
     fn hint(&self) -> ParseHint {
         <P as Parser<'src, I, A, E>>::hint(self as &P)
     }
@@ -78,6 +87,7 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> f
 where
     P: Parser<'src, I, A, E> + ?Sized,
 {
+    #[inline(always)]
     fn parse(
         &self,
         input: &'src I,
@@ -85,6 +95,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         (&**self as &P).parse(input, state)
     }
+    #[inline(always)]
     fn check(
         &self,
         input: &'src I,
@@ -92,17 +103,19 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         (&**self as &P).check(input, state)
     }
+    #[inline(always)]
     fn hint(&self) -> ParseHint {
         <P as Parser<'src, I, A, E>>::hint(self as &P)
     }
 }
 
 /// Parser combinator wrapper that allows for a parser combinator to carry its associated [`ParseEnvironment`].
-/// Used to wrap combinators, where the associated `ParseEnvironment` information is likely to be lost for type inference.
+/// May be useful where the associated `ParseEnvironment` information may be lost for type inference.
 ///
 /// See [`As<'src, I, A, E>`] for a stronger typed variant.
 #[repr(transparent)]
 pub struct With<E, P> {
+    /// The inner parser.
     pub inner: P,
     _marker: PhantomData<fn(E)>,
 }
@@ -135,8 +148,8 @@ impl<E, P: Hash> Hash for With<E, P> {
         self._marker.hash(state);
     }
 }
-
 impl<E: ParseEnvironment, P> With<E, P> {
+    /// Constructs a new [`With`] parser.
     pub fn new<'src, I: Input + ?Sized, A>(inner: P) -> Self
     where
         P: Parser<'src, I, A, E>,
@@ -147,10 +160,12 @@ impl<E: ParseEnvironment, P> With<E, P> {
         }
     }
 }
+
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> for With<E, P>
 where
     P: Parser<'src, I, A, E>,
 {
+    #[inline(always)]
     fn parse(
         &self,
         input: &'src I,
@@ -158,6 +173,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         self.inner.parse(input, state)
     }
+    #[inline(always)]
     fn check(
         &self,
         input: &'src I,
@@ -165,6 +181,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.inner.check(input, state)
     }
+    #[inline(always)]
     fn hint(&self) -> ParseHint {
         self.inner.hint()
     }
@@ -176,6 +193,7 @@ where
 /// See [`With`] for a weaker version that only requires proof of the [`Parser`] instance at construction, then forgets it.
 #[repr(transparent)]
 pub struct As<'src, I: ?Sized, A, E, P> {
+    /// The inner parser.
     pub inner: P,
     _marker: PhantomData<fn(&'src I, A, E)>,
 }
@@ -220,11 +238,22 @@ where
         }
     }
 }
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> As<'src, I, A, E, P>
+where
+    P: Parser<'src, I, A, E>,
+{
+    /// Constructs a new [`As`] parser. Defers to [`Self::from`].
+    pub fn new(value: P) -> Self {
+        As::from(value)
+    }
+}
+
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E>
     for As<'src, I, A, E, P>
 where
     P: Parser<'src, I, A, E>,
 {
+    #[inline(always)]
     fn parse(
         &self,
         input: &'src I,
@@ -232,6 +261,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
         self.inner.parse(input, state)
     }
+    #[inline(always)]
     fn check(
         &self,
         input: &'src I,
@@ -239,6 +269,7 @@ where
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
         self.inner.check(input, state)
     }
+    #[inline(always)]
     fn hint(&self) -> ParseHint {
         self.inner.hint()
     }

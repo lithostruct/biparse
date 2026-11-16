@@ -5,7 +5,7 @@ use crate::{
     input::{Input, LineColumn},
 };
 
-/// Simplistic failure kind discarding all payload information of [`FailureKind`].
+/// Simplistic failure kind, discarding all payload information of [`FailureKind`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
 pub enum SimpleKind {
     /// Expected a certain pattern, failed to match.
@@ -25,6 +25,9 @@ pub enum SimpleKind {
     /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
     #[error("non growing repetition")]
     NonGrowingRepetition,
+    /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
+    #[error("insufficient repetition")]
+    InsufficientRepetition,
 
     /// Custom failure.
     #[error("{0}")]
@@ -49,6 +52,7 @@ impl<I: Input + ?Sized> From<FailureKind<I>> for SimpleKind {
             FailureKind::UndefinedParser { .. } => SimpleKind::UndefinedParser,
             FailureKind::DroppedParser { .. } => SimpleKind::DroppedParser,
             FailureKind::NonGrowingRepetition { .. } => SimpleKind::NonGrowingRepetition,
+            FailureKind::InsufficientRepetition { .. } => SimpleKind::InsufficientRepetition,
         }
     }
 }
@@ -59,11 +63,15 @@ impl From<UnboundedRecursion> for SimpleKind {
 }
 
 /// Failure type retaining positional and simplistic kind identification.
+///
+/// Supplementary failure information is not retained.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
 #[error("{line_col} {kind}")]
 pub struct Simple {
-    pub kind: SimpleKind,
+    /// The line-column position at which this failure occured.
     pub line_col: LineColumn,
+    /// The kind of failure. *Discards* payload information.
+    pub kind: SimpleKind,
     recursive_info: Vec<(LineColumn, UnboundedRecursion)>,
 }
 impl ParseFailure for Simple {

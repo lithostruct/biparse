@@ -8,7 +8,7 @@ pub use crate::{
     input::{Input, LineColumn, Pattern},
     parse::{
         DefaultParseEnvironment, ParseArtifact, ParseEnvironment, ParseOutcome, ParseOutput,
-        ParseState, Parser, ParserExt, ParserIntoOwnedExt, RecursiveState, composite,
+        ParseState, Parser, ParserExt, ParserIntoOwnedExt, RecursiveState, derived,
     },
 };
 pub use either::Either;

@@ -17,6 +17,7 @@ pub use super::{cached_str::CachedStr, skipping_str::SkippingStr};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Into)]
 pub struct StrIndex(#[into] pub(super) usize);
 impl StrIndex {
+    /// Converts `self` into [`usize`].
     pub fn into_usize(self) -> usize {
         self.into()
     }

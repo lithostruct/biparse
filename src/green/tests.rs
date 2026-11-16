@@ -83,10 +83,7 @@ mod test {
             vec![NodeOrToken::Token(a.clone()), NodeOrToken::Token(b.clone())],
         );
 
-        let b_a = interner.node(
-            PAIR, 
-            vec![NodeOrToken::Token(b), NodeOrToken::Token(a)]
-        );
+        let b_a = interner.node(PAIR, vec![NodeOrToken::Token(b), NodeOrToken::Token(a)]);
 
         assert!(!std::ptr::eq::<GreenNodeData>(a_b.borrow(), b_a.borrow()))
     }

@@ -8,11 +8,15 @@ use crate::{
 
 /// Parser combinator that sequentially executes two parsers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Then<First, Second> {
-    first: First,
-    second: Second,
+    /// The first parser.
+    pub first: First,
+    /// The second parser, to be tried sequentially after the first upon success.
+    pub second: Second,
 }
 impl<First, Second> Then<First, Second> {
+    /// Constructs a new `Then` parser.
     pub fn new<'src, I: Input + ?Sized, A, B, E: ParseEnvironment>(
         first: First,
         second: Second,
@@ -103,11 +107,15 @@ where
 
 /// Parser combinator that returns the first viable alternative, preferring the first result wherever possible.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Or<First, Second> {
-    first: First,
-    second: Second,
+    /// The first parser.
+    pub first: First,
+    /// The second parser, to be tried as an alternative after the first fails speculatively.
+    pub second: Second,
 }
 impl<First, Second> Or<First, Second> {
+    /// Constructs a new `Or` parser.
     pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         first: First,
         second: Second,

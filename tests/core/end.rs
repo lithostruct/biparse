@@ -26,7 +26,7 @@ fn single_end() {
 
 #[test]
 fn just_then_end() {
-    let combinator: With<DefaultParseEnvironment, _> = just((SyntaxKind(0), "a")).then(end());
+    let combinator = just::<_, DefaultParseEnvironment, _>((SyntaxKind(0), "a")).then(end());
 
     let not_enough = combinator.parse_all("");
     let just_right = combinator.parse_all("a");

@@ -1,7 +1,7 @@
 //! Test regarding non-consuming input for recursive combinators.
 //! These focus less on correctness (thought that is important too),
 //! and more on termination of parsing.
-//! 
+//!
 //! In other words, the failure case is timeout or spinning.
 
 use biparse::prelude::*;

@@ -30,7 +30,7 @@ pub use self::{
         combinator::{Direct, Indirect, Recursive},
         frame::{RecursiveId, RecursiveState},
     },
-    repetition::Many,
+    repetition::Repetition,
 };
 
 // Constants and functions.

@@ -12,6 +12,10 @@ use std::{borrow::Cow, fmt::Debug};
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Success;
 impl Success {
+    /// Constructs a new, raw [`Success`] value.
+    ///
+    /// Prefer [`success`](crate::combinator::success),
+    /// which fixes the [`Parser`] implementation via [`As`](crate::combinator::As).
     pub fn new() -> Self {
         Self
     }
@@ -46,11 +50,19 @@ impl<'src, I: Input + ?Sized, E: ParseEnvironment> Parser<'src, I, (), E> for Su
 ///
 /// The zero identity for choices.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Fail(Option<Cow<'static, str>>);
+pub struct Fail(pub Option<Cow<'static, str>>);
 impl Fail {
+    /// Constructs a new, raw [`Fail`] value.
+    ///
+    /// Prefer [`fail`](crate::combinator::fail),
+    /// which fixes the [`Parser`] implementation via [`As`](crate::combinator::As).
     pub fn new() -> Self {
         Self(None)
     }
+    /// Constructs a new, raw [`Fail`] value, with the given name.
+    ///
+    /// Prefer [`fail_with`](crate::combinator::fail_with),
+    /// which fixes the [`Parser`] implementation via [`As`](crate::combinator::As).
     pub fn new_with(msg: impl Into<Cow<'static, str>>) -> Self {
         Self(Some(msg.into()))
     }
@@ -105,6 +117,10 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment> Parser<'src, I, A, E> for 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct End;
 impl End {
+    /// Constructs a new, raw [`End`] value.
+    ///
+    /// Prefer [`end`](crate::combinator::end),
+    /// which fixes the [`Parser`] implementation via [`As`](crate::combinator::As).
     pub fn new() -> Self {
         Self
     }

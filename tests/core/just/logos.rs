@@ -206,9 +206,9 @@ fn mismatched_token() {
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
     expect![[r#"
-        (1, 1): expected:
-              | └─ token Root
-              | found: token Plus at (1, 1)"#]]
+        (1, 1) expected:
+             | └─ token Root
+             | found: token Plus at (1, 1)"#]]
     .assert_eq(&result.unwrap_err().terminating.to_string());
 }
 #[test]
@@ -220,9 +220,9 @@ fn unrecognized_token() {
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
     expect![[r#"
-        (1, 1): expected:
-              | └─ token Root
-              | found: lex error () at (1, 1)"#]]
+        (1, 1) expected:
+             | └─ token Root
+             | found: lex error () at (1, 1)"#]]
     .assert_eq(&result.unwrap_err().terminating.to_string());
 }
 

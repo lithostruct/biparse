@@ -84,6 +84,11 @@ fn non_growing_termination() {
 }
 
 /// Asserting that saving/loading of state during seed-growing maintains association uniqueness.
+///
+/// This should be handled natively because left-recursion `this` should not have advanced the Id supply,
+/// regardless if it is then nested behind `associate`.
+/// The recursive seed saving then "preserves" any advanced supplies for that iteration,
+/// which is cached within the RecursiveState valid for the next iteration.
 #[test]
 fn left_recursion_with_association() {
     let combinator: Recursive<dyn Parser<'_, str, Vec<(usize, char)>, DefaultParseEnvironment>> =
@@ -99,19 +104,13 @@ fn left_recursion_with_association() {
     let artifact = combinator
         .parse_all("Lorem ipsum dolor sit amet")
         .expect("Parse success!");
-    let associations = artifact.cst().associations();
 
-    for id in associations.keys() {
-        // Following construction order, the first key corresponds to the first character,
-        // second key includes first and second,
-        // nth key includes all previous characters and nth character etc.
-        //
-        // This is a stronger promise than that documented in the API:
-        // `Id`s used need not come from contiguous allocations.
-        // This is true for the native combinators though.
+    for (index, (id, _)) in artifact.ast_only().iter().enumerate() {
+        // All `id`'s here should be sequential following each iteration.
+        // Though the API promise of `IdSupply` here is to just produce unique identification values.
         assert_eq!(
             artifact.cst().search(id).map(|node| node.text_len().into()),
-            Some(id + 1)
+            Some(index + 1)
         )
     }
 }

@@ -33,6 +33,9 @@ num-derive = "0.5.1"
 num-traits = "0.2.19"
 proptest = "1.11.0"
 
+[lints.rust]
+missing_docs = "warn"
+
 [package.metadata.mdbook]
 targets = [
     "guide",

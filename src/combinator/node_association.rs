@@ -8,13 +8,21 @@ use crate::{
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
+/// Parser combinator for appending a CST node as a parent to an existing green forest.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Node<P> {
-    kind: SyntaxKind,
-    name: Option<Cow<'static, str>>,
-    inner: P,
+    /// The [`SyntaxKind`] of the CST node, which takes the existing forest as its children.
+    pub kind: SyntaxKind,
+    /// Optional name for this parser.
+    ///
+    /// Used for better parse errors and diagnostics.
+    pub name: Option<Cow<'static, str>>,
+    /// The inner parser.
+    pub inner: P,
 }
 impl<P> Node<P> {
+    /// Constructs a new [`Node`] parser.
     pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(kind: SyntaxKind, inner: P) -> Self
     where
         P: Parser<'src, I, A, E>,
@@ -25,6 +33,7 @@ impl<P> Node<P> {
             name: None,
         }
     }
+    /// Constructs a new [`Node`] parser, with the given name.
     pub fn new_as<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         name: impl Into<Cow<'static, str>>,
         kind: SyntaxKind,
@@ -87,15 +96,24 @@ where
     }
 }
 
+/// Parser combinator for the association of AST and CST trees via [`IdSupply::Id`] correspondence.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Associate<P, F, A> {
-    inner: P,
-    closure: F,
-    kind: SyntaxKind,
-    name: Option<Cow<'static, str>>,
+    /// The inner parser.
+    pub inner: P,
+    /// The closure receiving an `Id` from `ParseEnvironment::IdSupply` and the inner parser,
+    /// returning a payload of type `A`.
+    pub closure: F,
+    /// The [`SyntaxKind`] of the CST node, which takes the existing forest as its children.
+    pub kind: SyntaxKind,
+    /// Optional name for this parser.
+    ///
+    /// Used for better parse errors and diagnostics.
+    pub name: Option<Cow<'static, str>>,
     _marker: PhantomData<fn(A)>,
 }
 impl<P, F, A> Associate<P, F, A> {
+    /// Constructs a new [`Associate`] parser.
     pub fn new<'src, I: Input + ?Sized, E: ParseEnvironment, B>(
         inner: P,
         kind: SyntaxKind,
@@ -112,6 +130,7 @@ impl<P, F, A> Associate<P, F, A> {
             _marker: PhantomData,
         }
     }
+    /// Constructs a new [`Associate`] parser, with the given name.
     pub fn new_as<'src, I: Input + ?Sized, E: ParseEnvironment, B>(
         name: impl Into<Cow<'static, str>>,
         inner: P,

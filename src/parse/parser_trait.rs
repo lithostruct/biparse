@@ -1,4 +1,4 @@
-use std::{borrow::Cow, rc::Rc};
+use std::{borrow::Cow, ops::RangeBounds, rc::Rc};
 
 use either::Either;
 use rowan::SyntaxKind;
@@ -6,8 +6,8 @@ use rowan::SyntaxKind;
 pub use crate::failure::ParseHint;
 use crate::{
     combinator::{
-        As, Associate, Commit, IntoOwned, Many, Map, Node, Or, Recover, Success, Then, TryMap,
-        With, end, success,
+        As, Associate, Commit, IntoOwned, Map, Node, Or, Recover, Repetition, Success, Then,
+        TryMap, With, end, success,
     },
     cst::IdSupply,
     input::Input,
@@ -110,70 +110,62 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     /// Chains `self` to then sequentially execute the second parser.
     ///
     /// Underlying combinator object: [`Then`].
-    fn then<P, B>(self, next: P) -> With<E, Then<Self, P>>
+    fn then<P, B>(self, next: P) -> Then<Self, P>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
     {
-        With::new(Then::new(self, next))
+        Then::new(self, next)
     }
     /// Chains `self` as an alternative, falling through to the second parser.
     ///
     /// Underlying combinator object: [`Or`].
-    fn or<P>(self, other: P) -> With<E, Or<Self, P>>
+    fn or<P>(self, other: P) -> Or<Self, P>
     where
         P: Parser<'src, I, A, E>,
         Self: Sized,
     {
-        With::new(Or::new(self, other))
+        Or::new(self, other)
     }
     /// Chains `self` to transform the success payload.
     ///
     /// Underlying combinator object: [`Map`].
-    fn map<F, B>(self, closure: F) -> With<E, Map<Self, F, A>>
+    fn map<F, B>(self, closure: F) -> Map<Self, F, A>
     where
         F: Fn(A) -> B,
         Self: Sized,
     {
-        With::new(Map::new(self, closure))
+        Map::new(self, closure)
     }
     /// Chains `self` to add a new parent to the current CST forest.
     ///
     /// Underlying combinator object: [`Node`].
-    fn node(self, kind: impl Into<SyntaxKind>) -> With<E, Node<Self>>
+    fn node(self, kind: impl Into<SyntaxKind>) -> Node<Self>
     where
         Self: Sized,
     {
-        With::new(Node::new(kind.into(), self))
+        Node::new(kind.into(), self)
     }
     /// Chains `self` to add a new parent to the current CST forest.
     /// Additionally provides a name to the parser object for use in diagnostics.
     ///
     /// Underlying combinator object: [`Node`].
-    fn named(
-        self,
-        name: impl Into<Cow<'static, str>>,
-        kind: impl Into<SyntaxKind>,
-    ) -> With<E, Node<Self>>
+    fn named(self, name: impl Into<Cow<'static, str>>, kind: impl Into<SyntaxKind>) -> Node<Self>
     where
         Self: Sized,
     {
-        With::new(Node::new_as(name, kind.into(), self))
+        Node::new_as(name, kind.into(), self)
     }
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
     ///
     /// Underlying combinator object: [`Associate`].
-    fn associate<F, B>(
-        self,
-        kind: impl Into<SyntaxKind>,
-        closure: F,
-    ) -> With<E, Associate<Self, F, A>>
+    fn associate<F, B>(self, kind: impl Into<SyntaxKind>, closure: F) -> Associate<Self, F, A>
     where
         F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
         Self: Sized,
     {
-        With::new(Associate::new(self, kind.into(), closure))
+        Associate::new(self, kind.into(), closure)
     }
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
@@ -185,35 +177,34 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         name: impl Into<Cow<'static, str>>,
         kind: impl Into<SyntaxKind>,
         closure: F,
-    ) -> With<E, Associate<Self, F, A>>
+    ) -> Associate<Self, F, A>
     where
         F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
         Self: Sized,
     {
-        With::new(Associate::new_as(name, self, kind.into(), closure))
+        Associate::new_as(name, self, kind.into(), closure)
     }
 
-    /// Chains `self` to repeat zero or more times, returning [`Vec<A>`].
-    ///
-    /// Underlying combinator object: [`Many`].
-    fn many(self) -> With<E, Many<Self>>
+    /// Chains `self` to repeat zero or more times, returning a [`Vec<A>`].
+    /// 
+    /// Underlying combinator object: [`Repetition`].
+    fn many(self) -> Repetition<Self>
     where
         Self: Sized,
     {
-        With::new(Many::new(self))
+        Repetition::new(self, 0..).expect("Range valid!")
     }
     /// Chains `self` to repeat one or more times, returning a non-empty [`Vec<A>`].
-    fn some(self) -> composite::Some<E, Self, A>
+    /// 
+    /// Underlying combinator object: [`Repetition`].
+    fn some(self) -> Repetition<Self>
     where
-        Self: Sized + Clone,
+        Self: Sized,
     {
-        self.clone().then(self.many()).map(|(first, mut rest)| {
-            rest.insert(0, first);
-            rest
-        })
+        Repetition::new(self, 1..).expect("Range valid!")
     }
     /// Chains `self` to match on zero or one occurrence, returning [`Option<A>`].
-    fn optional(self) -> composite::Optional<'src, Self, I, A, E>
+    fn optional(self) -> derived::Optional<'src, Self, I, A, E>
     where
         Self: Sized,
     {
@@ -269,14 +260,14 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Discards the current AST payload.
-    fn ignore(self) -> composite::Ignore<E, Self, A>
+    fn ignore(self) -> derived::Ignore<Self, A>
     where
         Self: Sized,
     {
         self.map(|_| ())
     }
     /// Sequentially executes the next parser, discarding the next parser's payload.
-    fn then_ignore<P, B>(self, next: P) -> composite::ThenIgnore<E, Self, P, A, B>
+    fn then_ignore<P, B>(self, next: P) -> derived::ThenIgnore<Self, P, A, B>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
@@ -284,7 +275,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         self.then(next).map(|(first, _)| first)
     }
     /// Sequentially executes the next parser, discarding `self`'s payload.
-    fn ignore_then<P, B>(self, next: P) -> composite::IgnoreThen<E, Self, P, A, B>
+    fn ignore_then<P, B>(self, next: P) -> derived::IgnoreThen<Self, P, A, B>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
@@ -295,7 +286,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     /// Speculatively parses `self` and the given parser.
     /// Unlike [`Self::or`], the payloads of `self` and `other` may be different,
     /// producing an [`Either<A, B>`] payload.
-    fn either_or<P, B>(self, other: P) -> composite::EitherOr<E, Self, P, A, B>
+    fn either_or<P, B>(self, other: P) -> derived::EitherOr<Self, P, A, B>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
@@ -304,11 +295,35 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
             .or(other.map(Either::Right))
     }
 
+    /// Chains `self` to repeat exactly `n` times, returning a [`Vec<A>`] with exactly `n` elements.
+    /// 
+    /// Underlying combinator object: [`Repetition`].
+    fn repeat(self, n: usize) -> Repetition<Self>
+    where
+        Self: Sized,
+    {
+        Repetition::new(self, n..=n).expect("Range valid!")
+    }
+    /// Chains `self` to repeat for the minimum and maximum bounds described by `range`,
+    /// returning a [`Vec<A>`] with the number of elements bounded to `range`.
+    /// 
+    /// Underlying combinator object: [`Repetition`].
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if `range` is empty.
+    fn repeat_by(self, range: impl RangeBounds<usize>) -> Repetition<Self>
+    where
+        Self: Sized,
+    {
+        Repetition::new(self, range).expect("Range valid!")
+    }
+
     /// Establishes a commitment point where subsequent speculative failure in the `other` parser
     /// is promoted to a committed failure.
-    /// 
+    ///
     /// Note that chaining `a.then_commit_to(b).then(c)` will only cause `b` to commit, but not `c`.
-    fn then_commit_to<P, B>(self, other: P) -> composite::ThenCommitTo<E, Self, P>
+    fn then_commit_to<P, B>(self, other: P) -> derived::ThenCommitTo<E, Self, P>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
@@ -321,38 +336,30 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E
 {
 }
 
-/// Types of composite and/or derived parsers formed by `ParserExt`,
+/// Types of composite and/or derived parsers formed by [`ParserExt`],
 /// expressed in terms of the primitive parser combinators.
-///
-/// These are here mostly due to `clippy::type_complexity`.
-/// They are what you expect from the corresponding value definitions,
-/// with closures type-erased to function pointers.
-pub mod composite {
+pub mod derived {
     use super::*;
 
-    pub type Some<E, P, A> =
-        With<E, Map<With<E, Then<P, With<E, Many<P>>>>, fn((A, Vec<A>)) -> Vec<A>, (A, Vec<A>)>>;
-    pub type Optional<'src, SELF, I, A, E> = With<
-        E,
-        Map<
-            composite::EitherOr<E, SELF, As<'src, I, (), E, Success>, A, ()>,
-            fn(Either<A, ()>) -> Option<A>,
-            Either<A, ()>,
-        >,
+    /// The derived parser type of [`ParserExt::optional`].
+    pub type Optional<'src, SELF, I, A, E> = Map<
+        derived::EitherOr<SELF, As<'src, I, (), E, Success>, A, ()>,
+        fn(Either<A, ()>) -> Option<A>,
+        Either<A, ()>,
     >;
 
-    pub type Ignore<E, P, A> = With<E, Map<P, fn(A) -> (), A>>;
-    pub type ThenIgnore<E, L, R, A, B> = With<E, Map<With<E, Then<L, R>>, fn((A, B)) -> A, (A, B)>>;
-    pub type IgnoreThen<E, L, R, A, B> = With<E, Map<With<E, Then<L, R>>, fn((A, B)) -> B, (A, B)>>;
+    /// The derived parser type of [`ParserExt::ignore`].
+    pub type Ignore<P, A> = Map<P, fn(A) -> (), A>;
+    /// The derived parser type of [`ParserExt::then_ignore`].
+    pub type ThenIgnore<L, R, A, B> = Map<Then<L, R>, fn((A, B)) -> A, (A, B)>;
+    /// The derived parser type of [`ParserExt::ignore_then`].
+    pub type IgnoreThen<L, R, A, B> = Map<Then<L, R>, fn((A, B)) -> B, (A, B)>;
 
-    pub type EitherOr<E, L, R, A, B> = With<
-        E,
-        Or<With<E, Map<L, fn(A) -> Either<A, B>, A>>, With<E, Map<R, fn(B) -> Either<A, B>, B>>>,
-    >;
-    pub type ThenCommitTo<E, L, R> = With<
-        E,
-        Then<L, With<E, Commit<R>>>
-    >;
+    /// The derived parser type of [`ParserExt::either_or`].
+    pub type EitherOr<L, R, A, B> =
+        Or<Map<L, fn(A) -> Either<A, B>, A>, Map<R, fn(B) -> Either<A, B>, B>>;
+    /// The derived parser type of [`ParserExt::then_commit_to`].
+    pub type ThenCommitTo<E, L, R> = Then<L, With<E, Commit<R>>>;
 }
 
 /// Convenience trait for [`.into_owned()`](Self::into_owned) method chaining.

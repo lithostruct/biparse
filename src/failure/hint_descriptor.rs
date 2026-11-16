@@ -26,11 +26,23 @@ pub enum ParseHint {
     Sequence(Vec<Self>),
     /// Any of the following as ordered choice.
     Choice(Vec<Self>),
-    /// This, zero or more times.
-    Many(Box<Self>),
+    /// This, for some number of times.
+    Repetition {
+        /// The minimum number of repetitions, inclusive.
+        minimum: usize,
+        /// The maximum number of repetitions, inclusive.
+        maximum: Option<usize>,
+        /// The inner hint.
+        inner: Box<Self>,
+    },
 
     /// A named representation of this.
-    Named { name: String, inner: Box<Self> },
+    Named {
+        /// The name of this parser.
+        name: String,
+        /// The inner hint.
+        inner: Box<Self>,
+    },
 }
 impl ParseHint {
     /// Constructs [`ParseHint::Sequence`] while eagerly flattening one-layer deep.
@@ -89,14 +101,29 @@ impl ParseHint {
                     hint => ParseHint::Peek(Box::new(hint)),
                 }
             }
-            ParseHint::Many(hint) => {
-                match hint.canonize() {
+            ParseHint::Repetition { minimum, maximum, inner } => {
+                match inner.canonize() {
                     // Leaf propagation.
                     ParseHint::Empty => ParseHint::Empty,
                     ParseHint::Fails => ParseHint::Empty,
                     // Inner de-nesting.
-                    ParseHint::Many(inner) => ParseHint::Many(inner),
-                    hint => ParseHint::Many(Box::new(hint)),
+                    ParseHint::Repetition { minimum: min2, maximum: max2, inner } => {
+                        let total_minimum =  minimum * min2;
+                        let total_maximum = match (maximum, max2) {
+                            (Some(inner), Some(inner2)) => Some(inner * inner2),
+                            _ => None,
+                        };
+                        ParseHint::Repetition {
+                            minimum: total_minimum,
+                            maximum: total_maximum,
+                            inner 
+                        }
+                    },
+                    hint => ParseHint::Repetition {
+                        minimum,
+                        maximum,
+                        inner: Box::new(hint),
+                    },
                 }
             }
             ParseHint::Named { name, inner } => ParseHint::Named {
@@ -214,7 +241,9 @@ impl TreeItem for ParseHint {
             ParseHint::Peek(_) => "peek:",
             ParseHint::Sequence(_) => "all of:",
             ParseHint::Choice(_) => "any of:",
-            ParseHint::Many(_) => "zero or more:",
+            ParseHint::Repetition { minimum, maximum, inner: _ } => {
+                &format!("repeat ({minimum}..{}):", maximum.map_or_default(|max| format!("={max}")))
+            },
             ParseHint::Named { name, inner: _ } => name,
         };
         write!(f, "{}", style.paint(text))
@@ -234,7 +263,7 @@ impl TreeItem for ParseHint {
             // Single child.
             ParseHint::Not(hint)
             | ParseHint::Peek(hint)
-            | ParseHint::Many(hint) => {
+            | ParseHint::Repetition{inner: hint, ..} => {
                 Cow::Borrowed(std::slice::from_ref(hint.as_ref()))
             },
 
@@ -308,7 +337,7 @@ impl TreeItem for ExpandedHint {
             // Single child.
             ParseHint::Not(hint)
             | ParseHint::Peek(hint)
-            | ParseHint::Many(hint)
+            | ParseHint::Repetition{inner: hint, ..}
             // Named is treated as a non-terminal.
             | ParseHint::Named { name: _, inner: hint } => {
                 Cow::Borrowed(ExpandedHint::expand_slice(
@@ -341,7 +370,9 @@ pub enum Descriptor {
         /// The data of this pattern.
         data: String,
     },
+    /// End-of-input.
     EndOfInput,
+    /// Any pattern.
     Any,
 }
 impl Display for Descriptor {

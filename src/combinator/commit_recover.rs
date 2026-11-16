@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use derive_more::{AsMut, AsRef};
 use rowan::SyntaxKind;
 
 use crate::{
@@ -10,14 +11,21 @@ use crate::{
 };
 
 /// Combinator that transforms an upstream speculative failure into a committed failure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Commit<P>(P);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, AsRef, AsMut)]
+#[non_exhaustive]
+pub struct Commit<P> {
+    #[as_ref]
+    #[as_mut]
+    /// The inner parser.
+    pub inner: P,
+}
 impl<P> Commit<P> {
-    pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(parser: P) -> Self
+    /// Constructs a new [`Commit`] parser.
+    pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(inner: P) -> Self
     where
         P: Parser<'src, I, A, E>,
     {
-        Commit(parser)
+        Commit { inner }
     }
 }
 
@@ -30,7 +38,7 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
-        let (state, output) = self.0.parse(input, state);
+        let (state, output) = self.inner.parse(input, state);
         match output.ast {
             ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 (state, output)
@@ -50,7 +58,7 @@ where
         input: &'src I,
         state: ParseState<'src, I, E>,
     ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        let (state, output) = self.0.check(input, state);
+        let (state, output) = self.inner.check(input, state);
         match output.ast {
             ParseOutcome::Success(_) | ParseOutcome::Committed(_) | ParseOutcome::Fatal(_) => {
                 (state, output)
@@ -66,7 +74,7 @@ where
     }
 
     fn hint(&self) -> ParseHint {
-        self.0.hint()
+        self.inner.hint()
     }
 }
 
@@ -82,13 +90,18 @@ where
 /// For this reason, it is recommended to keep the recovery parser as simple as possible.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Recover<F, R, B, C> {
-    fallible: F,
-    recovery: R,
-    closure: C,
-    kind: SyntaxKind,
+    /// The fallible parser, from which to recover from.
+    pub fallible: F,
+    /// The recovery parser, from which recovery is executed.
+    pub recovery: R,
+    /// The recovery closure, which converts a successful recovery into an AST paylaod.
+    pub closure: C,
+    /// The [`SyntaxKind`] of the CST node constructed upon successful recovery.
+    pub kind: SyntaxKind,
     _marker: PhantomData<fn(B)>,
 }
 impl<F, R, B, C> Recover<F, R, B, C> {
+    /// Constructs a new [`Recover`] parser.
     pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         fallible: F,
         recovery: R,

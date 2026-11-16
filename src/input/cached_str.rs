@@ -1,3 +1,5 @@
+//! Module for the [`CachedStr`] type, which caches its line-start information upon construction.
+
 use std::borrow::Cow;
 
 use derive_more::{AsRef, Deref};

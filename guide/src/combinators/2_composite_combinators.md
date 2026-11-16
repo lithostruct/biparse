@@ -4,7 +4,9 @@ This section describes combinators formed via composition of smaller parsers.
 
 ## Sequencing
 
-Sequencing involves parsing constituent elements in sequential order. All of the parsers must succeed to be considered an overall success.
+Sequencing involves parsing constituent elements in sequential order.
+
+All of the parsers must succeed to be considered an overall success, and Biparse typically implements short-circuiting semantics. In other words, early failure results in the entire collection failing.
 
 ### `then`
 
@@ -28,7 +30,7 @@ Binary alternative between two constituent parsers. A parser of `first.or(second
 
 ### `either_or`
 
-Syntactic sugar over `or`, distinguishing each parsing path as a sum type. A parser of `a.or(b)` has AST payload type `Either<A, B>`. `A` and `B` may be different types.
+Syntactic sugar over `or`, distinguishing each parsing path as a sum type. A parser of `a.either_or(b)` has AST payload type `Either<A, B>`. `A` and `B` may be different types.
 
 The Either type is re-exported from the [`either`](https://crates.io/crates/either) crate, and represents one of two possible payload types. It can be thought of as a `Result` without the conceptual semantics of success/error. The first parsing path from parser `a` is represented by `Either::Left(_)`, and the second parsing path from `b` is `Either::Right`.
 
@@ -42,13 +44,13 @@ Repetition involves parsing the same constructs multiple times,
 
 Zero or more repetitions of the inner parser. A parser of `a.many()` has AST payload type `Vec<A>`.
 
-The inner parser *must* advance the input by some non-zero amount each iteration. Failure to do so is an invariant violation, and produces a `Fatal` failure.
+The inner parser *must* advance the input by some non-zero amount each iteration. Failure to do so is an invariant violation, and produces a [`Fatal` failure](../parse_output.md#fatal).
 
 ### `some`
 
 One or more repetitions of the inner parser. Syntactic sugar over [`many`](#many). A parser of `a.some()` has AST payload type `Vec<A>`, which is guaranteed to be non-empty.
 
-The inner parser *must* advance the input by some non-zero amount each iteration. Failure to do so is an invariant violation, and produces a `Fatal` failure.
+The inner parser *must* advance the input by some non-zero amount each iteration. Failure to do so is an invariant violation, and produces a [`Fatal` failure](../parse_output.md#fatal).
 
 ### `optional`
 

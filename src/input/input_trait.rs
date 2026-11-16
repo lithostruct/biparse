@@ -96,6 +96,7 @@ pub trait Input {
         Self: 'src;
 }
 
+/// The result of pattern matching, as used by [`Pattern::matches_at`].
 pub type PatternMatchResult<'src, S, I> = Result<
     PatternMatch<<S as Pattern<'src, I>>::Payload, <I as Input>::Cursor>,
     Option<<I as Input>::Cursor>,
@@ -132,8 +133,11 @@ pub trait Pattern<'src, I: Input + ?Sized + 'src> {
 /// Information relating to tokens from [`Input::peek`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InputItem<T, C> {
+    /// The token `T` corresponding to `<I as Input>::Token`.
     pub token: T,
+    /// The contiguous span this token takes up.
     pub span: Range<usize>,
+    /// The next cursor this input should advance to.
     pub next_cursor: C,
 }
 impl<T, C> InputItem<T, C> {
@@ -150,7 +154,11 @@ impl<T, C> InputItem<T, C> {
 /// One-indexed line and column number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LineColumn {
+    /// 1-indexed line number.
     pub line: usize,
+    /// 1-indexed column number.
+    /// 
+    /// For most [`Input`] implementors, this is determined via [`str::chars`] rather than using Unicode width.
     pub column: usize,
 }
 impl Display for LineColumn {

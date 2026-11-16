@@ -1,11 +1,10 @@
-
 #[test]
 fn speculate_or_succeed() {
     todo!()
 }
 
 #[test]
-fn first_succees() {
+fn first_success() {
     todo!()
 }
 

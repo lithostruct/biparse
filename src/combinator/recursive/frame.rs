@@ -73,6 +73,7 @@ impl<'src, C: Clone, E: ParseEnvironment> Clone for RecursiveState<'src, C, E> {
     }
 }
 impl<'src, C: Clone, E: ParseEnvironment> RecursiveState<'src, C, E> {
+    /// Cosntructs a new, empty [`RecursiveState`].
     pub fn new() -> Self {
         Self::default()
     }
@@ -184,10 +185,13 @@ impl<'src, C: Clone, E: ParseEnvironment> Clone for RecursiveFrame<'src, C, E> {
     }
 }
 
-/// Opaque newtype identifying a recursive combinator within a parse session.
+/// Unique identifier for a recursive combinator.
+///
+/// This is a newtype over a pointer type, and is only meaningful within a single parse session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RecursiveId(pub(super) *const ());
 impl RecursiveId {
+    /// Writes `self` as the string representation of the inner pointer.
     pub fn as_str(&self) -> String {
         format!("<{:p}>", self.0)
     }

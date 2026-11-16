@@ -4,7 +4,7 @@ There are two main traits that are integral for the usage of a parser in the com
 
 ## Main `Parser` Trait
 
-The `Parser` trait takes the form:
+The `Parser` trait takes the form of:
 ```rust,ignore
 /// The central parsing trait, implemented by all combinators.
 pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment> {
@@ -29,7 +29,7 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
 - `'src` is the lifetime over which the input `I` is borrowed for during a parse operation.
 - `I` is the input type that this parser accepts.
 - `A` is the AST output type this parser produces.
-- `E` is `ParseEnvironment` implementor, which carries additional information regarding CST association and the type for parsing errors.
+- `E` is a `ParseEnvironment` implementor, which carries additional information regarding CST association and the type for parsing errors.
 - `parse` is the main operation used by the combinator ecosystem, which implements how this combinator takes in an input and parse state, to return either a successful parse containing payload `A` or an error.
 - `check` is similar to `parse` but discards all information other than diagnostics and whether the parse is successful.
 - `hint` provides diagnostic information regarding the input this parser expects.
@@ -65,6 +65,6 @@ Chaining methods include but are not limited to:
 - Repetition or optional parsing: `.many()`, `.some()`, `.optional()`.
 - Mapping, CST node construction and association: `.map()`, `.node(...)`, `associate(...)`.
 - `dyn` object construction: `.boxed()`, `.shared()` which constructs `Rc<dyn ...>`.
-- Derived parser combinators: `.ignore()`, `or_same()`, `optional_with_default()`, etc.
+- Derived parser combinators: `.ignore()`, `.either_or()`, etc.
 
 In other words, most non-leaf combinators are constructed via `ParserExt` method chaining, and is the preferred method of construction over direct usage of the corresponding combinator types. The combinator types themselves and their respective constructors methods remain available in the `biparse::combinator` module.

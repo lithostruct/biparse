@@ -220,9 +220,9 @@ fn commit_within_many() {
     // Missing closing parenthesis. This failure is terminal.
     const TERMINAL: &str = "( missing paren";
     expect![[r#"
-        (1, 16): expected:
-               | └─ character ')'
-               | found: end of input at (1, 16)"#]]
+        (1, 16) expected:
+              | └─ character ')'
+              | found: end of input at (1, 16)"#]]
     .assert_eq(
         &make_parser()
             .parse_all(TERMINAL)

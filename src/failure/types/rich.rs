@@ -28,7 +28,9 @@ pub enum RichKind {
         } else { String::new() }
     )]
     ExpectedFound {
+        /// The expected input value, as returned by [`Parser::hint`](crate::parse::Parser::hint).
         hint: ParseHint,
+        /// The location at which the input diverges from the hint, if applicable.
         diverges_at: Vec<(LineColumn, Descriptor)>,
     },
     /// Unbounded recursion. Carries payload information relating to composites.
@@ -36,19 +38,29 @@ pub enum RichKind {
         info[1].1.name.as_deref().map_or_else(String::new, |inner| format!(": {inner}"))
     } else { String::from("") })]
     UnboundedRecursion {
+        /// Provenance information of unbounded recursion.
         info: Vec<(LineColumn, UnboundedRecursion)>,
     },
     /// Failure caused by the [`Fail`](crate::combinator::Fail) primitive combinator.
     #[error("primitive failure{}", message.as_ref().map_or_else(String::new, |inner| format!(": {inner}")))]
-    FailPrimitive { message: Option<Cow<'static, str>> },
+    FailPrimitive {
+        /// Optional message to be transmitted.
+        message: Option<Cow<'static, str>>,
+    },
 
     /// Undefined parser. This is always fatal.
     #[error("undefined parser{}", name.as_ref().map_or_else(String::new, |inner| format!(": {inner}")))]
-    UndefinedParser { name: Option<Cow<'static, str>> },
+    UndefinedParser {
+        /// Optional name of the recursive parser.
+        name: Option<Cow<'static, str>>,
+    },
 
     /// Dropped parser. This is always fatal.
     #[error("dropped parser{}", name.as_ref().map_or_else(String::new, |inner| format!(": {inner}")))]
-    DroppedParser { name: Option<Cow<'static, str>> },
+    DroppedParser {
+        /// Optional name of the recursive parser.
+        name: Option<Cow<'static, str>>,
+    },
 
     /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
     #[error("primitive failure{}", {
@@ -58,7 +70,22 @@ pub enum RichKind {
         }
         format!(": {}", tree)
     })]
-    NonGrowingRepetition { inner_hint: ParseHint },
+    NonGrowingRepetition {
+        /// The hint of the inner parser, which admits unconditional success without advancing the input.
+        inner_hint: ParseHint,
+    },
+
+    /// Insufficient repetition in [`Repetition`](crate::combinator::Repetition) combinators.
+    /// Typically supplied as supplementary information for a failure.
+    #[error(
+        "insufficient repetition: expect at least {minimum_repetitions} repetitions, failed in iteration {in_repetition}"
+    )]
+    InsufficientRepetition {
+        /// The minimum number of repetitions expected.
+        minimum_repetitions: usize,
+        /// The repetition count at which this error is produced.
+        in_repetition: usize,
+    },
 
     /// Composite failure, which cannot be further reduced.
     ///
@@ -67,7 +94,7 @@ pub enum RichKind {
     CompositeFailure,
 
     /// Custom failure from an [`std::error::Error`] implementor, as its textual representation.
-    /// 
+    ///
     /// Note that for [`PartialEq`], [`Eq`] and [`Hash`](std::hash::Hash), the payload is compared or hashed by *pointer* equality.
     /// This means that custom failures constructed at different sites will not be considered equal,
     /// even if they contain identical payloads.
@@ -85,17 +112,42 @@ impl PartialEq for RichKind {
                 // Thin pointer comparison is assumed sufficient under `Arc`,
                 // barring unsafe shenanigans.
                 std::ptr::addr_eq(Arc::as_ptr(l0), Arc::as_ptr(r0))
-            },
+            }
 
             // Default implementation...
+            (
+                Self::ExpectedFound {
+                    hint: l_hint,
+                    diverges_at: l_diverges_at,
+                },
+                Self::ExpectedFound {
+                    hint: r_hint,
+                    diverges_at: r_diverges_at,
+                },
+            ) => l_hint == r_hint && l_diverges_at == r_diverges_at,
+            (
+                Self::UnboundedRecursion { info: l_info },
+                Self::UnboundedRecursion { info: r_info },
+            ) => l_info == r_info,
+            (
+                Self::FailPrimitive { message: l_message },
+                Self::FailPrimitive { message: r_message },
+            ) => l_message == r_message,
+            (Self::UndefinedParser { name: l_name }, Self::UndefinedParser { name: r_name }) => {
+                l_name == r_name
+            }
+            (Self::DroppedParser { name: l_name }, Self::DroppedParser { name: r_name }) => {
+                l_name == r_name
+            }
+            (
+                Self::NonGrowingRepetition {
+                    inner_hint: l_inner_hint,
+                },
+                Self::NonGrowingRepetition {
+                    inner_hint: r_inner_hint,
+                },
+            ) => l_inner_hint == r_inner_hint,
 
-            (Self::ExpectedFound { hint: l_hint, diverges_at: l_diverges_at }, Self::ExpectedFound { hint: r_hint, diverges_at: r_diverges_at }) => l_hint == r_hint && l_diverges_at == r_diverges_at,
-            (Self::UnboundedRecursion { info: l_info }, Self::UnboundedRecursion { info: r_info }) => l_info == r_info,
-            (Self::FailPrimitive { message: l_message }, Self::FailPrimitive { message: r_message }) => l_message == r_message,
-            (Self::UndefinedParser { name: l_name }, Self::UndefinedParser { name: r_name }) => l_name == r_name,
-            (Self::DroppedParser { name: l_name }, Self::DroppedParser { name: r_name }) => l_name == r_name,
-            (Self::NonGrowingRepetition { inner_hint: l_inner_hint }, Self::NonGrowingRepetition { inner_hint: r_inner_hint }) => l_inner_hint == r_inner_hint,
-            
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -111,28 +163,60 @@ impl Hash for RichKind {
             // This is consistent with `PartialEq` and `Eq`.
             RichKind::Custom(error) => {
                 Arc::as_ptr(error).hash(state);
-            },
+            }
 
             // Default implementation...
             RichKind::ExpectedFound { hint, diverges_at } => {
                 hint.hash(state);
                 diverges_at.hash(state);
-            },
+            }
             RichKind::UnboundedRecursion { info } => {
                 info.hash(state);
-            },
+            }
             RichKind::FailPrimitive { message } => {
                 message.hash(state);
-            },
-            RichKind::UndefinedParser { name }
-            | RichKind::DroppedParser { name } => {
+            }
+            RichKind::UndefinedParser { name } | RichKind::DroppedParser { name } => {
                 name.hash(state);
-            },
+            }
             RichKind::NonGrowingRepetition { inner_hint } => {
                 inner_hint.hash(state);
-            },
+            }
+            RichKind::InsufficientRepetition {
+                minimum_repetitions,
+                in_repetition,
+            } => {
+                minimum_repetitions.hash(state);
+                in_repetition.hash(state);
+            }
             RichKind::CompositeFailure => (),
         }
+    }
+}
+
+impl<I: Input + ?Sized> TryFrom<FailureKind<I>> for RichKind {
+    type Error = ();
+    fn try_from(value: FailureKind<I>) -> Result<Self, Self::Error> {
+        let kind = match value {
+            FailureKind::ExpectedFound { .. } => {
+                // require the input value to index into for this conversion.
+                return Err(());
+            }
+            FailureKind::FailPrimitive { message } => RichKind::FailPrimitive { message },
+            FailureKind::UndefinedParser { name } => RichKind::UndefinedParser { name },
+            FailureKind::DroppedParser { name } => RichKind::DroppedParser { name },
+            FailureKind::NonGrowingRepetition { inner_hint } => {
+                RichKind::NonGrowingRepetition { inner_hint }
+            }
+            FailureKind::InsufficientRepetition {
+                minimum_repetitions,
+                in_repetition,
+            } => RichKind::InsufficientRepetition {
+                minimum_repetitions,
+                in_repetition,
+            },
+        };
+        Ok(kind)
     }
 }
 
@@ -157,8 +241,11 @@ impl Hash for RichKind {
     } else { String::new() }
 )]
 pub struct Rich {
+    /// The line-column position at which this failure occured.
     pub position: LineColumn,
+    /// The kind of failure. Carries payload information.
     pub kind: RichKind,
+    /// Supplemental information regarding this failure value.
     pub supplemental: Vec<Self>,
 }
 impl ParseFailure for Rich {
@@ -177,12 +264,8 @@ impl ParseFailure for Rich {
                     vec![(diff_position, descriptor)]
                 }),
             },
-            FailureKind::FailPrimitive { message } => RichKind::FailPrimitive { message },
-            FailureKind::UndefinedParser { name } => RichKind::UndefinedParser { name },
-            FailureKind::DroppedParser { name } => RichKind::DroppedParser { name },
-            FailureKind::NonGrowingRepetition { inner_hint } => {
-                RichKind::NonGrowingRepetition { inner_hint }
-            }
+            kind => RichKind::try_from(kind)
+                .expect("Coverage of FailureKind conversion other than ExpectedFound!"),
         };
         Self {
             kind,
@@ -214,7 +297,8 @@ impl ParseFailure for Rich {
         // Unbounded recursion failure check.
         let try_fold = supplemental.iter().try_fold(Vec::new(), |mut acc, inner| {
             // Invariant: unbounded recursion composites are labelled as unbounded recursion.
-            // This does not inspect deeply-nested structures and relies on
+            // This does not inspect deeply-nested structures and relies on accurate `RichKind::UnboundedRecursion` labelling,
+            // Which should be maintained by this function.
             match &inner.kind {
                 RichKind::UnboundedRecursion { info } => {
                     acc.extend_from_slice(info);

@@ -105,10 +105,12 @@ impl<'src, C, E: ParseEnvironment> ParseStateData<'src, C, E> {
 }
 
 /// Parse output produced by intermediate [`Parser`](crate::parse::Parser) operations.
-/// 
+///
 /// May be lifted into a [`Result`] type via [`ParseOutput::into_lifted`].
 pub struct ParseOutput<A, E: ParseEnvironment> {
+    /// The AST component, signalling success or parse failure via [`ParseOutcome`].
     pub ast: ParseOutcome<A, E::Failure>,
+    /// The CST component, retaining construction information.
     pub cst: AssociatedGreenCst<
         <E::Supply as IdSupply>::Id,
         <E::ErrorSupply as IdSupply>::Id,
@@ -118,6 +120,7 @@ pub struct ParseOutput<A, E: ParseEnvironment> {
 impl<A, E: ParseEnvironment> Debug for ParseOutput<A, E>
 where
     A: Debug,
+    E::Failure: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ParseOutput")
@@ -222,6 +225,11 @@ impl<A, F> ParseOutcome<A, F> {
         }
     }
 }
+impl<A, F> From<ParseOutcome<A, F>> for Result<A, F> {
+    fn from(value: ParseOutcome<A, F>) -> Self {
+        value.into_result()
+    }
+}
 
 /// The top-level error of a failed parse.
 /// Represents irrevocable termination of parsing.
@@ -251,6 +259,7 @@ pub struct ParseArtifact<A, E: ParseEnvironment> {
 impl<A, E: ParseEnvironment> Debug for ParseArtifact<A, E>
 where
     A: Debug,
+    E::Failure: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ParseReport")

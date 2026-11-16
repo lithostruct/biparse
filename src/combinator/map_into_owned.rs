@@ -9,11 +9,14 @@ use crate::{
 /// Parser combinator for mapping successful AST payloads via the given closure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Map<P, F, A> {
-    inner: P,
-    closure: F,
+    /// The inner parser.
+    pub inner: P,
+    /// The inner closure, transforming the successful AST payload of the inner parser.
+    pub closure: F,
     _marker: PhantomData<fn(A)>,
 }
 impl<P, F, A> Map<P, F, A> {
+    /// Constructs a new [`Map`] parser.
     pub fn new<'src, I: Input + ?Sized, B, E: ParseEnvironment>(inner: P, closure: F) -> Self
     where
         P: Parser<'src, I, A, E>,
@@ -61,10 +64,12 @@ where
 /// Parser combinator that calls [`ToOwned::to_owned`] onto its payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IntoOwned<P, A: ?Sized> {
-    inner: P,
+    /// The inner parser, asserted to produce a reference borrowing into the input.
+    pub inner: P,
     _marker: PhantomData<fn(A)>,
 }
 impl<P, A: ?Sized> IntoOwned<P, A> {
+    /// Constructs a new [`IntoOwned`] parser.
     pub fn new<'src, I: Input + ?Sized, E: ParseEnvironment>(inner: P) -> Self
     where
         P: Parser<'src, I, &'src A, E>,
@@ -113,11 +118,15 @@ where
 /// If conversion fails, signal a committed failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TryMap<P, F, A> {
-    inner: P,
-    closure: F,
+    /// The inner parser.
+    pub inner: P,
+    /// The fallible closure to transform the successful AST payload, returning a [`Result`].
+    /// The error type must implement [`Error`](std::error::Error) and be `'static`.
+    pub closure: F,
     _marker: PhantomData<fn(A)>,
 }
 impl<P, F, A> TryMap<P, F, A> {
+    /// Constructs a new [`TryMap`] parser.
     pub fn new<'src, I: Input + ?Sized, B, E: ParseEnvironment, Error>(inner: P, closure: F) -> Self
     where
         P: Parser<'src, I, A, E>,

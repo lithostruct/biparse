@@ -7,10 +7,20 @@ use crate::{
 ///
 /// This trait should be implemented by zero-sized types.
 pub trait ParseEnvironment: 'static {
-    type Failure: ParseFailure + std::error::Error;
+    /// The type of the failure payload.
+    type Failure: ParseFailure;
+    /// The type of the supply provided to [`Associate`](crate::combinator::Associate) combinators.
+    /// Used for associations.
     type Supply: IdSupply;
+    /// The type of the supply provided to [`Recover`](crate::combinator::Recover) combinators.
+    /// Used for diagnostics.
     type ErrorSupply: IdSupply;
 }
+
+/// The default implementation of [`ParseEnvironment`].
+///
+/// Users are encouraged to define their own zero-typed structs implementing [`ParseEnvironment`]
+/// for different associated types.
 #[derive(Debug, Clone, Copy)]
 pub struct DefaultParseEnvironment;
 impl ParseEnvironment for DefaultParseEnvironment {
