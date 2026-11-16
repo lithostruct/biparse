@@ -1,3 +1,5 @@
+//! Module testing [`Commit`](biparse::combinator::Commit).
+
 use std::rc::Rc;
 
 use biparse::{input::Matches, prelude::*};

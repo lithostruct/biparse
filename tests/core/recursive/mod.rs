@@ -1,4 +1,4 @@
-//! Tests for the `Recursive` combinator.
+//! Tests for the [`Recursive`](biparse::combinator::Recursive) combinator.
 
 mod left_recursion;
 mod nonconsuming;

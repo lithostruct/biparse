@@ -12,3 +12,9 @@ This project makes two contributions:
 - `associate` combinators provide AST-CST correspondence through a configurable `Id` embedding, making it trivial to track which AST constructs correspond to the text and spans the CST node contains.
 
 If you want something that's quick to pick up and hack on, this crate may be just for you.
+
+# Quick Start
+
+```bash
+cargo add biparse
+```

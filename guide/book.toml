@@ -10,8 +10,6 @@ edition = "2024"
 after = ["links"]
 build.packages = [
   "either",
-  "rust_sitter",
-  "tree_sitter",
 ]
 
 [output.html]

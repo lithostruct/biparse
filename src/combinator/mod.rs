@@ -21,7 +21,7 @@ use crate::{
 pub use self::{
     binary::{Or, Then},
     blanket::{As, With},
-    commit_recover::{Commit, Recover},
+    commit_recover::{Commit, Fatal, Recover},
     just::Just,
     map_into_owned::{IntoOwned, Map, TryMap},
     node_association::{Associate, Node},

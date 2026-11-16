@@ -1,4 +1,4 @@
-//! Tests for the `End` sentinel combinator.
+//! Tests for the [`End`](biparse::combinator::End) primitive combinator.
 
 use biparse::prelude::*;
 use expect_test::expect;

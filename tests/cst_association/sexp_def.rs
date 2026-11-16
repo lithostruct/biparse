@@ -15,7 +15,9 @@ use rowan::{NodeOrToken, SyntaxKind};
 /// by constructing [`AssociatedGreenCst`] through its exposed interface.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SExp {
+    /// Terminal symbol. Represents a CST leaf token.
     Symbol(String),
+    /// Non-terminal node. Represents a CST node.
     List(SyntaxKind, Vec<Self>),
 }
 impl SExp {
@@ -142,9 +144,12 @@ impl FromStr for SExp {
     }
 }
 
+/// [`rowan::Language`] implementor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Lang {
+    /// Token. represented as [`u16::MAX`].
     Token,
+    /// Node.
     /// Representation invariant: field must *not* be [`u16::MAX`]!
     Node(u16),
 }
@@ -168,6 +173,7 @@ impl rowan::Language for Lang {
     }
 }
 
+/// [`SExp`] generation strategy. Used for fuzzing.
 pub fn sexp_strategy() -> impl Strategy<Value = SExp> {
     let symbol = r"[a-zA-Z][a-zA-Z0-9_-]{0,15}".prop_map(SExp::Symbol);
     let kind = any::<u16>().prop_map(|inner| SyntaxKind(inner.saturating_sub(1)));

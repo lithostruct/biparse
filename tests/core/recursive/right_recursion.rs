@@ -1,4 +1,4 @@
-//! Test regarding typical right-recursion of parser combinators.
+//! Test regarding typical right-recursion of recursive parser combinators.
 
 use biparse::prelude::*;
 use expect_test::expect;

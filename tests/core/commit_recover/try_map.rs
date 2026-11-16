@@ -1,3 +1,5 @@
+//! Module testing [`TryMap`](biparse::combinator::TryMap).
+
 use std::str::FromStr;
 
 use biparse::{input::Matches, prelude::*};

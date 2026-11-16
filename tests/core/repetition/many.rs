@@ -1,4 +1,10 @@
-//! Tests relating to the `Many` combinator.
+//! Tests relating to the `many` combinator.
+//!
+//! These tests were written before [`ParserExt::many`] was augmented/lifted to [`Repetition`](biparse::combinator::Repetition).
+//! They remain here because this is a useful dual to the tests in [`crate::recursive`],
+//! and also that this would be the most common repetition construct used.
+//!
+//! Refer to [`super::repeat_by`] for invariant testing regarding that.
 
 use biparse::prelude::*;
 use expect_test::expect;
@@ -68,7 +74,7 @@ proptest! {
 
 #[test]
 fn non_growing_termination() {
-    let fatal_parser = success().many();
-    let (_, outcome) = fatal_parser.parse("", ParseState::<str, DefaultParseEnvironment>::new(""));
+    let non_growing = success().many();
+    let (_, outcome) = non_growing.parse("", ParseState::<str, DefaultParseEnvironment>::new(""));
     assert!(matches!(outcome.ast, ParseOutcome::Fatal(_)))
 }

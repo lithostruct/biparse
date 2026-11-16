@@ -1,8 +1,11 @@
+//! Module testing [`Recover`](biparse::combinator::Recover).
+
 use biparse::{cst::NoLang, input::Matches, prelude::*};
+use expect_test::expect;
 use rowan::SyntaxKind;
 
 // Expects "something" or "strict: requirement". If "strict: " matched, commit and recover to end.
-fn make_parser<'src>() -> impl Parser<'src, str, Result<String, String>, DefaultParseEnvironment> {
+fn make_parser<'src>() -> impl Parser<'src, str, Result<String, (usize, String)>, DefaultParseEnvironment> {
     just((SyntaxKind(0), "something"))
         .into_owned()
         .or(just((SyntaxKind(1), "strict: "))
@@ -12,7 +15,7 @@ fn make_parser<'src>() -> impl Parser<'src, str, Result<String, String>, Default
         .map(Result::Ok)
         .recover(
             just(Matches(SyntaxKind(1), |_: &char| true)).many(),
-            |_, chars| Err(chars.into_iter().collect::<String>()),
+            |uid, chars| Err((uid, chars.into_iter().collect::<String>())),
             SyntaxKind(999),
         )
 }
@@ -46,11 +49,18 @@ fn recovery_success() {
         .expect("Committed failure and recovery!");
     assert_eq!(
         *artifact.ast_only(),
-        Err(String::from("unexpected sequence!"))
+        Err((0, String::from("unexpected sequence!")))
     );
 
     let red = artifact.into_cst().canonize::<NoLang>(SyntaxKind(0));
-    assert_eq!(red.tree().text(), COMMIT_AND_RECOVER)
+    assert_eq!(red.tree().text(), COMMIT_AND_RECOVER);
+
+    let entry = red.diagnose(&0).expect("In diagnostics!");
+    expect![[r#"
+        (1, 9) expected:
+             | └─ string "requirement"
+             | found: character 'u' at (1, 9)"#]].assert_eq(&entry.0.to_string());
+    assert_eq!(entry.1.text(), "unexpected sequence!");
 }
 
 /// Asserts that recovery parser failure propagates the committed failure.

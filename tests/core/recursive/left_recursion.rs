@@ -1,4 +1,4 @@
-//! Test regarding left-recursion of parser combinators involving the seed-growing algorithm.
+//! Test regarding left-recursion of recursive parser combinators involving the seed-growing algorithm.
 
 use biparse::{input::Matches, prelude::*};
 use expect_test::expect;

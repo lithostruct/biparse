@@ -181,7 +181,7 @@ where {
         ParseHint::Expectation(Descriptor::Pattern {
             kind: "string".to_string(),
             kind_plural: "strings".to_string(),
-            data: format!("\"{:?}\"", self.1),
+            data: format!("{:?}", self.1),
         })
     }
 }

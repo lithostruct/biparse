@@ -6,7 +6,7 @@ use rowan::SyntaxKind;
 pub use crate::failure::ParseHint;
 use crate::{
     combinator::{
-        As, Associate, Commit, IntoOwned, Map, Node, Or, Recover, Repetition, Success, Then,
+        As, Associate, Commit, Fatal, IntoOwned, Map, Node, Or, Recover, Repetition, Success, Then,
         TryMap, With, end, success,
     },
     cst::IdSupply,
@@ -215,22 +215,33 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     /// signalling a committed failure if conversion fails.
     ///
     /// Underlying combinator object: [`TryMap`].
-    fn try_map<F, B, Error>(self, closure: F) -> With<E, TryMap<Self, F, A>>
+    fn try_map<F, B, Error>(self, closure: F) -> TryMap<Self, F, A>
     where
         F: Fn(A) -> Result<B, Error>,
         Error: std::error::Error + 'static,
         Self: Sized,
     {
-        With::new(TryMap::new(self, closure))
+        TryMap::new(self, closure)
     }
-    /// Chains `self` to commit, promoting speculative failure into committed failure.
+    /// Chains `self` to commit, promoting speculative failure into
+    /// [`ParseOutcome::Committed`](crate::parse::ParseOutcome::Committed) failure.
     ///
     /// Underlying combinator object: [`Commit`].
-    fn commit(self) -> With<E, Commit<Self>>
+    fn commit(self) -> Commit<Self>
     where
         Self: Sized,
     {
-        With::new(Commit::new(self))
+        Commit::new(self)
+    }
+    /// Chains `self`, promoting speculative and committed failure into
+    /// [`ParseOutcome::Fatal`](crate::parse::ParseOutcome::Fatal) failure.
+    ///
+    /// Underlying combinator object: [`Fatal`].
+    fn fatal(self) -> Fatal<Self>
+    where
+        Self: Sized,
+    {
+        Fatal::new(self)
     }
     /// Chains `self` to a recovery strategy, handling and transforming committed failure
     /// into an associated diagnostic upon success.
@@ -316,14 +327,14 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     where
         Self: Sized,
     {
-        Repetition::new(self, range).expect("Range valid!")
+        Repetition::new(self, range).expect("range provided must be non-empty")
     }
 
     /// Establishes a commitment point where subsequent speculative failure in the `other` parser
     /// is promoted to a committed failure.
     ///
     /// Note that chaining `a.then_commit_to(b).then(c)` will only cause `b` to commit, but not `c`.
-    fn then_commit_to<P, B>(self, other: P) -> derived::ThenCommitTo<E, Self, P>
+    fn then_commit_to<P, B>(self, other: P) -> derived::ThenCommitTo<Self, P>
     where
         P: Parser<'src, I, B, E>,
         Self: Sized,
@@ -359,7 +370,7 @@ pub mod derived {
     pub type EitherOr<L, R, A, B> =
         Or<Map<L, fn(A) -> Either<A, B>, A>, Map<R, fn(B) -> Either<A, B>, B>>;
     /// The derived parser type of [`ParserExt::then_commit_to`].
-    pub type ThenCommitTo<E, L, R> = Then<L, With<E, Commit<R>>>;
+    pub type ThenCommitTo<L, R> = Then<L, Commit<R>>;
 }
 
 /// Convenience trait for [`.into_owned()`](Self::into_owned) method chaining.

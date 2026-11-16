@@ -78,7 +78,7 @@ pub enum RichKind {
     /// Insufficient repetition in [`Repetition`](crate::combinator::Repetition) combinators.
     /// Typically supplied as supplementary information for a failure.
     #[error(
-        "insufficient repetition: expect at least {minimum_repetitions} repetitions, failed in iteration {in_repetition}"
+        "insufficient repetition:\nexpect at least {minimum_repetitions} repetitions;\nfailed in iteration {in_repetition}."
     )]
     InsufficientRepetition {
         /// The minimum number of repetitions expected.

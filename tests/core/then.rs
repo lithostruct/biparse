@@ -1,3 +1,5 @@
+//! Module for testing of [`Then`](biparse::combinator::Then) combinators.
+//! 
 //! Notes:
 //!
 //! `then` is such a fundamental operator in Biparse that plenty of tests have been done in other files.
@@ -12,16 +14,55 @@ fn double_success() {
 }
 
 #[test]
+fn first_speculate() {
+    let combinator = fail::<_, !, DefaultParseEnvironment>()
+        .then(success());
+    let (_, output) = combinator.parse("",
+        ParseState::<str, DefaultParseEnvironment>::new(""));
+    assert!(matches!(output.ast, ParseOutcome::Speculative(_)))
+}
+
+#[test]
 fn success_then_speculative() {
-    todo!()
+    let combinator = success::<_, DefaultParseEnvironment>()
+        .then(fail::<_, !, _>());
+    let (_, output) = combinator.parse("",
+        ParseState::<str, DefaultParseEnvironment>::new(""));
+    assert!(matches!(output.ast, ParseOutcome::Speculative(_)))
+}
+
+#[test]
+fn first_committed() {
+    let combinator = fail::<_, !, DefaultParseEnvironment>().commit()
+        .then(success());
+    let (_, output) = combinator.parse("",
+        ParseState::<str, DefaultParseEnvironment>::new(""));
+    assert!(matches!(output.ast, ParseOutcome::Committed(_)))
 }
 
 #[test]
 fn success_then_committed() {
-    todo!()
+    let combinator = success::<_, DefaultParseEnvironment>()
+        .then(fail::<_, !, _>().commit());
+    let (_, output) = combinator.parse("",
+        ParseState::<str, DefaultParseEnvironment>::new(""));
+    assert!(matches!(output.ast, ParseOutcome::Committed(_)))
+}
+
+#[test]
+fn first_fatal() {
+    let combinator = fail::<_, !, DefaultParseEnvironment>().fatal()
+        .then(success());
+    let (_, output) = combinator.parse("",
+        ParseState::<str, DefaultParseEnvironment>::new(""));
+    assert!(matches!(output.ast, ParseOutcome::Fatal(_)))
 }
 
 #[test]
 fn success_then_fatal() {
-    todo!()
+    let combinator = success::<_, DefaultParseEnvironment>()
+        .then(fail::<_, !, _>().fatal());
+    let (_, output) = combinator.parse("",
+        ParseState::<str, DefaultParseEnvironment>::new(""));
+    assert!(matches!(output.ast, ParseOutcome::Fatal(_)))
 }

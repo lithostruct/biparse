@@ -10,7 +10,7 @@ use crate::{
     parse::{ParseEnvironment, ParseHint, ParseOutcome, ParseOutput, ParseState, Parser},
 };
 
-/// Combinator that transforms an upstream speculative failure into a committed failure.
+/// Combinator that transforms an upstream speculative failure into a [`ParseOutcome::Committed`] failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, AsRef, AsMut)]
 #[non_exhaustive]
 pub struct Commit<P> {
@@ -73,6 +73,71 @@ where
         }
     }
 
+    fn hint(&self) -> ParseHint {
+        self.inner.hint()
+    }
+}
+
+/// Combinator that transforms an upstream speculative or committed failure into a [`ParseOutcome::Fatal`] failure.
+///
+/// Fatal failures are *unrecoverable*. Use this combinator sparingly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, AsRef, AsMut)]
+#[non_exhaustive]
+pub struct Fatal<P> {
+    #[as_ref]
+    #[as_mut]
+    /// The inner parser.
+    pub inner: P,
+}
+impl<P> Fatal<P> {
+    /// Constructs a new [`Fatal`] parser.
+    pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(inner: P) -> Self
+    where
+        P: Parser<'src, I, A, E>,
+    {
+        Fatal { inner }
+    }
+}
+
+impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> for Fatal<P>
+where
+    P: Parser<'src, I, A, E>,
+{
+    fn parse(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
+        let (state, output) = self.inner.parse(input, state);
+        match output.ast {
+            ParseOutcome::Success(_) | ParseOutcome::Fatal(_) => (state, output),
+            ParseOutcome::Speculative(failure) | ParseOutcome::Committed(failure) => (
+                state,
+                ParseOutput {
+                    ast: ParseOutcome::Fatal(failure),
+                    cst: output.cst,
+                },
+            ),
+        }
+    }
+
+    fn check(
+        &self,
+        input: &'src I,
+        state: ParseState<'src, I, E>,
+    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
+        let (state, output) = self.inner.check(input, state);
+        match output.ast {
+            ParseOutcome::Success(_) | ParseOutcome::Fatal(_) => (state, output),
+            ParseOutcome::Speculative(failure) | ParseOutcome::Committed(failure) => (
+                state,
+                ParseOutput {
+                    ast: ParseOutcome::Fatal(failure),
+                    cst: output.cst,
+                },
+            ),
+        }
+    }
     fn hint(&self) -> ParseHint {
         self.inner.hint()
     }

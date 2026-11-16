@@ -1,4 +1,4 @@
-//! Tests for the `Success` sentinel combinator.
+//! Tests for the [`Success`](biparse::combinator::Success) primitive combinator.
 
 use biparse::prelude::*;
 use proptest::{arbitrary::any, proptest};

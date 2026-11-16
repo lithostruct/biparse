@@ -9,7 +9,7 @@ Some number of repetitions of the inner parser, using the bounds described by a 
 `range.start_bound()` represents the minimum number of repetitions (inclusive) required for an overall success. Failure to reach this number results in a [`Speculative` failure](../../parse_output.md#speculative).  
 `range.end_bound()` represents the maximum number of repetitions (inclusive) admitted by this construct. The combinator will not attempt to parse more repetitions beyond this bound.
 
-Eg. a parser of `a.repeat_by(n..=m)` produces a [`Vec<A>`](std::vec::Vec), whose length is bounded by the range `n..=m`. The range passed *must* be non-empty.
+Eg. a parser of `a.repeat_by(n..=m)` produces a [`Vec<A>`](std::vec::Vec), whose length is bounded by the range `n..=m`. The range passed *must* be non-empty, otherwise this combinator panics upon construction.
 
 The inner parser *must* advance the input by some non-zero amount each iteration. Failure to do so is an invariant violation, and produces a [`Fatal` failure](../../parse_output.md#fatal).
 
@@ -40,4 +40,4 @@ Zero or one repetitions of the inner parser. A parser of `a.optional()` has AST 
 
 Unlike [`repeat_by`](#repeat_by)-derived combinators, the inner parser is allowed to be non-advancing. This is because `a.optional()` is actually syntactic sugar over `a.either_or(success()).map(Either::left)`.
 
-Note that `a.repeat_by(0..=1)` differs from `a.optional()` in that it is forbidden to be non-advancing, producing a [`Fatal` failure](../../parse_output.md#fatal).
+Note that `a.repeat_by(0..=1)` differs from `a.optional()` in that it is forbidden to be non-advancing, producing a [`Fatal` failure](../../parse_output.md#fatal) otherwise.

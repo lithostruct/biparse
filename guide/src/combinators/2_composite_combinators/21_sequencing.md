@@ -6,7 +6,7 @@ All of the parsers must succeed to be considered an overall success, and Biparse
 
 ## `then`
 
-Binary sequencing of two constituent parsers. A parser of `a.then(b)` has AST payload type `(A, B)`.
+Binary sequencing of two constituent parsers. A parser of `a.then(b)` has AST payload type [`(A, B)`](tuple).
 
 Note that the tuple payload type is not flattened. Chained `then` parsers will produce left-nested 2-tuples eg. `a.then(b).then(c)` has payload type `((A, B), C)`.
 
