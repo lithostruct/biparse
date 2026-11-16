@@ -101,7 +101,7 @@ where
 pub struct Associate<P, F, A> {
     /// The inner parser.
     pub inner: P,
-    /// The closure receiving an `Id` from `ParseEnvironment::IdSupply` and the inner parser,
+    /// The closure receiving an `Id` from [`ParseEnvironment::Supply`] and the inner parser,
     /// returning a payload of type `A`.
     pub closure: F,
     /// The [`SyntaxKind`] of the CST node, which takes the existing forest as its children.

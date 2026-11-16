@@ -2,6 +2,10 @@
 
 Biparse offers recursive parsing capabilities in the form of self-recursion and mutual recursion.
 
+Biparse employs a seed-growing algorithm as described in as described by the paper
+["Packrat Parsers can Support Left-Recursion"](https://web.cs.ucla.edu/~todd/research/pepm08.pdf) to enable left-recursion.
+Hence, to store, compare and return intermediate results, the payload type `A` *must* satisfy `Clone + 'static`.
+
 ## Self Recursion
 
 A grammar construct that only refers to itself recursively.
@@ -87,9 +91,9 @@ Note that defining a parser via `Recursive::define` takes a parser directly, unl
 
 ### Left-Recursive Grammars
 
-Biparse employs a seed-growing algorithm as described by the paper ["Packrat Parsers can Support Left-Recursion"](https://web.cs.ucla.edu/~todd/research/pepm08.pdf). This means that left-recursive grammars are supported for both self-recursion and mutual recursion, and are oftentimes preferable to equivalent right-recursive grammars due to bounded stack space consumption.
+Due to the seed-growing algorithm, left-recursive grammars are supported for both self-recursion and mutual recursion, and are oftentimes preferable to equivalent right-recursive grammars due to bounded stack space consumption.
 
-Note that unlike a true packrat parser, Biparse makes no attempt to memoize intermediate results formed from non-recursive constructs. Memoization only occurs for intermediate seeds formed via left recursion.
+Note that Biparse makes no attempt to memoize intermediate results formed from non-recursive constructs. Memoization only occurs for intermediate seeds formed via left recursion.
 
 ### Right-Recursive Grammars
 
@@ -101,18 +105,12 @@ Prefer left-recursive grammars where applicable.
 
 ### Unbounded Recursion
 
-Unbounded recursion from self or mutual recursion will result in a [`Fatal` failure](../parse_output.md#fatal).
+Attempting a parse on a recursive parser describing unbounded recursion results in a [`Fatal` failure](../parse_output.md#fatal).
 
-Examples of unbounded recursive grammars include but are not limited to:
-
-```text
-self ::= self
-```
-```text
-a ::= b
-b ::= a
-```
+Examples of unbounded recursive grammars include:
+- `self ::= self`
+- `a ::= b & b ::= a`
 
 ### Native Repetition
 
-Prefer using the [native repetition composites](./2_composite_combinators/23_repetition.md) `many`, `some` and `optional` over recursive grammars where applicable. This is particularly true for right-recursive grammars, which may consume unbounded stack space proportional to the recursive depth.
+Prefer using the [native repetition composites](./2_composite_combinators/23_repetition.md) over recursive grammars where applicable. This is particularly true for right-recursive grammars, which may consume unbounded stack space proportional to the recursive depth.

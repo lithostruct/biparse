@@ -109,88 +109,8 @@ where
     }
 }
 
-/// Parser combinator wrapper that allows for a parser combinator to carry its associated [`ParseEnvironment`].
-/// May be useful where the associated `ParseEnvironment` information may be lost for type inference.
-///
-/// See [`As<'src, I, A, E>`] for a stronger typed variant.
-#[repr(transparent)]
-pub struct With<E, P> {
-    /// The inner parser.
-    pub inner: P,
-    _marker: PhantomData<fn(E)>,
-}
-impl<E, P: Debug> Debug for With<E, P> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WithEnv")
-            .field("inner", &self.inner)
-            .field("_marker", &self._marker)
-            .finish()
-    }
-}
-impl<E, P: Clone> Clone for With<E, P> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            _marker: self._marker,
-        }
-    }
-}
-impl<E, P: Copy> Copy for With<E, P> {}
-impl<E, P: PartialEq> PartialEq for With<E, P> {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner && self._marker == other._marker
-    }
-}
-impl<E, P: Eq> Eq for With<E, P> {}
-impl<E, P: Hash> Hash for With<E, P> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.inner.hash(state);
-        self._marker.hash(state);
-    }
-}
-impl<E: ParseEnvironment, P> With<E, P> {
-    /// Constructs a new [`With`] parser.
-    pub fn new<'src, I: Input + ?Sized, A>(inner: P) -> Self
-    where
-        P: Parser<'src, I, A, E>,
-    {
-        With {
-            inner,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, P> Parser<'src, I, A, E> for With<E, P>
-where
-    P: Parser<'src, I, A, E>,
-{
-    #[inline(always)]
-    fn parse(
-        &self,
-        input: &'src I,
-        state: ParseState<'src, I, E>,
-    ) -> (ParseState<'src, I, E>, ParseOutput<A, E>) {
-        self.inner.parse(input, state)
-    }
-    #[inline(always)]
-    fn check(
-        &self,
-        input: &'src I,
-        state: ParseState<'src, I, E>,
-    ) -> (ParseState<'src, I, E>, ParseOutput<(), E>) {
-        self.inner.check(input, state)
-    }
-    #[inline(always)]
-    fn hint(&self) -> ParseHint {
-        self.inner.hint()
-    }
-}
-
 /// Parser combinator wrapper that restricts the inner parser to use the specified [`Parser<'src, I, A, E>`] instance.
 /// Usually used to wrap leaf combinators where type information otherwise cannot be propagated.
-///
-/// See [`With`] for a weaker version that only requires proof of the [`Parser`] instance at construction, then forgets it.
 #[repr(transparent)]
 pub struct As<'src, I: ?Sized, A, E, P> {
     /// The inner parser.

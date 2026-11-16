@@ -208,7 +208,7 @@ fn sexp_metatest() {
     .assert_debug_eq(&sexp);
 
     let err = SExp::from_str("(:65535)").unwrap_err();
-    expect!["(1, 8): invalid value of node SyntaxKind 'u16::MAX'"]
+    expect!["(1, 8) invalid value of node SyntaxKind 'u16::MAX'"]
         .assert_eq(&err.terminating.to_string());
 }
 

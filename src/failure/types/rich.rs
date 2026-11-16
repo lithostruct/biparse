@@ -17,7 +17,7 @@ pub enum RichKind {
     /// This may correspond to a cursor location in which the input diverges.
     #[error("{}{}",
         {
-            let mut tree = hint.clone().canonize().to_expectation();
+            let mut tree = hint.to_expectation();
             if tree.ends_with('\n') {
                 tree.pop();
             }
@@ -206,7 +206,7 @@ impl<I: Input + ?Sized> TryFrom<FailureKind<I>> for RichKind {
             FailureKind::UndefinedParser { name } => RichKind::UndefinedParser { name },
             FailureKind::DroppedParser { name } => RichKind::DroppedParser { name },
             FailureKind::NonGrowingRepetition { inner_hint } => {
-                RichKind::NonGrowingRepetition { inner_hint }
+                RichKind::NonGrowingRepetition { inner_hint: inner_hint.canonize() }
             }
             FailureKind::InsufficientRepetition {
                 minimum_repetitions,
@@ -241,7 +241,7 @@ impl<I: Input + ?Sized> TryFrom<FailureKind<I>> for RichKind {
     } else { String::new() }
 )]
 pub struct Rich {
-    /// The line-column position at which this failure occured.
+    /// The line-column position at which this failure occurred.
     pub position: LineColumn,
     /// The kind of failure. Carries payload information.
     pub kind: RichKind,
@@ -255,7 +255,7 @@ impl ParseFailure for Rich {
                 hint,
                 difference_at,
             } => RichKind::ExpectedFound {
-                hint,
+                hint: hint.canonize(),
                 diverges_at: difference_at.map_or(Vec::new(), |diff_cursor| {
                     let diff_position = input.to_line_col(diff_cursor);
                     let descriptor = input

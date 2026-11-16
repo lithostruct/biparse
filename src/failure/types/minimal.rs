@@ -7,9 +7,12 @@ use crate::{
 
 /// Minimal failure type. Other than [`UnboundedRecursion`] information, all failure information is discarded.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
-#[error("{}", if .0.is_empty() { String::from("parse failure") } else {
-    String::from("unbounded recursion")
-})]
+#[error("{}", if .0.is_empty() {
+        "parse failure"
+    } else {
+        "unbounded recursion"
+    }
+)]
 pub struct Minimal(Vec<(usize, UnboundedRecursion)>);
 impl ParseFailure for Minimal {
     fn failure_at<I: Input + ?Sized>(_: &I, _: I::Cursor, _: FailureKind<I>) -> Self {

@@ -1,4 +1,6 @@
 //! Module for parser combinator types, which implement [`Parser`](crate::parse::Parser).
+//! 
+//! # Note on
 
 mod blanket;
 
@@ -20,7 +22,7 @@ use crate::{
 
 pub use self::{
     binary::{Or, Then},
-    blanket::{As, With},
+    blanket::As,
     commit_recover::{Commit, Fatal, Recover},
     just::Just,
     map_into_owned::{IntoOwned, Map, TryMap},
@@ -55,6 +57,10 @@ pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E,
 }
 
 /// Constructs the [`Just`] combinator that matches the current input on some [`Pattern`].
+/// ```rust
+/// # use biparse::prelude::*;
+/// let just_lorem = just::<str, DefaultParseEnvironment, _>((SyntaxKind(0), "lorem ipsum dolor sit amet"));
+/// ```
 pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<'src, I> + 'src>(
     pattern: P,
 ) -> As<'src, I, P::Payload, E, Just<P>> {

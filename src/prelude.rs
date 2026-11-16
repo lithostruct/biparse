@@ -2,7 +2,7 @@
 
 pub use crate::{
     // We can omit most of these, because `ParserExt` includes the intended construction mechanism.
-    combinator::{As, Direct, Indirect, Recursive, With, end, fail, just, success},
+    combinator::{As, Direct, Indirect, Recursive, end, fail, just, success},
     cst::{AssociatedGreenCst, AssociatedRedCst},
     failure::{Descriptor, FailureKind, ParseFailure, ParseHint},
     input::{Input, LineColumn, Pattern},

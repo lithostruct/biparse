@@ -80,7 +80,7 @@ where
 
 /// Combinator that transforms an upstream speculative or committed failure into a [`ParseOutcome::Fatal`] failure.
 ///
-/// Fatal failures are *unrecoverable*. Use this combinator sparingly.
+/// *Fatal failures are unrecoverable.* Use this combinator sparingly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, AsRef, AsMut)]
 #[non_exhaustive]
 pub struct Fatal<P> {
@@ -155,11 +155,13 @@ where
 /// For this reason, it is recommended to keep the recovery parser as simple as possible.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Recover<F, R, B, C> {
-    /// The fallible parser, from which to recover from.
+    /// The fallible parser, assumed to potentially produce a [`ParseOutcome::Committed`] failure from which to recover from.
     pub fallible: F,
-    /// The recovery parser, from which recovery is executed.
+    /// The recovery parser, from which recovery is attempted.
+    /// Produces an AST payload of type `B`.
     pub recovery: R,
-    /// The recovery closure, which converts a successful recovery into an AST paylaod.
+    /// The recovery closure, receiving an `Id` from [`ParseEnvironment::ErrorSupply`] and a successful recovery parse,
+    /// producing the corresponding payload type `A` expected from the fallible parser.
     pub closure: C,
     /// The [`SyntaxKind`] of the CST node constructed upon successful recovery.
     pub kind: SyntaxKind,
@@ -204,6 +206,7 @@ where
         // Catching committed failure.
         let failure = match output.ast {
             ParseOutcome::Success(_) | ParseOutcome::Speculative(_) | ParseOutcome::Fatal(_) => {
+                // Short-circuit; return.
                 return (state, output);
             }
             ParseOutcome::Committed(failure) => failure,

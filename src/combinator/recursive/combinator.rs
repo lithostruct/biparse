@@ -22,12 +22,27 @@ use arcstr::ArcStr;
 
 // The following structures are basically copied from `chumsky`'s approach to their `Recursive` combinator.
 
-/// The type of recursive constructs.
+/// The type of recursive combinators and constructs.
 /// - `Recursive<Direct<...>>` or `Recursive<dyn Parser<...>>`: direct self-recursion.
 ///   Constructed via [`Recursive::new`] and [`Recursive::new_as`].
 /// - `Recursive<Indirect<...>>`: mutual recursion.
 ///   Constructed uninitialized via [`Recursive::declare`] and [`Recursive::declare_as`],
-///   the filed with [`Recursive::define`].
+///   then filled with [`Recursive::define`].
+/// 
+/// # Note on [`Clone`] and `'static` Restrictions
+/// 
+/// Biparse employs a seed-growing algorithm as described in as described by the paper
+/// ["Packrat Parsers can Support Left-Recursion"](https://web.cs.ucla.edu/~todd/research/pepm08.pdf).
+/// Hence, to store, memoize and return intermediate results, 
+/// the payload type `A` *must* be cloneable and wholly owned (hence lifetime `'static`).
+/// 
+/// # Note on Unbounded Recursion
+/// 
+/// Attempting a parse on a recursive parser describing unbounded recursion results in a [`ParseOutcome::Fatal`] failure.
+/// 
+/// Examples of unbounded recursive grammars include:
+/// - `self ::= self`
+/// - `a ::= b & b ::= a`
 #[derive(Debug)]
 pub struct Recursive<P: ?Sized> {
     /// Inner payload.
@@ -47,7 +62,7 @@ impl<P: ?Sized> Recursive<P> {
     }
     #[inline(always)]
     fn diagnostic_name(&self) -> String {
-        format!("<{:p}>", self.inner.as_ptr() as *const ())
+        format!("{:p}", self.inner.as_ptr() as *const ())
     }
 
     #[inline(always)]
@@ -65,9 +80,36 @@ impl<P: ?Sized> Recursive<P> {
             .map_or_else(|| self.diagnostic_name(), |inner| inner.to_string())
     }
 }
-impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, 'src, I, A, E>> {
+impl<'p, 'src, I: Input + ?Sized, A: Clone + 'static, E: ParseEnvironment> Recursive<Direct<'p, 'src, I, A, E>> {
     /// Creates a new self-recursive combinator.
     /// The closure taken will be provided a reference to the created combinator (`self`).
+    /// 
+    /// ```rust
+    /// # use biparse::prelude::*;
+    /// ##[derive(Clone)]
+    /// enum SExp {
+    ///     Identifier(String),
+    ///     List(Vec<Self>),
+    /// }
+    /// 
+    /// # fn test() {
+    /// let identifier: Box<dyn Parser<str, String, DefaultParseEnvironment>> =
+    /// # just((SyntaxKind(9), "placeholder!")).into_owned().boxed()
+    ///     /* ... */;
+    /// 
+    /// let sexp_parser: Recursive<Direct<str, SExp, DefaultParseEnvironment>> =
+    ///     Recursive::new(|this|              // <- `this` is the back-edge referring to `sexp_parser`.
+    ///         identifier
+    ///         .map(SExp::Identifier)
+    ///         .or(
+    ///             just((SyntaxKind(0), '('))
+    ///             .ignore_then(this.many())  // <- back-edge used!
+    ///             .then_ignore(just((SyntaxKind(1), ')')))
+    ///             .map(SExp::List)
+    ///         )
+    ///     );
+    /// # }
+    /// ```
     pub fn new<F, P>(closure: F) -> Self
     where
         F: FnOnce(Self) -> P,
@@ -90,6 +132,8 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
     /// Creates a new self-recursive combinator with the given name.
     /// Combinator names are used for error reporting and better diagnostics.
     /// The closure taken will be provided a reference to the created combinator (`self`).
+    /// 
+    /// Refer to [`Recursive::new`] for example usage.
     pub fn new_as<F, P>(name: impl Into<Cow<'static, str>>, closure: F) -> Self
     where
         F: FnOnce(Self) -> P,
@@ -111,7 +155,7 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Direct<'p, '
     }
 }
 
-impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p, 'src, I, A, E>> {
+impl<'p, 'src, I: Input + ?Sized, A: Clone + 'static, E: ParseEnvironment> Recursive<Indirect<'p, 'src, I, A, E>> {
     /// Declares a new recursive combinator to be later defined via [`Recursive::define`].
     ///
     /// This is preferred when direct self-recursion is insufficient or unergonomic,
@@ -119,6 +163,8 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
     ///
     /// Attempting a parse or check with a declared but undefined recursive parser
     /// immediately results in a [`ParseOutcome::Fatal`] failure.
+    /// 
+    /// Refer to [`Recursive::define`] for example usage.
     pub fn declare() -> Self {
         Recursive {
             inner: RecursiveInner::Owned(
@@ -138,6 +184,8 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
     ///
     /// Attempting a parse or check with a declared but undefined recursive parser
     /// immediately results in a [`ParseOutcome::Fatal`] failure.
+    /// 
+    /// Refer to [`Recursive::define`] for example usage.
     pub fn declare_as(name: impl Into<Cow<'static, str>>) -> Self {
         let name: Option<ArcStr> = Some(name.into().into());
         Recursive {
@@ -153,11 +201,41 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
 
     /// Defines a parser to use the following inner definition.
     /// The parser object must be strongly-owned.
+    /// 
+    /// ```rust
+    /// # use biparse::prelude::*;
+    /// ##[derive(Clone)]
+    /// pub enum Even {
+    ///     Zero,
+    ///     Succ(Box<Odd>),
+    /// }
+    /// ##[derive(Clone)]
+    /// pub enum Odd {
+    ///     Succ(Box<Even>),
+    /// }
+    /// 
+    /// // Create two owning handles to be used.
+    /// let mut even_As = Recursive::<Indirect<str, Even, DefaultParseEnvironment>>::declare();
+    /// let mut odd_As = Recursive::<Indirect<str, Odd, DefaultParseEnvironment>>::declare();
+    /// 
+    /// // Define the handles:
+    /// even_As.define(
+    ///     just((SyntaxKind(0), 'A'))
+    ///     .ignore_then(odd_As.clone())    // <- owning handle cloned.
+    ///     .map(|odd: Odd| Even::Succ(Box::new(odd)))
+    ///     .or(success().map(|_| Even::Zero))
+    /// );
+    /// odd_As.define(
+    ///     just((SyntaxKind(0), 'A'))
+    ///     .ignore_then(even_As.weaken())  // <- handle weakened to non-owning for recursive edge!
+    ///     .map(|even: Even| Odd::Succ(Box::new(even)))
+    /// );
+    /// ```
     ///
     /// # Panics
     ///
     /// Panics on multiple or re-entrant definition of the same parser object,
-    /// or attempting to define a weak handle as produced by [`Recursive::weaken`].
+    /// or attempting to define through a weak handle as produced by [`Recursive::weaken`].
     ///
     /// # Limitation on Strong Cycles
     ///
@@ -213,12 +291,12 @@ impl<'p, 'src, I: Input + ?Sized, A, E: ParseEnvironment> Recursive<Indirect<'p,
     }
 }
 
-/// # Note on First Field: Why `ArcStr`?
+/// # Note on First Field: Why [`ArcStr`]?
 ///
 /// Recursive constructs are cloned a lot. This makes that cheaper.
-/// Since the name is an important field supplied as `Cow<'static, str>`,
+/// Since the name is an important field supplied as [`Cow<'static, str>`],
 /// where the literal string is the (extremely) common case,
-/// `ArcStr` can be zero-copy and no-atomic.
+/// [`ArcStr`] can be zero-copy and no-atomic.
 ///
 /// This is to be converted at API boundaries.
 #[derive(Debug)]
@@ -434,8 +512,7 @@ macro_rules! recompute {
         let mut recursive_state = state.recursive_state.clone();
         recursive_state.push_to_top(this.recursive_id(), state.cursor,
             RecursiveFrame {
-                description: this.name(),
-                diagnostic_name: this.diagnostic_name(),
+                name: this.name(),
                 allocation_store: Box::new(this.inner.as_weak()),
                 seed_result: None,
                 active_fixpoint: false,

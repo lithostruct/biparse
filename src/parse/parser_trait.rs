@@ -7,7 +7,7 @@ pub use crate::failure::ParseHint;
 use crate::{
     combinator::{
         As, Associate, Commit, Fatal, IntoOwned, Map, Node, Or, Recover, Repetition, Success, Then,
-        TryMap, With, end, success,
+        TryMap, end, success,
     },
     cst::IdSupply,
     input::Input,
@@ -108,8 +108,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to then sequentially execute the second parser.
-    ///
-    /// Underlying combinator object: [`Then`].
     fn then<P, B>(self, next: P) -> Then<Self, P>
     where
         P: Parser<'src, I, B, E>,
@@ -118,8 +116,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         Then::new(self, next)
     }
     /// Chains `self` as an alternative, falling through to the second parser.
-    ///
-    /// Underlying combinator object: [`Or`].
     fn or<P>(self, other: P) -> Or<Self, P>
     where
         P: Parser<'src, I, A, E>,
@@ -128,8 +124,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         Or::new(self, other)
     }
     /// Chains `self` to transform the success payload.
-    ///
-    /// Underlying combinator object: [`Map`].
     fn map<F, B>(self, closure: F) -> Map<Self, F, A>
     where
         F: Fn(A) -> B,
@@ -138,8 +132,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         Map::new(self, closure)
     }
     /// Chains `self` to add a new parent to the current CST forest.
-    ///
-    /// Underlying combinator object: [`Node`].
     fn node(self, kind: impl Into<SyntaxKind>) -> Node<Self>
     where
         Self: Sized,
@@ -148,8 +140,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self` to add a new parent to the current CST forest.
     /// Additionally provides a name to the parser object for use in diagnostics.
-    ///
-    /// Underlying combinator object: [`Node`].
     fn named(self, name: impl Into<Cow<'static, str>>, kind: impl Into<SyntaxKind>) -> Node<Self>
     where
         Self: Sized,
@@ -158,8 +148,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
-    ///
-    /// Underlying combinator object: [`Associate`].
     fn associate<F, B>(self, kind: impl Into<SyntaxKind>, closure: F) -> Associate<Self, F, A>
     where
         F: Fn(<E::Supply as IdSupply>::Id, A) -> B,
@@ -170,8 +158,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     /// Chains `self` to add a new parent to the current CST forest,
     /// and associate it with the fresh `Id` supplied to the closure.
     /// Additionally provides a name to the parser object for use in diagnostics.
-    ///
-    /// Underlying combinator object: [`Associate`].
     fn associate_as<F, B>(
         self,
         name: impl Into<Cow<'static, str>>,
@@ -186,8 +172,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to repeat zero or more times, returning a [`Vec<A>`].
-    ///
-    /// Underlying combinator object: [`Repetition`].
+    /// 
+    /// `self` must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     fn many(self) -> Repetition<Self>
     where
         Self: Sized,
@@ -195,8 +181,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         Repetition::new(self, 0..).expect("Range valid!")
     }
     /// Chains `self` to repeat one or more times, returning a non-empty [`Vec<A>`].
-    ///
-    /// Underlying combinator object: [`Repetition`].
+    /// 
+    /// `self` must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     fn some(self) -> Repetition<Self>
     where
         Self: Sized,
@@ -213,8 +199,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
 
     /// Chains `self` to attempt fallible mapping on the success payload,
     /// signalling a committed failure if conversion fails.
-    ///
-    /// Underlying combinator object: [`TryMap`].
     fn try_map<F, B, Error>(self, closure: F) -> TryMap<Self, F, A>
     where
         F: Fn(A) -> Result<B, Error>,
@@ -225,8 +209,6 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self` to commit, promoting speculative failure into
     /// [`ParseOutcome::Committed`](crate::parse::ParseOutcome::Committed) failure.
-    ///
-    /// Underlying combinator object: [`Commit`].
     fn commit(self) -> Commit<Self>
     where
         Self: Sized,
@@ -235,21 +217,18 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self`, promoting speculative and committed failure into
     /// [`ParseOutcome::Fatal`](crate::parse::ParseOutcome::Fatal) failure.
-    ///
-    /// Underlying combinator object: [`Fatal`].
     fn fatal(self) -> Fatal<Self>
     where
         Self: Sized,
     {
         Fatal::new(self)
     }
-    /// Chains `self` to a recovery strategy, handling and transforming committed failure
-    /// into an associated diagnostic upon success.
+    /// Chains `self` to a recovery strategy, handling and transforming
+    /// [`ParseOutcome::Committed`](crate::parse::ParseOutcome::Committed) failure
+    /// into a diagnostic upon success.
     ///
     /// Common recovery strategies include parsing up to a set of recognized "safe characters" or end-of-input,
     /// where regular parsing can then resume.
-    ///
-    /// Underlying combinator object: [`Recover`].
     ///
     /// # Note on Recovery Parser Failure
     ///
@@ -261,13 +240,13 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         with: R,
         closure: C,
         kind: impl Into<SyntaxKind>,
-    ) -> With<E, Recover<Self, R, B, C>>
+    ) -> Recover<Self, R, B, C>
     where
         Self: Sized,
         R: Parser<'src, I, B, E>,
         C: Fn(<E::ErrorSupply as IdSupply>::Id, B) -> A,
     {
-        With::new(Recover::new(self, with, closure, kind))
+       Recover::new(self, with, closure, kind)
     }
 
     /// Discards the current AST payload.
@@ -307,8 +286,8 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to repeat exactly `n` times, returning a [`Vec<A>`] with exactly `n` elements.
-    ///
-    /// Underlying combinator object: [`Repetition`].
+    /// 
+    /// `self` must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     fn repeat(self, n: usize) -> Repetition<Self>
     where
         Self: Sized,
@@ -317,12 +296,14 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self` to repeat for the minimum and maximum bounds described by `range`,
     /// returning a [`Vec<A>`] with the number of elements bounded to `range`.
-    ///
-    /// Underlying combinator object: [`Repetition`].
+    /// 
+    /// Refer to [`Repetition::new`] regarding the handling of the [`RangeBounds`] value.
+    /// 
+    /// `self` must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     ///
     /// # Panics
     ///
-    /// Panics if `range` is empty.
+    /// Panics if `range` contains no elements.
     fn repeat_by(self, range: impl RangeBounds<usize>) -> Repetition<Self>
     where
         Self: Sized,
@@ -331,7 +312,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Establishes a commitment point where subsequent speculative failure in the `other` parser
-    /// is promoted to a committed failure.
+    /// is promoted to a committed failure. Resembles a Prolog-like cut boundary.
     ///
     /// Note that chaining `a.then_commit_to(b).then(c)` will only cause `b` to commit, but not `c`.
     fn then_commit_to<P, B>(self, other: P) -> derived::ThenCommitTo<Self, P>
@@ -383,13 +364,11 @@ pub trait ParserIntoOwnedExt<
     A: ToOwned + ?Sized + 'src,
 {
     /// Chains `self` by turning an AST payload reference into owned data.
-    ///
-    /// Underlying combinator object: [`IntoOwned`].
-    fn into_owned(self) -> With<E, IntoOwned<Self, A>>
+    fn into_owned(self) -> IntoOwned<Self, A>
     where
         Self: Sized,
     {
-        With::new(IntoOwned::new(self))
+        IntoOwned::new(self)
     }
 }
 impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserIntoOwnedExt<'src, I, A, E> for T

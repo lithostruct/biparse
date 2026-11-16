@@ -73,7 +73,7 @@ impl<'src, C: Clone, E: ParseEnvironment> Clone for RecursiveState<'src, C, E> {
     }
 }
 impl<'src, C: Clone, E: ParseEnvironment> RecursiveState<'src, C, E> {
-    /// Cosntructs a new, empty [`RecursiveState`].
+    /// Constructs a new, empty [`RecursiveState`].
     pub fn new() -> Self {
         Self::default()
     }
@@ -115,9 +115,7 @@ impl<'src, C: Clone + Hash + Eq, E: ParseEnvironment> RecursiveState<'src, C, E>
 pub(super) struct RecursiveFrame<'src, C, E: ParseEnvironment> {
     // IDENTIFYING INFORMATION
     /// The user-given name for this recursive combinator.
-    pub(super) description: Option<ArcStr>,
-    /// Diagnostic name, for use in debugging. Typically a string representation of the pointer address.
-    pub(super) diagnostic_name: String,
+    pub(super) name: Option<ArcStr>,
 
     // SAFETY INFORMATION
     /// A weak pointer to this recursive combinator.
@@ -155,14 +153,14 @@ pub(super) struct RecursiveFrame<'src, C, E: ParseEnvironment> {
 impl<'src, C: Clone + Debug, E: ParseEnvironment> Debug for RecursiveFrame<'src, C, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecursiveFrame")
-            .field("description", &self.description)
-            .field("diagnostic_name", &self.diagnostic_name)
+            .field("name", &self.name)
+            .field("allocation_store", &self.allocation_store.as_ptr())
             .field(
                 "seed_result",
                 &if self.seed_result.is_none() {
                     "None"
                 } else {
-                    "<erased>"
+                    "Some(<erased>)"
                 },
             )
             .field("active_fixpoint", &self.active_fixpoint)
@@ -174,8 +172,7 @@ impl<'src, C: Clone + Debug, E: ParseEnvironment> Debug for RecursiveFrame<'src,
 impl<'src, C: Clone, E: ParseEnvironment> Clone for RecursiveFrame<'src, C, E> {
     fn clone(&self) -> Self {
         RecursiveFrame {
-            description: self.description.clone(),
-            diagnostic_name: self.diagnostic_name.clone(),
+            name: self.name.clone(),
             allocation_store: self.allocation_store.clone_erased(),
             seed_result: self.seed_result.clone(),
             active_fixpoint: self.active_fixpoint,
@@ -187,13 +184,13 @@ impl<'src, C: Clone, E: ParseEnvironment> Clone for RecursiveFrame<'src, C, E> {
 
 /// Unique identifier for a recursive combinator.
 ///
-/// This is a newtype over a pointer type, and is only meaningful within a single parse session.
+/// This is a newtype over a pointer, and is only meaningful within a single parse session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RecursiveId(pub(super) *const ());
 impl RecursiveId {
     /// Writes `self` as the string representation of the inner pointer.
     pub fn as_str(&self) -> String {
-        format!("<{:p}>", self.0)
+        format!("{:p}", self.0)
     }
 }
 
@@ -223,6 +220,7 @@ pub(super) trait ErasedWeak {
     fn clone_erased<'a>(&self) -> Box<dyn ErasedWeak + 'a>
     where
         Self: 'a;
+    fn as_ptr(&self) -> *const ();
 }
 impl<P: ?Sized> ErasedWeak for Weak<P> {
     fn clone_erased<'a>(&self) -> Box<dyn ErasedWeak + 'a>
@@ -230,5 +228,8 @@ impl<P: ?Sized> ErasedWeak for Weak<P> {
         Self: 'a,
     {
         Box::new(self.clone())
+    }
+    fn as_ptr(&self) -> *const () {
+        Weak::as_ptr(self) as *const ()
     }
 }

@@ -7,7 +7,7 @@ use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 /// - All `Id` values produced *must* be distinct.
 /// - Clones of a [`IdSupply`] implementor must produce the same values as the original supply.
 ///
-/// Failure to adhere to the above may cause the `biparse` parser ecosystem to panic.
+/// Failure to adhere to the above may cause the parser ecosystem to panic.
 pub trait IdSupply: Clone + Default {
     /// The type of the Id this object produces.
     type Id: Debug + Clone + Eq + Hash;
@@ -22,7 +22,7 @@ pub trait IdSupply: Clone + Default {
 /// # User Precondition
 ///
 /// This supply assumes that `T::from(value : usize)` is injective, which is the case for transparent newtypes.
-/// Violating this invariant may lead to panicking.
+/// Violating this invariant leads to violation of the [`IdSupply`] extension contract, which may lead to panicking.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewtypeSupply<T>(usize, PhantomData<T>);
 impl<T: From<usize>> Default for NewtypeSupply<T> {

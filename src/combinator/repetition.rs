@@ -19,18 +19,22 @@ pub struct Repetition<P> {
 }
 impl<P> Repetition<P> {
     /// Constructs a new [`Repetition`] parser object.
+    /// 
+    /// Returns [`None`] if the range provided has no elements in [`usize`].
     ///
-    /// `range` describes the minimum and maximum repetitions permitted by this object;
-    /// - Below the minimum repetition, speculative failure is propagated.
-    /// - Between the minimum and maximum repetitions (inclusive),
-    ///   the parser may terminate early via speculative failure of the inner parser.
-    /// - No parsing is tried beyond the maximum repetition count.
+    /// [`range : impl RangeBound<usize>`](std::ops::RangeBounds) describes the
+    /// minimum and maximum number of repetitions permitted by this parser object:
+    /// - Below the minimum number of repetitions, bounded by [`RangeBounds::start_bound`],
+    ///   speculative failure is propagated if there are insufficient repeated occurrences of the inner parser.
+    /// - Between the minimum and maximum number of repetitions (both inclusive),
+    ///   the parser may return early via returning of [`ParseOutcome::Speculative`] of the inner parser.
+    ///   This results in an overall successful parse via [`ParseOutcome::Success`].
+    /// - No parsing is tried beyond the maximum number of repetitions, bounded by [`RangeBounds::end_bound`].
     ///
-    /// An unbounded `range.start_bound()` is normalized as zero minimum repetitions.
+    /// If [`range.start_bound()`](RangeBounds::start_bound) is [`Bound::Unbounded`],
+    /// the start bound is stored and normalized as zero minimum repetitions ([`usize::MIN`]`= 0`).
     ///
-    /// The inner parser must be advancing. Otherwise, a [`ParseOutcome::Fatal`] failure is returned upon parse.
-    ///
-    /// Returns [`None`] if the range is empty.
+    /// The inner parser must be advancing. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         inner: P,
         range: impl RangeBounds<usize>,
@@ -65,10 +69,11 @@ impl<P> Repetition<P> {
         }
     }
 
-    /// Returns the range at which this parser accepts the minimum and maximum number of repetitions.
+    /// Returns the minimum and maximum number of repetitions which `self` accepts,
+    /// expressed as [`std::ops::Bound`] values.
     ///
-    /// Note that this range object is normalized, and may not be identical to the `range`
-    /// suppplied to [`Repetition::new`] upon construction.
+    /// Note that this range object is normalized, and may not be identical to that
+    /// supplied to [`Repetition::new`] during construction of `self`.
     pub fn repetition_range(&self) -> (Bound<usize>, Bound<usize>) {
         let maximum_bound = if let Some(maximum) = self.maximum_repetitions {
             Bound::Included(maximum)
@@ -76,6 +81,31 @@ impl<P> Repetition<P> {
             Bound::Unbounded
         };
         (Bound::Included(self.minimum_repetitions), maximum_bound)
+    }
+    /// Returns the iterator over the number of repetitions `self` accepts.
+    /// 
+    /// This iterator may be unbounded if there is no maximum bound to the number of repetitions,
+    /// in which case following the [`std::ops::RangeFrom`] implementation:
+    /// > Overflow in the [`Iterator`] implementation (when the contained data type reaches its numerical limit)
+    /// > is allowed to panic, wrap, or saturate.
+    /// > This behavior is defined by the implementation of the [`Step`](std::iter::Step) trait.
+    ///
+    /// The following invariant holds with respect to [`Repetition::new`]:
+    /// ```rust,ignore
+    /// range_normalized.into_iter().eq(
+    ///     Repetition::new(_, range).repetition_range_iter()
+    /// ) == true;
+    /// 
+    /// where:
+    ///     let range_normalized = if range.start_bound() == Bound::Unbounded {
+    ///         /* range from 0 to range.end_bound() */
+    ///     } else { range };
+    /// ```
+    pub fn repetition_range_iter(&self) -> impl IntoIterator<Item = usize> {
+        (self.minimum_repetitions..).take_while(|&u| match self.maximum_repetitions {
+            Some(maximum) => u <= maximum,
+            None => true,
+        })
     }
 }
 

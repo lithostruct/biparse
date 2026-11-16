@@ -68,7 +68,7 @@ impl From<UnboundedRecursion> for SimpleKind {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
 #[error("{line_col} {kind}")]
 pub struct Simple {
-    /// The line-column position at which this failure occured.
+    /// The line-column position at which this failure occurred.
     pub line_col: LineColumn,
     /// The kind of failure. *Discards* payload information.
     pub kind: SimpleKind,

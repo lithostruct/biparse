@@ -45,7 +45,7 @@ fn first_committed() {
 
 #[test]
 fn speculate_then_committed() {
-    let combinator = fail::<str, (), DefaultParseEnvironment>().fatal()
+    let combinator = fail::<str, (), DefaultParseEnvironment>()
         .or(fail().commit());
     let (_, output) = combinator.parse("",
         ParseState::<str, DefaultParseEnvironment>::new(""));
