@@ -172,7 +172,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to repeat zero or more times, returning a [`Vec<A>`].
-    /// 
+    ///
     /// `self` must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     fn many(self) -> Repetition<Self>
     where
@@ -181,7 +181,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         Repetition::new(self, 0..).expect("Range valid!")
     }
     /// Chains `self` to repeat one or more times, returning a non-empty [`Vec<A>`].
-    /// 
+    ///
     /// `self` must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     fn some(self) -> Repetition<Self>
     where
@@ -246,7 +246,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
         R: Parser<'src, I, B, E>,
         C: Fn(<E::ErrorSupply as IdSupply>::Id, B) -> A,
     {
-       Recover::new(self, with, closure, kind)
+        Recover::new(self, with, closure, kind)
     }
 
     /// Discards the current AST payload.
@@ -286,7 +286,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
 
     /// Chains `self` to repeat exactly `n` times, returning a [`Vec<A>`] with exactly `n` elements.
-    /// 
+    ///
     /// `self` must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     fn repeat(self, n: usize) -> Repetition<Self>
     where
@@ -296,9 +296,9 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultPar
     }
     /// Chains `self` to repeat for the minimum and maximum bounds described by `range`,
     /// returning a [`Vec<A>`] with the number of elements bounded to `range`.
-    /// 
+    ///
     /// Refer to [`Repetition::new`] regarding the handling of the [`RangeBounds`] value.
-    /// 
+    ///
     /// `self` must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     ///
     /// # Panics

@@ -1,5 +1,5 @@
 //! Module for parser combinator types, which implement [`Parser`](crate::parse::Parser).
-//! 
+//!
 //! # Note on
 
 mod blanket;

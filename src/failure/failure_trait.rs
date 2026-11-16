@@ -113,42 +113,74 @@ pub enum FailureKind<I: Input + ?Sized> {
 impl<I: Input + ?Sized> Clone for FailureKind<I> {
     fn clone(&self) -> Self {
         match self {
-            Self::ExpectedFound { hint, difference_at }
-                => Self::ExpectedFound { hint: hint.clone(), difference_at: *difference_at },
-            Self::FailPrimitive { message }
-                => Self::FailPrimitive { message: message.clone() },
-            Self::UndefinedParser { name }
-                     => Self::UndefinedParser { name: name.clone() },
-            Self::DroppedParser { name }
-                => Self::DroppedParser { name: name.clone() },
-            Self::NonGrowingRepetition { inner_hint }
-                => Self::NonGrowingRepetition { inner_hint: inner_hint.clone() },
-            Self::InsufficientRepetition { minimum_repetitions, in_repetition }
-                => Self::InsufficientRepetition { minimum_repetitions: *minimum_repetitions, in_repetition: *in_repetition },
+            Self::ExpectedFound {
+                hint,
+                difference_at,
+            } => Self::ExpectedFound {
+                hint: hint.clone(),
+                difference_at: *difference_at,
+            },
+            Self::FailPrimitive { message } => Self::FailPrimitive {
+                message: message.clone(),
+            },
+            Self::UndefinedParser { name } => Self::UndefinedParser { name: name.clone() },
+            Self::DroppedParser { name } => Self::DroppedParser { name: name.clone() },
+            Self::NonGrowingRepetition { inner_hint } => Self::NonGrowingRepetition {
+                inner_hint: inner_hint.clone(),
+            },
+            Self::InsufficientRepetition {
+                minimum_repetitions,
+                in_repetition,
+            } => Self::InsufficientRepetition {
+                minimum_repetitions: *minimum_repetitions,
+                in_repetition: *in_repetition,
+            },
         }
     }
 }
 impl<I: Input + ?Sized> PartialEq for FailureKind<I> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::ExpectedFound { hint: l_hint, difference_at: l_difference_at },
-                Self::ExpectedFound { hint: r_hint, difference_at: r_difference_at })
-                => l_hint == r_hint && l_difference_at == r_difference_at,
-            (Self::FailPrimitive { message: l_message },
-                Self::FailPrimitive { message: r_message })
-                => l_message == r_message,
-            (Self::UndefinedParser { name: l_name },
-                Self::UndefinedParser { name: r_name })
-                => l_name == r_name,
-            (Self::DroppedParser { name: l_name },
-                Self::DroppedParser { name: r_name })
-                => l_name == r_name,
-            (Self::NonGrowingRepetition { inner_hint: l_inner_hint },
-                Self::NonGrowingRepetition { inner_hint: r_inner_hint })
-                => l_inner_hint == r_inner_hint,
-            (Self::InsufficientRepetition { minimum_repetitions: l_minimum_repetitions, in_repetition: l_in_repetition },
-                Self::InsufficientRepetition { minimum_repetitions: r_minimum_repetitions, in_repetition: r_in_repetition })
-                => l_minimum_repetitions == r_minimum_repetitions && l_in_repetition == r_in_repetition,
+            (
+                Self::ExpectedFound {
+                    hint: l_hint,
+                    difference_at: l_difference_at,
+                },
+                Self::ExpectedFound {
+                    hint: r_hint,
+                    difference_at: r_difference_at,
+                },
+            ) => l_hint == r_hint && l_difference_at == r_difference_at,
+            (
+                Self::FailPrimitive { message: l_message },
+                Self::FailPrimitive { message: r_message },
+            ) => l_message == r_message,
+            (Self::UndefinedParser { name: l_name }, Self::UndefinedParser { name: r_name }) => {
+                l_name == r_name
+            }
+            (Self::DroppedParser { name: l_name }, Self::DroppedParser { name: r_name }) => {
+                l_name == r_name
+            }
+            (
+                Self::NonGrowingRepetition {
+                    inner_hint: l_inner_hint,
+                },
+                Self::NonGrowingRepetition {
+                    inner_hint: r_inner_hint,
+                },
+            ) => l_inner_hint == r_inner_hint,
+            (
+                Self::InsufficientRepetition {
+                    minimum_repetitions: l_minimum_repetitions,
+                    in_repetition: l_in_repetition,
+                },
+                Self::InsufficientRepetition {
+                    minimum_repetitions: r_minimum_repetitions,
+                    in_repetition: r_in_repetition,
+                },
+            ) => {
+                l_minimum_repetitions == r_minimum_repetitions && l_in_repetition == r_in_repetition
+            }
 
             _ => false,
         }
@@ -157,29 +189,34 @@ impl<I: Input + ?Sized> PartialEq for FailureKind<I> {
 impl<I: Input + ?Sized> Eq for FailureKind<I> {}
 impl<I: Input + ?Sized> Hash for FailureKind<I>
 where
-    I::Cursor : Hash
+    I::Cursor: Hash,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
         match self {
-            FailureKind::ExpectedFound { hint, difference_at } => {
+            FailureKind::ExpectedFound {
+                hint,
+                difference_at,
+            } => {
                 hint.hash(state);
                 difference_at.hash(state);
-            },
+            }
             FailureKind::FailPrimitive { message } => {
                 message.hash(state);
-            },
-            FailureKind::UndefinedParser { name }
-            | FailureKind::DroppedParser { name } => {
+            }
+            FailureKind::UndefinedParser { name } | FailureKind::DroppedParser { name } => {
                 name.hash(state);
-            },
+            }
             FailureKind::NonGrowingRepetition { inner_hint } => {
                 inner_hint.hash(state);
-            },
-            FailureKind::InsufficientRepetition { minimum_repetitions, in_repetition } => {
+            }
+            FailureKind::InsufficientRepetition {
+                minimum_repetitions,
+                in_repetition,
+            } => {
                 minimum_repetitions.hash(state);
                 in_repetition.hash(state);
-            },
+            }
         }
     }
 }

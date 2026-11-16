@@ -205,9 +205,9 @@ impl<I: Input + ?Sized> TryFrom<FailureKind<I>> for RichKind {
             FailureKind::FailPrimitive { message } => RichKind::FailPrimitive { message },
             FailureKind::UndefinedParser { name } => RichKind::UndefinedParser { name },
             FailureKind::DroppedParser { name } => RichKind::DroppedParser { name },
-            FailureKind::NonGrowingRepetition { inner_hint } => {
-                RichKind::NonGrowingRepetition { inner_hint: inner_hint.canonize() }
-            }
+            FailureKind::NonGrowingRepetition { inner_hint } => RichKind::NonGrowingRepetition {
+                inner_hint: inner_hint.canonize(),
+            },
             FailureKind::InsufficientRepetition {
                 minimum_repetitions,
                 in_repetition,

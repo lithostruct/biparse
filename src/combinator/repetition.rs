@@ -19,7 +19,7 @@ pub struct Repetition<P> {
 }
 impl<P> Repetition<P> {
     /// Constructs a new [`Repetition`] parser object.
-    /// 
+    ///
     /// Returns [`None`] if the range provided has no elements in [`usize`].
     ///
     /// [`range : impl RangeBound<usize>`](std::ops::RangeBounds) describes the
@@ -83,7 +83,7 @@ impl<P> Repetition<P> {
         (Bound::Included(self.minimum_repetitions), maximum_bound)
     }
     /// Returns the iterator over the number of repetitions `self` accepts.
-    /// 
+    ///
     /// This iterator may be unbounded if there is no maximum bound to the number of repetitions,
     /// in which case following the [`std::ops::RangeFrom`] implementation:
     /// > Overflow in the [`Iterator`] implementation (when the contained data type reaches its numerical limit)
@@ -95,7 +95,7 @@ impl<P> Repetition<P> {
     /// range_normalized.into_iter().eq(
     ///     Repetition::new(_, range).repetition_range_iter()
     /// ) == true;
-    /// 
+    ///
     /// where:
     ///     let range_normalized = if range.start_bound() == Bound::Unbounded {
     ///         /* range from 0 to range.end_bound() */

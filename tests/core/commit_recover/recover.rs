@@ -5,7 +5,8 @@ use expect_test::expect;
 use rowan::SyntaxKind;
 
 // Expects "something" or "strict: requirement". If "strict: " matched, commit and recover to end.
-fn make_parser<'src>() -> impl Parser<'src, str, Result<String, (usize, String)>, DefaultParseEnvironment> {
+fn make_parser<'src>()
+-> impl Parser<'src, str, Result<String, (usize, String)>, DefaultParseEnvironment> {
     just((SyntaxKind(0), "something"))
         .into_owned()
         .or(just((SyntaxKind(1), "strict: "))
@@ -59,7 +60,8 @@ fn recovery_success() {
     expect![[r#"
         (1, 9) expected:
              | └─ string "requirement"
-             | found: character 'u' at (1, 9)"#]].assert_eq(&entry.0.to_string());
+             | found: character 'u' at (1, 9)"#]]
+    .assert_eq(&entry.0.to_string());
     assert_eq!(entry.1.text(), "unexpected sequence!");
 }
 
