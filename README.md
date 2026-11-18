@@ -1,5 +1,11 @@
 # biparse
 
+[![Crates.io](https://img.shields.io/crates/v/biparse.svg)](https://crates.io/crates/biparse)
+[![Documentation](https://docs.rs/biparse/badge.svg)](https://docs.rs/biparse)
+[![Guide](https://img.shields.io/badge/guide-biparse-181717)](https://lithostruct.github.io/biparse)
+[![GitHub](https://img.shields.io/badge/GitHub-biparse-181717?logo=github)](https://github.com/lithostruct/biparse)
+[![CI](https://github.com/lithostruct/biparse/actions/workflows/ci.yml/badge.svg)](https://github.com/lithostruct/biparse/actions/workflows/ci.yml)
+
 Biparse is a parser-combinator framework designed around dual AST + CST construction and correspondence.  
 Write an AST parser, get the CST for free!
 
@@ -11,7 +17,7 @@ To add to your project:
 cargo add biparse
 ```
 
-Refer to [`Parser`] and [`ParserExt`] for initial documentation.
+Go through the [guide book](https://lithostruct.github.io/biparse) for further information, or refer to [`Parser`] and [`ParserExt`] for initial documentation.
 
 ### Why Should I Use This?
 

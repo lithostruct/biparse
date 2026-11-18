@@ -29,3 +29,4 @@ playground.runnable = false
 [output.linkcheck2]
 follow-web-links = false
 traverse-parent-directories = true
+warning-policy = "error"
