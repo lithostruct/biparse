@@ -1,4 +1,4 @@
-//! Integration test demonstrating a JSON parser.
+//! Integration test demonstrating a JSON parser using [`logos`]-based input.
 #![cfg(feature = "regex")]
 
 use std::str::FromStr;
@@ -155,7 +155,7 @@ where
     // Hence, the CST produced by this combinator is different.
     let string = just(WithText(Kind::RawText))
         .map(|(_, fragment)| {
-            let mut s = fragment.into_owned();
+            let mut s = fragment.to_owned();
             s.remove(0);
             s.pop();
             s
@@ -166,7 +166,7 @@ where
     // Simplifying assumption:
     // Numbers are integers only, and can be cast to `BigInt` without failing.
     let number = just(WithText(Kind::Number))
-        .map(|(_, s)| BigInt::from_str(&s).unwrap())
+        .map(|(_, s)| BigInt::from_str(s).unwrap())
         .shared();
 
     // Corresponds to (',' value)*.

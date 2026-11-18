@@ -1,7 +1,6 @@
 //! Module for testing of [`Or`](biparse::combinator::Or) combinators.
 //!
-//! Notes:
-//!
+//! # Notes:
 //! `or` is such a fundamental operator in Biparse that plenty of tests have been done in other files.
 //! This mostly targets the combinations of potential parse outcomes in the first or second payload.
 

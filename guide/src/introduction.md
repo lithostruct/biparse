@@ -1,4 +1,4 @@
-# Biparse Documentation
+# Introduction
 
 Biparse is a parser-combinator framework designed around dual AST + CST construction and correspondence.  
 Write an AST parser, get the CST for free!

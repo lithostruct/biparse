@@ -7,6 +7,7 @@ For speculative failure, trying an alternative parsing branch may be constituted
 ## Commitment Boundaries
 
 ### `commit`
+*Docs.rs documentation: [`ParserExt::commit`], [`combinator::Commit`].*
 
 Promotes a speculative failure ([`ParseOutcome::Speculative`](../parse_output.md#speculative)) into a [`ParseOutcome::Committed`](../parse_output.md#committed) failure.
 
@@ -16,6 +17,7 @@ let_binding ::= "let" identifier [':' type] '=' expression ';'
 ```
 
 ### `then_commit_to`
+*Docs.rs documentation: [`ParserExt::then_commit_to`]*
 
 Syntactic sugar over `a.then(b.commit())`, which resembles a Prolog-like cut boundary.
 
@@ -43,7 +45,15 @@ let let_binding : Rc<dyn Parser<'_, I, _, E>> = just((/* kind */, "let"))
 
 Note that eg. `a.then_commit_to(b).then(c)` will only enforce commitment in constituent `b`; `c` may fail speculatively if `a` and `b` succeed, returning a speculative error. If `b` fails, it returns a committed failure, and `c` is not tried at all.
 
+### `fatal`
+*Docs.rs documentation: [`ParserExt::fatal`], [`combinator::Fatal`].*
+
+Not strictly related to this section, but bears mentioning.
+
+Promotes any speculative or committed failure into [`ParseOutcome::Fatal`] failure, which is unrecoverable.
+
 ## Recovery Parsing (`recover`)
+*Docs.rs documentation: [`ParserExt::recover`], [`combinator::Recover`].*
 
 The `recover` combinator takes in:
 - The upstream combinator via method chaining,

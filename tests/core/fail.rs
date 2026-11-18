@@ -1,4 +1,12 @@
 //! Tests for the [`Fail`](biparse::combinator::Fail) primitive combinator.
+//!
+//! # Note on Never Type
+//!
+//! While the never type [`!`](primitive@never) is indeed the "canonical" type that
+//! [`Fail`](biparse::combinator::Fail) outputs,
+//! the tests here (and everywhere `fail` is used) will default to unit [`()`](primitive@unit).
+//!
+//! This is mostly for backwards compatibility with pre-1.100 versions.
 
 use biparse::prelude::*;
 use proptest::{arbitrary::any, proptest};
@@ -7,7 +15,7 @@ use rowan::SyntaxKind;
 proptest! {
     #[test]
     fn single_fail(s in any::<String>()) {
-        let (state, output): (_, ParseOutput<!, DefaultParseEnvironment>) = fail()
+        let (state, output): (_, ParseOutput<(), DefaultParseEnvironment>) = fail()
             .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         assert_eq!(state.cursor.into_usize(), 0);
@@ -31,7 +39,7 @@ proptest! {
     fn just_then_fail(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
         let (_, output): (_, ParseOutput<&str, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern))
-                .then(fail()).map(|(s, _) : (&str, !)| s)
+                .then(fail()).map(|(s, ())| s)
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
 
         assert!(matches!(output.ast, ParseOutcome::Speculative(_)));
@@ -65,11 +73,11 @@ proptest! {
 
     #[test]
     fn just_or_fail(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (state1, result1): (_, ParseOutput<Either<&str, !>, DefaultParseEnvironment>)
+        let (state1, result1): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern.clone()))
                 .map(Either::Left)
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
-        let (state2, result2): (_, ParseOutput<Either<&str, !>, DefaultParseEnvironment>)
+        let (state2, result2): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
             = just((SyntaxKind(kind), pattern))
                 .either_or(fail())
                 .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));

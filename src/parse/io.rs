@@ -175,23 +175,31 @@ impl<A, E: ParseEnvironment> ParseOutput<A, E> {
 }
 
 /// Intermediate outcome of a parse on the AST payload.
+///
+/// You may conceptually think of this as a [`Result<A, F>`],
+/// with distinctions between failures based on severity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ParseOutcome<A, F> {
-    /// A successful parse producing an AST payload.
+    /// A successful parse producing an AST payload of type `A`.
     Success(A),
     /// Speculative failure.
+    ///
     /// The combinator system is free to try out parsing alternatives,
     /// and a later success will cause this value to be discarded.
     Speculative(F),
     /// Committed failure.
+    ///
     /// The combinator system may not try other alternatives.
-    /// This failure is propagated outwards until explicitly handled.
+    /// This failure is propagated outwards until explicitly handled or recovered from
+    /// (typically by [`Recover`](crate::combinator::Recover)),
+    /// after which it is retained as a diagnostic within the CST component [`AssociatedGreenCst`].
     Committed(F),
     /// Fatal failure.
-    /// This results from combinator system invariant violations.
-    /// Upon receiving this from any parsing path,
+    ///
+    /// This typically results from combinator invariant violations.
+    /// Upon receiving this from *any* parsing path,
     /// the combinator system *must* halt subsequent parsing or recovery attempts,
-    /// and propagate it outwards until it is converted into a top-level parse failure.
+    /// and propagate it to the top-level as a terminating failure.
     Fatal(F),
 }
 impl<A, F> ParseOutcome<A, F> {
@@ -299,7 +307,6 @@ impl<A, E: ParseEnvironment> ParseArtifact<A, E> {
     /// Materializes an immutable view into the AST payload and raw diagnostics.
     ///
     /// To view only the AST component, ignoring diagnostics, use [`Self::ast_only`].
-    ///
     /// To view only diagnostics, use [`Self::diagnostics`].
     pub fn ast(&self) -> (&A, Vec<&E::Failure>) {
         (&self.ast, self.diagnostics())
@@ -318,7 +325,6 @@ impl<A, E: ParseEnvironment> ParseArtifact<A, E> {
     /// Consumes `self` to produce the AST payload and diagnostics.
     ///
     /// To obtain only the AST component, discarding diagnostics, use [`Self::into_ast_only`].
-    ///
     /// To obtain only diagnostics, use [`Self::into_diagnostics`].
     ///
     /// To obtain both AST and CST components, use [`Self::into_parts`].

@@ -1,22 +1,27 @@
-# Parse Output, Parse Outcomes and Parse Artifacts
+# Parse Outcomes, Output and Artifacts
 
-Parse outputs (`ParseOutput`) refer to the intermediate output of a parse, which consists of an AST and CST component. 
-Both components are vital to the functionality of the Biparse combinator library. It is intended to be used primarily by [`Parser`](./parser_trait.md#main-parser-trait) implementors and those that interact with `Parser` functionality.
+[`ParseOutput`] refer to the intermediate output of a parse, which consists of an AST and CST component. 
+Both components are vital to the functionality of the Biparse combinator library. It is intended to be used primarily by [`Parser`](./parser_trait.md#main-parser-trait) implementors and those that interact with [`Parser`] functionality.
 
-Parse artifacts (`ParseArtifact`), on the other hand, are finalized from `ParseOutput`, containing the same information but in a more ergonomic form for end-users. They are produced by the top-level `parse_all` and `check_all` methods.
+[`ParseArtifact`] are finalized from [`ParseOutput`], containing the same AST and CST information but in a more ergonomic form for end-users. They are produced by the top-level [`ParserExt::parse_all`] and [`ParserExt::check_all`] methods.
+
+[`ParseOutcome`] refers to the AST component of both output types. More is covered in its [dedicated section](#abstract-syntax-tree-ast).
 
 ## Abstract Syntax Tree (AST)
+*Docs.rs documentation: [`ParseOutcome`].*
 
-The intermediate AST component consists of a `ParseOutcome`. You may think of this as a `Result<A, F>` payload with subcategories describing how the parser ecosystem should react to failure, in increasing levels of severity.
+The intermediate AST component consists of a [`ParseOutcome`]. You may think of this as a [`Result<A, F>`] payload with subcategories describing how the parser ecosystem should react to failure, in increasing levels of severity.
 
-Finalization within `parse_all` and `check_all` lossily converts `ParseOutcome` into a `Result` type, lifting failure out of the AST component to indicate overall success or failure. This means that the event of a top-level failure, the CST is *not* retained.
+Finalization from [`ParseOutput`] to [`ParseArtifact`] lossily converts parse outcome into the corresponding `Result`, lifting failure out of the AST component to indicate overall success or failure. This means that the event of a top-level failure, the CST is *not* retained.
 
-The type of failures may be configured by changing the `ParseEnvironment` threaded throughout a parse operation. This allows the end user to control how much failure information to retain for error reporting purposes.
+The type of failures may be configured by changing the [`ParseEnvironment`] threaded throughout a parse operation. This allows the end user to control how much failure information to retain for error reporting purposes.
 
-Three failure payload types are provided, implementing the necessary `ParseFailure` trait:
-- `Minimal`, which discards all error information.
-- `Simple`, which retains the line-column position and simplistic failure kind information.
-- `Rich`, which retains and pretty-prints most of the information supplied at the site of failure.
+Three failure payload types are provided, implementing the necessary [`ParseFailure`] trait:
+- [`Minimal`](biparse::failure::types::Minimal), which discards all error information.
+- [`Simple`](biparse::failure::types::Simple), which retains the line-column position and simplistic failure kind information.
+- [`Rich`](biparse::failure::types::Rich), which retains and pretty-prints most of the information supplied at the site of failure.
+
+These may be accessed through module [`failure::types`]. They are not exported via the [`prelude`].
 
 ### `Success`
 
@@ -24,7 +29,7 @@ Successful parse results in the AST value `A`. These may be constructed and tran
 
 ### `Speculative`
 
-Speculative failure is the default failure mode of the combinator ecosystem. This indicates while the current parse branch failed, alternatives may be tried, and success within sister or enclosing branches will be taken as success overall. This allows for speculative parsing via `or`, repetition via `many`, and recursive parsing via `Recursive` combinators.
+Speculative failure is the default failure mode of the combinator ecosystem. This indicates while the current parse branch failed, alternatives may be tried, and success within sister or enclosing branches will be taken as success overall. This allows for speculative parsing via `or`, repetition via `many`, and recursive parsing via [`Recursive`] combinators.
 
 ### `Committed`
 
@@ -54,8 +59,9 @@ As a simplistic but illustrative example regarding AST outcome semantics:
 - `success().many()` produces a fatal failure, as `success()` consumes no input and hence how many items to populate the payload `Vec<()>` with is undecidable. A naive implementation would spin forever.
 
 ## Concrete Syntax Tree (CST)
+*Docs.rs documentation: [`AssociatedGreenCst`], [AssociatedRedCst].*
 
-The CST component (`AssociatedGreenCst`) consists of a `rowan` CST forest, along with coupled path information for both associations and diagnostics. The structure of `AssociatedGreenCst` can be thought of as:
+The CST component [`AssociatedGreenCst`] consists of a `rowan` CST forest, along with coupled path information for both associations and diagnostics. The structure of [`AssociatedGreenCst`] can be thought of as:
 ```rust,ignore
 pub struct AssociatedGreenCst<Id, EId, E>
 where
@@ -67,12 +73,12 @@ where
     diagnostics: HashMap<EId, (E, CstPath)>,
 }
 ```
-- The `rowan` CST forest is constructed automatically during parsing. `Parser` implementors maintain the extension contract that the CST formed is total.
-- Associations are introduced by `associate` combinators, which allow a unique `Id` value to be embedded into both the AST and CST.
-- Diagnostics are formed from successful error recovery from committed failures via `recover` combinators. This causes a unique `EId` value to be embedded into both the AST and CST.
+- The [`rowan`] CST forest is constructed automatically during parsing. [`Parser`] implementors maintain the extension contract that the CST formed is total.
+- Associations are introduced by [`associate`](./combinators/3_transformation.md#associate) combinators, which allow a unique `Id` value to be embedded into both the AST and CST.
+- Diagnostics are formed from successful error recovery from committed failures via [`recover`](./combinators/4_commitment_and_error_recovery.md#recovery-parsing-recover) combinators. This causes a unique `EId` value to be embedded into both the AST and CST.
 
-The `Id` and `EId` associated types may be configured by implementing the `ParseEnvironment` threaded throughout a parse operation. The default for both associated types is `usize`.
+The `Id` and `EId` associated types may be configured by implementing the [`ParseEnvironment`] threaded throughout a parse operation. The default for both associated types is `usize`.
 
-`AssociatedGreenCst` maintains the strong invariant that all association and diagnostic paths correspond to the same green nodes within the CST forest throughout CST transformation for the entire parse operation. This also means that `Id` and `EId` values embedded within the AST constructed will always point to the same CST spans from which they are associated with. This forms the AST-CST correspondence mechanism of Biparse.
+[`AssociatedGreenCst`] maintains the strong invariant that all association and diagnostic paths correspond to the same green nodes within the CST forest throughout CST transformation for the entire parse operation. This also means that `Id` and `EId` values embedded within the AST constructed will always point to the same CST spans from which they are associated with. This forms the AST-CST correspondence mechanism of Biparse.
 
-`AssociatedGreenCst` may be canonized into `AssociatedRedCst`, which instead contains a `rowan::SyntaxNode<L>` red tree. Both types may weaken their correspondence invariants via deconstruction to take ownership of their constituent parts.
+[`AssociatedGreenCst`] may be canonized into [`AssociatedRedCst`], which instead contains a [`rowan::SyntaxNode<L>`] red tree. Both types may weaken their correspondence invariants via deconstruction to take ownership of their constituent parts.

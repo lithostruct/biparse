@@ -1,14 +1,14 @@
 # Summary
 
-- [Quick Start](./quick_start.md)
+- [Introduction](./introduction.md)
 - [But Why Though?](./motivation.md)
 - [`Input` Types](./input_comparison/index.md)
     - [Input `str`](./input_comparison/1_input_str.md)
     - [Input `LexerStream<'source>`](./input_comparison/2_input_lexerstream.md)
     - [Input `SkippingStr<'source>`](./input_comparison/3_input_skippingstr.md)
-- [`Parser` Trait Description and Usage](./parser_trait.md)
-- [Parser Output and Outcomes](./parse_output.md)
-- [Parser Combinators](./combinators/index.md)
+- [`Parser` Traits](./parser_trait.md)
+- [Parse Outcomes, Output and Artifacts](./parse_output.md)
+- [Combinators](./combinators/index.md)
     - [Blanket Implementors](./combinators/0_blanket_implementors.md)
     - [Primitives and Leaf Combinators](./combinators/1_primitives_and_leaf_combinators.md)
     - [Composite Combinators](./combinators/2_composite_combinators/index.md)

@@ -7,24 +7,28 @@ This section describes transformation of the AST and CST components of a parse o
 AST payloads are freely transformable as Rust values. You may call methods, consume or discard them entirely. These operate on `Success` payloads only; failure values pass through unchanged.
 
 ### `map`
+*Docs.rs documentation: [`ParserExt::map`], [`combinator::Map`].*
 
 Uses a Rust function or closure to transform the AST payload, which is passed into it by value.
 
 For a function or closure `F : impl Fn(A) -> B`, a parser of `a.map(f)` produces an AST payload of type `B`.
 
 ### `ignore`
+*Docs.rs documentation: [`ParserExt::ignore`].*
 
 Syntax sugar for eg. `a.map(|_| ())`, discarding the AST payload and returning the unit value `()`.
 
 ### `into_owned`
+*Docs.rs documentation: [`ParserIntoOwnedExt::into_owned`], [`combinator::IntoOwned`].*
 
-A specialized implementation for converting some reference into an owned value via [`ToOwned::to_owned`](https://doc.rust-lang.org/std/borrow/trait.ToOwned.html).
+A specialized implementation for converting some reference into an owned value via [`ToOwned::to_owned`].
 
 A parser of `a_ref.into_owned()` produces an AST payload of type `<A as ToOwned>::Owned`, with the initial parser `a_ref` producing a `&'src A` typically borrowing into the input.
 
-Due to type requirements being stricter than most `Parser` implementors, using the `.into_owned` chaining method requires the `ParserIntoOwnedExt` trait to be in scope, rather than `ParserExt`. This trait is automatically blanket-implemented and included by the prelude.
+Due to type requirements being stricter than most [`Parser`] implementors, using the `.into_owned` chaining method requires the [`ParserIntoOwnedExt`] trait to be in scope, rather than [`ParserExt`]. This trait is automatically blanket-implemented and included by the [`prelude`].
 
 ### `try_map`
+*Docs.rs documentation: [`ParserExt::try_map`], [`combinator::TryMap`].*
 
 Uses a fallible Rust function or closure returning `Result` to transform the AST payload.
 
@@ -41,12 +45,14 @@ The green CST forest is automatically accumulated during parsing. Without interf
 To maintain correspondence invariants, CST transformation is more limited and pre-defined compared to AST transformation, and does not involve type conversions.
 
 ### `node`, `named`
+*Docs.rs documentation: [`ParserExt::node`], [`ParserExt::named`], [`combinator::Node`].*
 
 Appends a `SyntaxKind` as a new parent node, taking the existing forest as all of its children. `named` additionally provides the current construct with a name string, which may be useful for parsing error-reporting clarity.
 
 Use these to mark syntactic constructs within the CST grammar. These typically will mirror the AST types produced.
 
 ### `associate`
+*Docs.rs documentation: [`ParserExt::associate`], [`combinator::Associate`].*
 
 Provides a unique `ParseEnvironment::Supply::Id` value to associate AST and CST constructs.
 

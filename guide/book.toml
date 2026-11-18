@@ -9,7 +9,16 @@ edition = "2024"
 [preprocessor.rustdoc-links]
 after = ["links"]
 build.packages = [
+  "biparse",
   "either",
+  "logos",
+  "rowan",
+  "regex",
+  "regex-lite",
+]
+build.preludes = [
+  "biparse::*",
+  "biparse::prelude::*",
 ]
 
 [output.html]

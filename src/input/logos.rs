@@ -48,6 +48,7 @@ where
         }
     }
 }
+
 impl<'src, Token> LexerStream<'src, Token>
 where
     Token: Clone + Logos<'src, Source = str>,
@@ -123,10 +124,15 @@ where
             descriptor,
         }
     }
+}
 
+impl<'src, Token> LexerStream<'src, Token>
+where
+    Token: Logos<'src, Source = str>,
+{
     /// Returns the underlying source string.
     pub fn source(&self) -> &str {
-        &self.source
+        self.source.source()
     }
 }
 
@@ -301,7 +307,7 @@ where
     T: Debug + Clone + Eq + Logos<'source, Source = str> + 'static,
 {
     type Payload
-        = (&'src T, Cow<'src, str>)
+        = (&'src T, &'src str)
     where
         LexerStream<'source, T>: 'src;
 
@@ -314,7 +320,7 @@ where
             // INVARIANT: `matched.cst_spans` is a singleton vector.
             let range = &matched.cst_spans.first().unwrap().1;
             PatternMatch {
-                payload: (matched.payload, input.slice_bytes(range.start, range.end)),
+                payload: (matched.payload, &input.source()[range.start..range.end]),
                 cst_spans: matched.cst_spans,
                 next_cursor: matched.next_cursor,
             }
@@ -332,7 +338,7 @@ where
     T: Debug + Clone + Eq + Logos<'source, Source = str> + Into<SyntaxKind> + 'static,
 {
     type Payload
-        = (&'src T, Cow<'src, str>)
+        = (&'src T, &'src str)
     where
         LexerStream<'source, T>: 'src;
 
@@ -345,7 +351,7 @@ where
             // INVARIANT: `matched.cst_spans` is a singleton vector.
             let range = &matched.cst_spans.first().unwrap().1;
             PatternMatch {
-                payload: (matched.payload, input.slice_bytes(range.start, range.end)),
+                payload: (matched.payload, &input.source()[range.start..range.end]),
                 cst_spans: matched.cst_spans,
                 next_cursor: matched.next_cursor,
             }

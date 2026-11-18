@@ -7,4 +7,8 @@ mod parser_trait;
 mod environment;
 mod io;
 
-pub use self::{environment::*, io::*, parser_trait::*};
+pub use self::{
+    environment::*,
+    io::*,
+    parser_trait::{derived, *},
+};

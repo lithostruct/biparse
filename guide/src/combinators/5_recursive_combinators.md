@@ -1,16 +1,16 @@
 # Recursive Combinators
 
-Biparse offers recursive parsing capabilities in the form of self-recursion and mutual recursion.
+Biparse offers recursive parsing capabilities in the form of self-recursion and mutual recursion via [`Recursive`].
 
 Biparse employs a seed-growing algorithm as described in as described by the paper
 ["Packrat Parsers can Support Left-Recursion"](https://web.cs.ucla.edu/~todd/research/pepm08.pdf) to enable left-recursion.
-Hence, to store, compare and return intermediate results, the payload type `A` *must* satisfy `Clone + 'static`.
+Hence, to store, compare and return intermediate results, the payload type `A` *must* satisfy [`Clone`] `+ 'static`.
 
 ## Self Recursion
 
 A grammar construct that only refers to itself recursively.
 
-Self-recursive parsers may be constructed via the `Recursive::new` and `Recursive::new_as` methods. The primary argument is a fixpoint closure that takes in a `self` reference and constructs the desired parser.
+Self-recursive parsers may be constructed via the [`Recursive::new`] and [`Recursive::new_as`] methods. The primary argument is a fixpoint closure that takes in a `self` reference and constructs the desired parser.
 
 ### Example
 
@@ -34,13 +34,13 @@ let sexp : Recursive<Direct<'_, '_, I, _, E>> =
 
 A set of grammar constructs that may refer to each other.
 
-`Recursive::declare` and `Recursive::declare_as` creates a new mutually-recursive parser with an undefined body. This body is filled upon calling `Recursive::define`. Each parser must be defined exactly *once*; attempting to define a parser multiple times result in an immediate panic, and attempting a parse with an undefined parser results in a [`Fatal` failure](../parse_output.md#fatal).
+[`Recursive::declare`] and [`Recursive::declare_as`] creates a new mutually-recursive parser with an undefined body. This body is filled upon calling [`Recursive::define`]. Each parser must be defined exactly *once*; attempting to define a parser multiple times result in an immediate panic, and attempting a parse with an undefined parser results in a [`Fatal` failure](../parse_output.md#fatal).
 
 ### Limitations
 
 [Strong reference cycles](https://doc.rust-lang.org/std/rc/index.html) formed by mutually-recursive parsers causes them to *never* deallocate when inaccessible, persisting until the end of program execution.
 
-Strategic use of `Recursive::weaken` may be required to break strong cycles where applicable, by constructing a non-owning handle to a recursive combinator. This is typically applied to the recursive back-edges to a "primary" combinator, which keeps its group of related constructs alive. Attempting a parse on a dropped parser results in a [`Fatal` failure](../parse_output.md#fatal).
+Strategic use of [`Recursive::weaken`] may be required to break strong cycles where applicable, by constructing a non-owning handle to a recursive combinator. This is typically applied to the recursive back-edges to a "primary" combinator, which keeps its group of related constructs alive. Attempting a parse on a dropped parser results in a [`Fatal` failure](../parse_output.md#fatal).
 
 This may be addressed more completely in the future with dedicated recursive group semantics.
 
@@ -85,7 +85,7 @@ statement.define(
 );
 ```
 
-Note that defining a parser via `Recursive::define` takes a parser directly, unlike the fixpoint closure of [self-recursion](#self-recursion), which handles weakening for us automatically.
+Note that defining a parser via [`Recursive::define`] takes a parser directly, unlike the fixpoint closure of [self-recursion](#self-recursion), which handles weakening for us automatically.
 
 ## Notes
 
@@ -105,7 +105,7 @@ Prefer left-recursive grammars where applicable.
 
 ### Unbounded Recursion
 
-Attempting a parse on a recursive parser describing unbounded recursion results in a [`Fatal` failure](../parse_output.md#fatal).
+Attempting a parse on a recursive parser describing unbounded recursion results in a [`ParseOutcome::Fatal`] failure.
 
 Examples of unbounded recursive grammars include:
 - `self ::= self`

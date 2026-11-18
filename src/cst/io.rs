@@ -11,9 +11,15 @@ use crate::{
     input::Input,
 };
 
-/// The mutable output of CST construction, representing a green CST forest and coupled associations.
+/// The intermediate output of CST construction, representing a green CST forest
+/// and its coupled associations and diagnostics.
 ///
-/// Associations contained are guaranteed to be valid for this CST forest.
+/// Associations represent injective relationships between the AST and CST.
+/// They are typically formed via [`Associate`](crate::combinator::Associate) combinators.
+///
+/// Diagnostics are formed from parser recovery operations from syntactically incorrect input,
+/// typically via [`Recover`](crate::combinator::Recover) combinators acting upon
+/// [`ParseOutcome::Committed`](crate::parse::ParseOutcome::Committed) failures.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AssociatedGreenCst<Id, EId, E>
 where

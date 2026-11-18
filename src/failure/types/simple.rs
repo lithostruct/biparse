@@ -22,10 +22,10 @@ pub enum SimpleKind {
     /// Dropped parser. This is always fatal.
     #[error("dropped parser")]
     DroppedParser,
-    /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
+    /// Non-growing repetition in [`Repetition`](crate::combinator::Repetition). This is always fatal.
     #[error("non growing repetition")]
     NonGrowingRepetition,
-    /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
+    /// Non-growing repetition in [`Repetition`](crate::combinator::Repetition). This is always fatal.
     #[error("insufficient repetition")]
     InsufficientRepetition,
 

@@ -10,7 +10,7 @@ Most language experiments simply don't bother with a source-to-CST parser, becau
 
 This project makes two contributions:
 - Despite being a parser combinator ecosystem comparable to [`chumsky`](https://crates.io/crates/chumsky) in its intuitive use, all parser combinators natively support CST construction and do so automatically. You essentially get a CST without even trying.
-- `associate` combinators provide AST-CST correspondence through a configurable `Id` embedding, making it trivial to track which AST constructs correspond to the text and spans the CST node contains.
+- [`associate`](./combinators/3_transformation.md#associate) combinators provide AST-CST correspondence through a configurable `Id` embedding, making it trivial to track which AST constructs correspond to the text and spans the CST node contains.
 
 This crate is unlikely to be stellar at performance compared to other options. If you want something that's quick to pick up and hack on though? Biparse may be just for you.
 
@@ -24,11 +24,17 @@ The pair of projects that I would say exceeds the value proposition of Biparse a
 
 `treesitter` needs no introduction: it is the de-facto standard for fast and incremental parsing, natively producing a lossless CST. The `rust_sitter` wrapper makes writing the grammar and converting it to a typed AST effortless via proc-macro generation and type-directed extraction via [`rust_sitter::Extract`](https://docs.rs/rust-sitter/latest/rust_sitter/trait.Extract.html).
 
-By exposing the [`tree_sitter::Language`](https://docs.rs/tree-sitter/latest/tree_sitter/struct.Language.html) generated, *all* of the capabilities of `treesitter` are retained via its Rust bindings. This means that incremental CST reuse (ASTs are rematerialized on each parse), fast parsing and quick iteration within Rust are all a given. I cannot recommend this combination enough.
+By exposing the [`tree_sitter::Language`](https://docs.rs/tree-sitter/latest/tree_sitter/struct.Language.html) generated, *all* of the capabilities of `treesitter` are retained. This means that incremental CST reuse (ASTs are rematerialized on each parse), fast parsing and quick iteration within Rust are all a given. These are all *massive* advantages if you're keen on leveraging them.
 
-Possible points are that `treesitter` (and hence `rust_sitter`) use [GLR parsing](https://en.wikipedia.org/wiki/GLR_parser), which can produce unintuitive grammar errors in shift-reduce and reduce-reduce errors. Error recovery during parsing is also automated and hence less controlled by the parser author (this can be seen as both a benefit and drawback).
+Minor points of contention are that:
+- `treesitter` (and hence `rust_sitter`) use [GLR parsing](https://en.wikipedia.org/wiki/GLR_parser), which can produce unintuitive grammar errors in shift-reduce and reduce-reduce errors.
+- Error recovery during parsing is automated and hence less controlled by the parser author. This can be seen as both a benefit and drawback.
 
-In contrast, Biparse is based on [parsing expression grammars](https://en.wikipedia.org/wiki/Parsing_expression_grammar), which follows ordered choice and execution-based control flow and are hence unambiguous. Furthermore, `recover` combinators allow for arbitrary recovery strategies, offering significant granularity to parser authors. Some may find this style of parser writing more intuitive coming from handwritten recursive descent.
+In contrast, Biparse:
+- Is based on [parsing expression grammars](https://en.wikipedia.org/wiki/Parsing_expression_grammar), which follows ordered choice and execution-based control flow.
+- [`recover`](./combinators/4_commitment_and_error_recovery.md#recovery-parsing-recover) combinators allow for arbitrary recovery strategies, offering significant granularity to parser authors.
+
+Some may find Biparse's style of parser writing more familiar coming from handwritten recursive descent.
 
 ### Rust Parser Generators
 
@@ -52,3 +58,9 @@ Options include but are not limited to:
 - [`chumsky`](https://crates.io/crates/chumsky): primary inspiration for this crate and its structure. Notable approach to error recovery, which this project builds upon.
 - [`nom`](https://crates.io/crates/nom): natively supports binary formats, parser combinators are functions.
 - [`winnow`](https://crates.io/crates/winnow): similar to `nom`.
+
+### Handwritten Recursive Descent
+
+While this is the yardstick that Biparse is explicitly built against, handwritten parsers oftentimes can offer authors significant control over error recovery and error messages over any form of pre-built parser architecture. The tedium mostly lies in the double pass one often needs to write if you go from source to CST to AST.
+
+It is perfectly possible (and at times preferrable) to handwrite a robust parser. I recommend Thunderseethe's blogpost ["Reproachfully Presenting Resilient Recursive Descent Parsing"](https://thunderseethe.dev/posts/parser-base/).

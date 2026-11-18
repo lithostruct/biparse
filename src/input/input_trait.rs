@@ -15,8 +15,15 @@ use crate::failure::{Descriptor, ParseHint};
 
 /// The trait describing all input types accepted by the [`Parser`](crate::parse::Parser) trait.
 ///
-/// This trait describes a UTF-8 [`str`]-based input, indexed via a given cursor (which delineates each token item),
+/// This trait describes a UTF-8 [`str`]-based input, indexed via a given cursor type (which delineates each token item),
 /// and the byte offset corresponding to the underlying [`str`] source.
+///
+/// Implementors include:
+/// - [`str`].
+/// - [`LexerStream`](super::logos::LexerStream), which wraps [`logos::Lexer`]
+///   for any token type satisfying [`logos::Logos`] and [`Clone`]. Requires default feature `logos`.
+/// - [`SkippingStr`](super::skipping_str::SkippingStr), which implicitly skips trivia characters (such as whitespace),
+///   thus not requiring them to be explictly matched on the parser combinator level.
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
     type Cursor: Copy + Ord + Hash;
@@ -102,7 +109,21 @@ pub type PatternMatchResult<'src, S, I> = Result<
     Option<<I as Input>::Cursor>,
 >;
 
-/// The trait describing all pattern types that match onto a specific input type.
+/// The trait describing pattern types that match onto a specific [`Input`] type.
+///
+/// Implementors include, for their respective [`Input`] types:
+/// - [`str`], [`SkippingStr`](super::skipping_str::SkippingStr):
+///   - [`(K, char)`](char)
+///   - [`(K, &str)`](str)
+///   - [`(K, String)`](String)
+///   - [`(K, regex::Regex)`](regex::Regex) with default feature `regex`.
+///   - [`(K, regex_lite::Regex)`](regex_lite::Regex) with default feature `regex`.
+/// - [`LexerStream<'_, T>`](super::logos::LexerStream) with default feature `logos`:
+///   - `(K, T)`
+///   - `T` satisfying [`Eq`]
+///   - [`WithText<P>`](super::logos::WithText) where `P` is a compatible pattern.
+///
+/// where `K` satisfies [`Clone`] and [`Into<rowan::SyntaxKind>`](Into).
 pub trait Pattern<'src, I: Input + ?Sized + 'src> {
     /// The type of the payload.
     type Payload;
@@ -130,10 +151,10 @@ pub trait Pattern<'src, I: Input + ?Sized + 'src> {
     fn hint(&self) -> ParseHint;
 }
 
-/// Information relating to tokens from [`Input::peek`].
+/// Information relating to tokens produced from [`Input::peek`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InputItem<T, C> {
-    /// The token `T` corresponding to `<I as Input>::Token`.
+    /// The token `T` corresponding to some [`Input::Token`].
     pub token: T,
     /// The contiguous span this token takes up.
     pub span: Range<usize>,

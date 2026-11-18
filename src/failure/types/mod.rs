@@ -1,3 +1,5 @@
+//! Implementors of [`ParseFailure`](crate::failure::ParseFailure) and related types.
+
 mod minimal;
 mod rich;
 mod simple;

@@ -18,7 +18,7 @@ enum SExp {
 
 struct IdParseEnvironment;
 impl ParseEnvironment for IdParseEnvironment {
-    type Failure = biparse::failure::Rich;
+    type Failure = biparse::failure::types::Rich;
     type Supply = biparse::cst::NewtypeSupply<Id>;
     type ErrorSupply = usize;
 }

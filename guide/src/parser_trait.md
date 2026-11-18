@@ -1,8 +1,9 @@
-# `Parser` Trait Description and Usage
+# Parser Traits
 
-There are two main traits that are integral for the usage of a parser in the combinator ecosystem, which are brought into scope by the prelude.
+There are two main traits that are integral for the usage of a parser in the combinator ecosystem, which are brought into scope by the [`prelude`].
 
 ## Main `Parser` Trait
+*Docs.rs documentation: [`Parser`].*
 
 The `Parser` trait takes the form of:
 ```rust,ignore
@@ -29,16 +30,17 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
 - `'src` is the lifetime over which the input `I` is borrowed for during a parse operation.
 - `I` is the input type that this parser accepts.
 - `A` is the AST output type this parser produces.
-- `E` is a `ParseEnvironment` implementor, which carries additional information regarding CST association and the type for parsing errors.
+- `E` is a [`ParseEnvironment`] implementor, which carries additional information other than the inputs and outputs required for a parse.
 - `parse` is the main operation used by the combinator ecosystem, which implements how this combinator takes in an input and parse state, to return either a successful parse containing payload `A` or an error.
 - `check` is similar to `parse` but discards all information other than diagnostics and whether the parse is successful.
 - `hint` provides diagnostic information regarding the input this parser expects.
 
-You may note the unusually minimal definition of the `Parser` trait. As it turns out, this is all we need to describe a parser! The definition is intentionally kept minimal to allow for [dyn-compatibility](https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility), which is essential for type erasure and boxing.
+As it turns out, this is all we need to describe a parser! The definition is intentionally kept minimal to allow for [dyn-compatibility](https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility), which is essential for type erasure and boxing.
 
 ## Peripheral `ParserExt` Trait
+*Docs.rs documentation: [`ParserExt`].*
 
-To maintain `dyn`-compatibility, the main `Parser` trait does not include method chaining options. Instead, a `ParserExt` trait is used for this purpose, and it extends and is blanket-implemented for all implementors of `Parser`:
+To maintain `dyn`-compatibility, the main [`Parser`] trait does not include method chaining options. Instead, [`ParserExt`] is used for this purpose, and it extends and is blanket-implemented for all implementors of [`Parser`]:
 
 ```rust,ignore
 /// Convenience methods available to all implementors of [`Parser<'src, I, A, E>`]. Enables combinator method chaining.
@@ -58,7 +60,7 @@ impl<'src, I: Input + ?Sized, A, E: ParseEnvironment, T> ParserExt<'src, I, A, E
     T: Parser<'src, I, A, E>
 { }
 ```
-`parse_all` and `check_all` are the top-level methods which are expected to be used by end users of the parser combinator ecosystem.
+[`ParserExt::parse_all`] and [`ParserExt::check_all`] are the top-level methods which are expected to be used by end users of the parser combinator ecosystem.
 
 Chaining methods include but are not limited to:
 - Sequential and alternative composition: `.then(...)`, `.or(...)`.
@@ -67,4 +69,4 @@ Chaining methods include but are not limited to:
 - `dyn` object construction: `.boxed()`, `.shared()` which constructs `Rc<dyn ...>`.
 - Derived parser combinators: `.ignore()`, `.either_or()`, etc.
 
-In other words, most non-leaf combinators are constructed via `ParserExt` method chaining, and is the preferred method of construction over direct usage of the corresponding combinator types. The combinator types themselves and their respective constructors methods remain available in the `biparse::combinator` module.
+In other words, most non-leaf combinators are constructed via [`ParserExt`] method chaining, and is the preferred method of construction over direct usage of the corresponding combinator types. The combinator types themselves and their respective constructors methods remain available in the [`combinator`] module.

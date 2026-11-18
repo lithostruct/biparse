@@ -1,4 +1,4 @@
-//! Integration test demonstrating a JSON parser.
+//! Integration test demonstrating a JSON parser using [`str`]-based input.
 #![cfg(feature = "regex")]
 
 use std::str::FromStr;

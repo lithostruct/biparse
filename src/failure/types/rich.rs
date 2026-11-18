@@ -62,7 +62,7 @@ pub enum RichKind {
         name: Option<Cow<'static, str>>,
     },
 
-    /// Non-growing repetition in [`Many`](crate::combinator::Many). This is always fatal.
+    /// Non-growing repetition in [`Repetition`](crate::combinator::Repetition). This is always fatal.
     #[error("primitive failure{}", {
         let mut tree = inner_hint.to_expectation();
         if tree.ends_with('\n') {

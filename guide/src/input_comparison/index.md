@@ -1,24 +1,34 @@
 # Input Types
 
-The Biparse parser combinator ecosystem specializes according to a suitable input type implementing the `Input` trait. While all input types have similar expressivity, choosing a suitable input type may help with subsequent writing and composition of combinators. This section describes some of the tradeoffs between existing `Input` types.
+The Biparse parser combinator ecosystem specializes according to a suitable input type implementing the [`Input`] trait. While all input types have similar expressivity, choosing a suitable input type may help with subsequent writing and composition of combinators.
 
-Note that you may add your own input types! So long as you have a suitable `Input` implementor and corresponding `Pattern` implementors for `just` combinators.
+This section describes some of the tradeoffs between existing [`Input`] types.
+
+Note that you may add your own input types! So long as you have a suitable [`Input`] implementor and corresponding [`Pattern`] implementors for `just` combinators.
 
 ## Trait Overview 
 
 ### `Input`
+*Docs.rs documentation: [`Input`].*
 
-A type implementing `Input` describes a conceptually contiguous UTF-8 `str` input, that may be indexed into using either an associated cursor type `Input::Cursor` or a byte offset. Note that storage and actualization of the string itself need not be contiguous; you may use interior mutability to provide `Cow<'_, str>` substrings as exposed by slicing operations. An input value is borrowed immutably for an entire parse operation.
+A type implementing [`Input`] describes a conceptually contiguous UTF-8 [`str`] input, that may be indexed into using either an associated cursor type [`Input::Cursor`] or a byte offset. Note that storage and actualization of the string itself need not be contiguous; you may use interior mutability to provide [`Cow<'_, str>`](std::borrow::Cow) substrings as exposed by slicing operations. An input value is borrowed immutably for an entire parse operation.
+
+#### Why UTF-8 Strings Only?
+
+The central promise of Biparse, that being of automatic dual AST-CST construction, relies on [`rowan`] as its green CST representation, which enforces [`str`]-based green tokens.
+
+Given that `rowan` is pretty well-established as the go-to CST representation for Rust CSTs, this is accepted as a limitation for now. It is highly likely that Biparse will be primiarily used for programming language experimentation, where input is assumed to be valid UTF-8 to begin with.
 
 ### `Pattern`
+*Docs.rs documentation: [`Pattern`].*
 
-A type implementing `Pattern<'src, I>` for some `I : Input` describes a predicate that checks whether an input, borrowed for lifetime `'src`, at the specified location "matches" it. For example, `char` performs a character match against a `str` input, which may succeed if the location has the same `char` value or fail otherwise, returning a `&str` borrowing from the input.
+A type implementing [`Pattern<'src, I>`] for some [`I : Input`](Input) describes a predicate that checks whether an input, borrowed for lifetime `'src`, at the specified location "matches" it. For example, [`char`] performs a character match against a [`str`] input, which may succeed if the location has the same `char` value or fail otherwise, returning a `&str` borrowing from the input.
 
-All `Pattern` implementors must specify a `rowan::SyntaxKind` value that a match corresponds to. This is used for total CST construction.
+All [`Pattern`] implementors must specify a [`rowan::SyntaxKind`] value that a match corresponds to. This is used for total CST construction.
 
-A universal pattern exists in the form of `Matches`: all `I : Input` implementors may use `Matches<impl Into<SyntaxKind>, impl Fn(&I::Token<'_>) -> bool>` as an out-the-box supported pattern. This fills the role of the boolean predicate for whether a token should be accepted as a match.
+A universal pattern exists in the form of [`Matches`](input::Matches): all `I : Input` implementors may use `Matches<impl Into<SyntaxKind>, impl Fn(&I::Token<'_>) -> bool>` as an out-the-box supported pattern. This fills the role of the boolean predicate for whether a token should be accepted as a match.
 
-All `Pattern<'_, I>` implementors may use `AllOf` and `AnyOf` to compose sequential and alternative matching.
+All `Pattern<'_, I>` implementors may use [`AllOf`](input::AllOf) and [`AnyOf`](input::AnyOf) to compose sequential and alternative matching of patterns.
 
 ## Note on Lifetime-Bound Inputs
 

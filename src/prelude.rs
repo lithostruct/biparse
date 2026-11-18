@@ -2,13 +2,13 @@
 
 pub use crate::{
     // We can omit most of these, because `ParserExt` includes the intended construction mechanism.
-    combinator::{As, Direct, Indirect, Recursive, end, fail, just, success},
+    combinator::{As, Direct, Indirect, Recursive, end, fail, fail_with, just, success},
     cst::{AssociatedGreenCst, AssociatedRedCst},
-    failure::{Descriptor, FailureKind, ParseFailure, ParseHint},
-    input::{Input, LineColumn, Pattern},
+    failure::{self, Descriptor, FailureKind, ParseFailure, ParseHint},
+    input::{self, Input, LineColumn, Pattern},
     parse::{
         DefaultParseEnvironment, ParseArtifact, ParseEnvironment, ParseOutcome, ParseOutput,
-        ParseState, Parser, ParserExt, ParserIntoOwnedExt, RecursiveState, derived,
+        ParseState, Parser, ParserExt, ParserIntoOwnedExt, RecursiveState,
     },
 };
 pub use either::Either;

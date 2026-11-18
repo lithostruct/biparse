@@ -4,12 +4,11 @@
 
 mod failure_trait;
 mod hint_descriptor;
-mod types;
+pub mod types;
 
 pub use {
     failure_trait::*,
     hint_descriptor::{Descriptor, ParseHint},
-    types::*,
 };
 
 pub use ptree::{self, PrintConfig};

@@ -1,8 +1,9 @@
 # Input `SkippingStr<'source>`
+*Docs.rs documentation: [input::skipping_str::SkippingStr].*
 
 Trivia skipping for `str`-based input, typically whitespace. Trivia is skipped before and after successful pattern matching.
 
-This type is not exported by the prelude. It may be accessed via module path `biparse::input::str::SkippingStr`.
+This type is *not* exported by the [`prelude`].
 
 ## Usage
 A producer of parser combinators expecting this input type should have the signature:
@@ -13,16 +14,16 @@ where
 {...}
 ```
 where `A` is the desired AST payload type. 
-Note the two distinct lifetimes: `'source` refers to the lifetime of the underlying `str` data that `SkippingStr` borrows upon construction, and `'parse` represents the borrow on the input type `SkippingStr<'source>` throughout a single parse.
+Note the two distinct lifetimes: `'source` refers to the lifetime of the underlying [`str`] data that [`SkippingStr`](input::skipping_str::SkippingStr) borrows upon construction, and `'parse` represents the borrow on the input type `SkippingStr<'source>` throughout a single parse.
 
 ## Supported Patterns
-All patterns supported by `str`.
+All patterns supported by [`str`](./1_input_str.md#supported-patterns).
 
 ## Tradeoffs
-Naturally, this input type offers a fusion of the benefits of `str` and `LexerStream`:
-- Familiar `str`-based pattern matching constructs eg. characters, string, regex patterns.
-- Tokens need not be globally distinct, unlike `LexerStream`, and can be disambugated via control flow.
-- Trivia is implicitly consumed and retained in the CST. This mitigates the biggest issue of raw `str` input.
+Naturally, this input type offers a fusion of the benefits of [`str`] and [`LexerStream`]:
+- Familiar [`str`]-based pattern matching constructs eg. characters, string, regex patterns.
+- Tokens need not be globally distinct, unlike [`LexerStream`], and can be disambugated via control flow.
+- Trivia is implicitly consumed and retained in the CST. This mitigates the biggest issue of raw [`str`] input.
 
 However, due to the eager implicit consumption of trivia characters, this input type may have unexpected interactions with pattern matching containing trivia characters.
 

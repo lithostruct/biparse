@@ -34,7 +34,7 @@ impl<P> Repetition<P> {
     /// If [`range.start_bound()`](RangeBounds::start_bound) is [`Bound::Unbounded`],
     /// the start bound is stored and normalized as zero minimum repetitions ([`usize::MIN`]`= 0`).
     ///
-    /// The inner parser must be advancing. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
+    /// The inner parser must consume input. Otherwise, attempting a parse results in [`ParseOutcome::Fatal`] failure.
     pub fn new<'src, I: Input + ?Sized, A, E: ParseEnvironment>(
         inner: P,
         range: impl RangeBounds<usize>,

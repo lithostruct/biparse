@@ -3,6 +3,7 @@
 Repetition involves parsing the same constructs multiple times.
 
 ## `repeat_by`
+*Docs.rs documentation: [`ParserExt::repeat_by`], [`combinator::Repetition`].*
 
 Some number of repetitions of the inner parser, using the bounds described by a [`range : RangeBounds<usize>`](std::ops::RangeBounds) argument.
 
@@ -11,9 +12,10 @@ Some number of repetitions of the inner parser, using the bounds described by a 
 
 Eg. a parser of `a.repeat_by(n..=m)` produces a [`Vec<A>`](std::vec::Vec), whose length is bounded by the range `n..=m`. The range passed *must* be non-empty, otherwise this combinator panics upon construction.
 
-The inner parser *must* advance the input by some non-zero amount each iteration. Failure to do so is an invariant violation, and produces a [`Fatal` failure](../../parse_output.md#fatal).
+The inner parser *must* advance the input by some non-zero amount each iteration. Failure to do so is an invariant violation, and produces a [`ParseOutcome::Fatal`] failure.
 
 ## `repeat`
+*Docs.rs documentation: [`ParserExt::repeat`].*
 
 Exactly `n` repetitions of the inner parser. Syntax sugar over [`.repeat_by(n..=n)`](#repeat_by).  
 A parser of `a.repeat(n)` has AST payload type [`Vec<A>`](std::vec::Vec), which is guaranteed to contain `n` elements.
@@ -21,6 +23,7 @@ A parser of `a.repeat(n)` has AST payload type [`Vec<A>`](std::vec::Vec), which 
 This parser inherits the invariant of [`repeat_by`](#repeat_by) that the inner parser must be advancing, otherwise a `Fatal` failure is produced.
 
 ## `many`
+*Docs.rs documentation: [`ParserExt::many`].*
 
 Zero or more repetitions of the inner parser. Syntax sugar over [`.repeat_by(0..)`](#repeat_by).  
 A parser of `a.many()` has AST payload type [`Vec<A>`](std::vec::Vec).
@@ -28,6 +31,7 @@ A parser of `a.many()` has AST payload type [`Vec<A>`](std::vec::Vec).
 This parser inherits the invariant of [`repeat_by`](#repeat_by) that the inner parser must be advancing, otherwise a `Fatal` failure is produced.
 
 ## `some`
+*Docs.rs documentation: [`ParserExt::some`].*
 
 One or more repetitions of the inner parser.  Syntax sugar over [`.repeat_by(1..)`](#repeat_by).  
 A parser of `a.some()` has AST payload type [`Vec<A>`](std::vec::Vec), which is guaranteed to be non-empty.
@@ -35,6 +39,7 @@ A parser of `a.some()` has AST payload type [`Vec<A>`](std::vec::Vec), which is 
 This parser inherits the invariant of [`repeat_by`](#repeat_by) that the inner parser must be advancing, otherwise a `Fatal` failure is produced.
 
 ## `optional`
+*Docs.rs documentation: [`ParserExt::optional`].*
 
 Zero or one repetitions of the inner parser. A parser of `a.optional()` has AST payload type [`Option<A>`](std::option::Option).
 
