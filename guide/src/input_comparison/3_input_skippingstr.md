@@ -11,7 +11,10 @@ A producer of parser combinators expecting this input type should have the signa
 fn make_parser<'parse, 'source, E: ParserEnvironment>(...) -> impl Parser<'parse, SkippingStr<'source>, A, E>
 where
     'source : 'parse,
-{...}
+{
+    /* ... */
+    # success()
+}
 ```
 where `A` is the desired AST payload type. 
 Note the two distinct lifetimes: `'source` refers to the lifetime of the underlying [`str`] data that [`SkippingStr`](input::skipping_str::SkippingStr) borrows upon construction, and `'parse` represents the borrow on the input type `SkippingStr<'source>` throughout a single parse.

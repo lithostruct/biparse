@@ -62,7 +62,7 @@ The `recover` combinator takes in:
 
 Recovery parsers implement a recovery strategy. Common strategies include:
 - Discarding all text until the end-of-input.
-- Discarding all text up to (and potentially including) a set of recognized "checkpoint" tokens.
+- Discarding all text up to (and potentially including) a set of recognized synchronization tokens.
 
 Recovery parsers can be as elaborate as regular parsers (and indeed are represented as parser objects!), but are typically kept simple for robustness. A recovery parser that fails will cause the propagation of the initial failure to resume.
 

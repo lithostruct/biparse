@@ -10,18 +10,15 @@ fn make_parser<'parse, 'source, E: ParserEnvironment>(...)
     -> impl Parser<'parse, LexerStream<'source, T>, A, E>
 where
     'source : 'parse,
-{...}
+{
+    /* ... */
+    # success()
+}
 ```
 where `A` is the desired AST payload type. 
 Note the two distinct lifetimes: `'source` refers to the lifetime of the underlying [`str`] data that [`LexerStream`] borrows upon construction, and `'parse` represents the borrow on the input type [`LexerStream<'source, T>`] throughout a single parse.
 
-`T` implements the lexing grammar using the `logos` ecosystem, and must adhere to the following bounds:
-```rust,ignore
-impl<'source, T> Input for LexerStream<'source, T>
-where
-    T: Debug + Clone + Logos<'source, Source = str>,
-{...}
-```
+`T` implements the lexing grammar using the `logos` ecosystem via [`logos::Logos<'source, Source = str>`], and must additionally implement [`Clone`].
 
 ## Supported Patterns
 [`Pattern<'src, LexerStream<'source, T>>`] implementors include:
@@ -54,50 +51,3 @@ In exchange, [`LexerStream`] provides various correctness and ergonomic advantag
 - Trivia such as whitespace may be omitted or skipped, rather than explicitly consumed. Skipped trivia is preserved in the CST representation using a [`SyntaxKind`] value provided at construction, or the caller may assert that the lexing grammar is lossless via [`LexerStream::assume_contiguous`].
 
 This tends to lead to less noise within parser combinator definition.
-
-## Example Usage
-
-Take this example of a JSON parser for objects, describing the grammar rule:
-> `object ::= '{' (pair members)? '}'`
-
-Compare and contrast the [`str`]-based and [`LexerStream`]-based implementation.
-
-```rust,ignore
-// `str`-based implementation.
-let object = (just((Kind::LeftBrace, '{')).then(optional_whitespace.clone()))
-    .ignore_then(
-        pair.clone()
-            .then_ignore(optional_whitespace.clone())
-            .then(members)
-            .map(|(first, mut rest)| {
-                rest.insert(0, first);
-                rest
-            })
-            .optional()
-            .map(Option::unwrap_or_default)
-    )
-    .then_ignore(
-        optional_whitespace
-            .clone()
-            .then(just((Kind::RightBrace, '}'))),
-    )
-    .map(Json::Object)
-    .node(Kind::Object);
-```
-```rust,ignore
-// `LexerStream`-based implementation.
-let object = just(Kind::LeftBrace)
-    .ignore_then(
-        pair.clone()
-            .then(members)
-            .map(|(first, mut rest)| {
-                rest.insert(0, first);
-                rest
-            })
-            .optional()
-            .map(Option::unwrap_or_default)
-    )
-    .then_ignore(just(Kind::RightBrace))
-    .map(Json::Object)
-    .node(Kind::Object);
-```
