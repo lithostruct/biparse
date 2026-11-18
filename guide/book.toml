@@ -6,6 +6,9 @@ language = "en"
 [rust]
 edition = "2024"
 
+[build]
+build-dir = "book"
+
 [preprocessor.rustdoc-links]
 after = ["links"]
 build.toolchain = "1.99.0"
