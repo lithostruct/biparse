@@ -4,7 +4,7 @@ This section is an exhaustive listing of all combinators Biparse provides, categ
 
 It is not necessary to know all of these to start using Biparse! Treat this section more as an encyclopedia than anything.
 
-You can check out some examples if you want a more holistic look at the ecosystem.
+You can check out some [examples](../examples/index.md) if you want a more holistic look at Biparse.
 
 Alternatively, most of the information in this section is available in the Docs.rs documentation on [`ParserExt`], which provides the method-chaining construction typical of parser combinator libraries.
 
