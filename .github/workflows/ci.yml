@@ -148,7 +148,7 @@ jobs:
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Install mdBook and mdbook-rustdoc-links
+      - name: Install mdBook and preprocessors
         uses: taiki-e/install-action@v2
         with:
           tool: mdbook,mdbook-rustdoc-links,mdbook-linkcheck2

@@ -1,4 +1,4 @@
-name: Deploy Documentation
+name: Deploy Pages
 
 on:
   push:
@@ -45,7 +45,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: build
     steps:
       - name: Deploy to GitHub Pages
