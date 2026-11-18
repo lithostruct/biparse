@@ -17,7 +17,7 @@ A type implementing [`Input`] describes a conceptually contiguous UTF-8 [`str`] 
 
 The central promise of Biparse, that being of automatic dual AST-CST construction, relies on [`rowan`] as its green CST representation, which enforces [`str`]-based green tokens.
 
-Given that `rowan` is pretty well-established as the go-to CST representation for Rust CSTs, this is accepted as a limitation for now. It is highly likely that Biparse will be primiarily used for programming language experimentation, where input is assumed to be valid UTF-8 to begin with.
+Given that `rowan` is pretty well-established as the go-to CST representation for Rust CSTs, this is accepted as a limitation for now. It is highly likely that Biparse will be primarily used for programming language experimentation, where input is assumed to be valid UTF-8 to begin with.
 
 ### `Pattern`
 *Docs.rs documentation: [`Pattern`].*

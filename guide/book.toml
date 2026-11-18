@@ -8,6 +8,7 @@ edition = "2024"
 
 [preprocessor.rustdoc-links]
 after = ["links"]
+build.toolchain = "1.99.0"
 build.packages = [
   "biparse",
   "either",

@@ -63,4 +63,4 @@ Options include but are not limited to:
 
 While this is the yardstick that Biparse is explicitly built against, handwritten parsers oftentimes can offer authors significant control over error recovery and error messages over any form of pre-built parser architecture. The tedium mostly lies in the double pass one often needs to write if you go from source to CST to AST.
 
-It is perfectly possible (and at times preferrable) to handwrite a robust parser. I recommend Thunderseethe's blogpost ["Reproachfully Presenting Resilient Recursive Descent Parsing"](https://thunderseethe.dev/posts/parser-base/).
+It is perfectly possible (and at times preferable) to handwrite a robust parser. I recommend Thunderseethe's blogpost ["Reproachfully Presenting Resilient Recursive Descent Parsing"](https://thunderseethe.dev/posts/parser-base/).
