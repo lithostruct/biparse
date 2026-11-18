@@ -27,7 +27,7 @@ use crate::{
 /// use biparse::{input::Matches, prelude::*};
 ///
 /// // Matches any character in a `str` input.
-/// let parser : Box<dyn Parser<'_, str, char, DefaultParseEnvironment>> =
+/// let parser : Box<dyn Parser<'_, str, char, environment::Rich>> =
 ///     just(Matches(SyntaxKind(1), |_ : &char| true)).boxed();
 ///                                   /* ^ type annotation required here! */
 /// ```

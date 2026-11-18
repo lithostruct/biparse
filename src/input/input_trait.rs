@@ -124,6 +124,10 @@ pub type PatternMatchResult<'src, S, I> = Result<
 ///   - [`WithText<P>`](super::logos::WithText) where `P` is a compatible pattern.
 ///
 /// where `K` satisfies [`Clone`] and [`Into<rowan::SyntaxKind>`](Into).
+/// 
+/// All [`Input`] implementors may use [`Matches`](super::matches::Matches),
+/// [`AnyOf`](super::composite_patterns::AnyOf) and [`AllOf`](super::composite_patterns::AllOf)
+/// as universal patterns.
 pub trait Pattern<'src, I: Input + ?Sized + 'src> {
     /// The type of the payload.
     type Payload;

@@ -109,7 +109,7 @@ where
     ///
     /// This constructor assumes the caller has asserted that
     /// the Lexer created from this `Token` type produces gapless input coverage.
-    /// [`Parser`] methods may panic if this invariant is not upheld.
+    /// [`Parser`](crate::parse::Parser) methods may panic if this invariant is not upheld.
     pub fn assume_contiguous<'root>(
         source: &'root Token::Source,
         descriptor: fn(&Token) -> String,

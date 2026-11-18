@@ -22,7 +22,7 @@ fn bounded_repetition() {
     expect![[r#"
         (1, 1) expected:
              | └─ character 'a'
-             | found: end of input at (1, 1)
+             | found: 0 at (1, 1)
         supplemental diagnostics:
             (1, 1) insufficient repetition:
                  | expect at least 1 repetitions;
@@ -39,6 +39,6 @@ fn bounded_repetition() {
     expect![[r#"
         (1, 6) expected:
              | └─ end of input
-             | found: character 'a' at (1, 6)"#]]
+             | found: 5 at (1, 6)"#]]
     .assert_eq(&err.terminating.to_string());
 }

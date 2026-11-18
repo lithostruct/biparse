@@ -95,11 +95,11 @@ impl<'p, 'src, I: Input + ?Sized, A: Clone + 'static, E: ParseEnvironment>
     /// }
     ///
     /// # fn test() {
-    /// let identifier: Box<dyn Parser<str, String, DefaultParseEnvironment>> =
+    /// let identifier: Box<dyn Parser<str, String, environment::Rich>> =
     /// # just((SyntaxKind(9), "placeholder!")).into_owned().boxed()
     ///     /* ... */;
     ///
-    /// let sexp_parser: Recursive<Direct<str, SExp, DefaultParseEnvironment>> =
+    /// let sexp_parser: Recursive<Direct<str, SExp, environment::Rich>> =
     ///     Recursive::new(|this|              // <- `this` is the back-edge referring to `sexp_parser`.
     ///         identifier
     ///         .map(SExp::Identifier)
@@ -219,8 +219,8 @@ impl<'p, 'src, I: Input + ?Sized, A: Clone + 'static, E: ParseEnvironment>
     /// }
     ///
     /// // Create two owning handles to be used.
-    /// let mut even_As = Recursive::<Indirect<str, Even, DefaultParseEnvironment>>::declare();
-    /// let mut odd_As = Recursive::<Indirect<str, Odd, DefaultParseEnvironment>>::declare();
+    /// let mut even_As = Recursive::<Indirect<str, Even, environment::Rich>>::declare();
+    /// let mut odd_As = Recursive::<Indirect<str, Odd, environment::Rich>>::declare();
     ///
     /// // Define the handles:
     /// even_As.define(

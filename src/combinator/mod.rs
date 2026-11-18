@@ -69,7 +69,7 @@ pub fn end<'src, I: Input + ?Sized, E: ParseEnvironment>() -> As<'src, I, (), E,
 /// Refer to the documentation on [`Pattern`] and [`Input`] for further details.
 /// ```rust
 /// # use biparse::prelude::*;
-/// let just_lorem = just::<str, DefaultParseEnvironment, _>((SyntaxKind(0), "lorem ipsum dolor sit amet"));
+/// let just_lorem = just::<str, environment::Rich, _>((SyntaxKind(0), "lorem ipsum dolor sit amet"));
 /// ```
 pub fn just<'src, I: Input + ?Sized, E: ParseEnvironment, P: Pattern<'src, I> + 'src>(
     pattern: P,

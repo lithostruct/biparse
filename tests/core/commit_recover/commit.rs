@@ -193,11 +193,12 @@ fn commit_within_many() {
 
     expect![[r#"
         [
-            environment::Rich {
+            Rich {
                 position: LineColumn {
                     line: 1,
                     column: 14,
                 },
+                byte_offset: 13,
                 kind: FailPrimitive {
                     message: None,
                 },
@@ -224,7 +225,7 @@ fn commit_within_many() {
     expect![[r#"
         (1, 16) expected:
               | └─ character ')'
-              | found: end of input at (1, 16)"#]]
+              | found: 15 at (1, 16)"#]]
     .assert_eq(
         &make_parser()
             .parse_all(TERMINAL)
