@@ -2,6 +2,9 @@
 name = "biparse"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Parser combinator framework for dual AST + CST construction and correspondence."
+repository = "https://github.com/lithostruct/biparse"
 
 [features]
 default = ["regex", "logos"]

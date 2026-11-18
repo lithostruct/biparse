@@ -17,13 +17,13 @@ fn commit_semantics() {
             .is_ok()
     );
     assert!(
-        fail::<str, !, environment::Rich>()
+        fail::<str, (), environment::Rich>()
             .commit()
             .parse_all("")
             .is_err()
     );
 
-    let combinator = fail::<str, !, environment::Rich>().commit();
+    let combinator = fail::<str, (), environment::Rich>().commit();
     let (_, output) = combinator.parse("", ParseState::<str, _>::new(""));
     assert!(matches!(output.ast, ParseOutcome::Committed(_)));
 }
@@ -126,7 +126,7 @@ fn commit_within_many() {
     -> impl Parser<'src, str, Result<Vec<String>, FailReason>, environment::Rich> {
         let whitespace = just((SyntaxKind(20), regex::Regex::new(r"[ \t\r\n]+").unwrap())).shared();
         let identifier: Rc<dyn Parser<'_, _, String, _>> = just((SyntaxKind(10), "FAIL:"))
-            .then_ignore(fail::<_, !, _>().commit())
+            .then_ignore(fail::<_, (), _>().commit())
             .or(just((
                 SyntaxKind(11),
                 regex::Regex::new(r"[a-zA-Z0-9_]+").unwrap(),

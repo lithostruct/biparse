@@ -317,7 +317,7 @@ pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = environmen
     /// [`ParseOutcome::Committed`](crate::parse::ParseOutcome::Committed) failure
     /// into a diagnostic upon success.
     ///
-    /// Common recovery strategies include parsing up to a set of recognized "safe characters" or end-of-input,
+    /// Common recovery strategies include parsing up to a set of recognized synchronization characters or end-of-input,
     /// where regular parsing can then resume.
     ///
     /// # Note on Recovery Parser Failure

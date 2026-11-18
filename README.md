@@ -19,6 +19,11 @@ cargo add biparse
 
 Go through the [guide book](https://lithostruct.github.io/biparse) for further information, or refer to [`Parser`] and [`ParserExt`] for initial documentation.
 
+You may use the [`prelude`] module to bring Biparse's commonly used items and traits into scope:
+```rust
+use biparse::prelude::*;
+```
+
 ### Why Should I Use This?
 
 Handwriting a source to CST to AST parser is fine at most *once*.
@@ -31,5 +36,12 @@ This project makes two contributions:
 
 This crate is unlikely to be stellar at performance compared to other options. If you want something that's quick to pick up and hack on though? Biparse may be just for you.
 
+### Acknowledgements
+
+This project is heavily inspired and based on [`chumsky`](https://crates.io/crates/chumsky) and Kiran Shila's blog post "Easy Lossless Trees with Nom and Rowan" ([Wayback Machine](https://web.archive.org/web/20250318134533/https://blog.kiranshila.com/post/easy_cst)).
+
 [`Parser`]: https://docs.rs/biparse/latest/biparse/parse/parser_trait/trait.Parser.html
 [`ParserExt`]: https://docs.rs/biparse/latest/biparse/parse/parser_trait/trait.ParserExt.html
+[`prelude`]: https://docs.rs/biparse/latest/biparse/prelude/index.html
+
+License: MIT OR Apache-2.0

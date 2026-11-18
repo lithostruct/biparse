@@ -18,3 +18,18 @@ pub use rowan;
 pub use logos;
 #[cfg(feature = "regex")]
 pub use {regex, regex_lite};
+
+
+/// Mirrors my usage of `mdbook-rustdoc-links`.
+#[cfg(doctest)]
+#[allow(unused)]
+use crate::prelude::*;
+
+/// Book examples tested here due to some weird incompatibilities with `mdbook test`.
+// #[cfg(doctest)]
+mod book_tests {
+    mod examples {
+        #[doc = include_str!("../guide/src/examples/1_s-expressions.md")]
+        mod s_expressions {}
+    }
+}

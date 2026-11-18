@@ -27,7 +27,7 @@ proptest! {
         let (state, output): (_, ParseOutput<&str, environment::Rich>)
             = fail()
                 .then(just((SyntaxKind(kind), pattern.clone())))
-                .map(|(_, s) : (!, &str)| s)
+                .map(|((), s)| s)
                 .parse(s.as_str(), ParseState::<str, environment::Rich>::new(s.as_str()));
 
         // No input should be consumed.
