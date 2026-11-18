@@ -71,10 +71,20 @@ impl<P> Repetition<P> {
 
     /// Returns the minimum and maximum number of repetitions which `self` accepts,
     /// expressed as [`std::ops::Bound`] values.
+    /// The return value is a [`std::ops::RangeBounds`] implementor and
+    /// thus can be used for slicing operations in collection types.
     ///
     /// Note that this range object is normalized, and may not be identical to that
     /// supplied to [`Repetition::new`] during construction of `self`.
-    pub fn repetition_range(&self) -> (Bound<usize>, Bound<usize>) {
+    /// 
+    /// The following invariant holds with respect to [`Repetition::new`]:
+    /// ```rust,ignore
+    /// collection[range] == collection[Repetition::new(_, range).unwrap().range()]
+    /// 
+    /// where:
+    ///     Repetition::new(_, range) matches! Some(_);
+    /// ```
+    pub fn range(&self) -> (Bound<usize>, Bound<usize>) {
         let maximum_bound = if let Some(maximum) = self.maximum_repetitions {
             Bound::Included(maximum)
         } else {
@@ -85,7 +95,7 @@ impl<P> Repetition<P> {
     /// Returns the iterator over the number of repetitions `self` accepts.
     ///
     /// This iterator may be unbounded if there is no maximum bound to the number of repetitions,
-    /// in which case following the [`std::ops::RangeFrom`] implementation:
+    /// in which case behaviour follows the [`std::ops::RangeFrom`] implementation:
     /// > Overflow in the [`Iterator`] implementation (when the contained data type reaches its numerical limit)
     /// > is allowed to panic, wrap, or saturate.
     /// > This behavior is defined by the implementation of the [`Step`](std::iter::Step) trait.
@@ -93,15 +103,16 @@ impl<P> Repetition<P> {
     /// The following invariant holds with respect to [`Repetition::new`]:
     /// ```rust,ignore
     /// range_normalized.into_iter().eq(
-    ///     Repetition::new(_, range).repetition_range_iter()
-    /// ) == true;
+    ///     Repetition::new(_, range).unwrap().range_iter()
+    /// )
     ///
     /// where:
+    ///     Repetition::new(_, range) matches! Some(_);
     ///     let range_normalized = if range.start_bound() == Bound::Unbounded {
     ///         /* range from 0 to range.end_bound() */
     ///     } else { range };
     /// ```
-    pub fn repetition_range_iter(&self) -> impl IntoIterator<Item = usize> {
+    pub fn range_iter(&self) -> impl IntoIterator<Item = usize> {
         (self.minimum_repetitions..).take_while(|&u| match self.maximum_repetitions {
             Some(maximum) => u <= maximum,
             None => true,

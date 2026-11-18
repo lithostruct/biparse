@@ -13,13 +13,12 @@ use rowan::SyntaxKind;
 
 /// Matches string `s` on zero or more occurrences of 'a'.
 fn many_a(s: String) -> String {
-    let parser = just::<'_, str, DefaultParseEnvironment, _>((SyntaxKind(0), 'a'))
+    let parser = just::<'_, str, environment::Rich, _>((SyntaxKind(0), 'a'))
         .many()
         .map(|vec| vec.join(""));
-    let (state, output) = parser.node(SyntaxKind(1)).parse(
-        &s,
-        ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
-    );
+    let (state, output) = parser
+        .node(SyntaxKind(1))
+        .parse(&s, ParseState::<str, environment::Rich>::new(s.as_str()));
 
     match output.ast {
         ParseOutcome::Success(header) => {
@@ -75,6 +74,6 @@ proptest! {
 #[test]
 fn non_growing_termination() {
     let non_growing = success().many();
-    let (_, outcome) = non_growing.parse("", ParseState::<str, DefaultParseEnvironment>::new(""));
+    let (_, outcome) = non_growing.parse("", ParseState::<str, environment::Rich>::new(""));
     assert!(matches!(outcome.ast, ParseOutcome::Fatal(_)))
 }

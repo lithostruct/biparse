@@ -30,8 +30,8 @@ pub enum RichKind {
     ExpectedFound {
         /// The expected input value, as returned by [`Parser::hint`](crate::parse::Parser::hint).
         hint: ParseHint,
-        /// The location at which the input diverges from the hint, if applicable.
-        diverges_at: Vec<(LineColumn, Descriptor)>,
+        /// The line-column and byte offset at which the input diverges from the hint, if applicable.
+        diverges_at: Vec<(LineColumn, usize, Descriptor)>,
     },
     /// Unbounded recursion. Carries payload information relating to composites.
     #[error("unbounded recursion{}", if info.len() == 1 {
@@ -243,6 +243,8 @@ impl<I: Input + ?Sized> TryFrom<FailureKind<I>> for RichKind {
 pub struct Rich {
     /// The line-column position at which this failure occurred.
     pub position: LineColumn,
+    /// The byte offset at which this failure occurred.
+    pub byte_offset: usize,
     /// The kind of failure. Carries payload information.
     pub kind: RichKind,
     /// Supplemental information regarding this failure value.
@@ -258,10 +260,11 @@ impl ParseFailure for Rich {
                 hint: hint.canonize(),
                 diverges_at: difference_at.map_or(Vec::new(), |diff_cursor| {
                     let diff_position = input.to_line_col(diff_cursor);
+                    let diff_offset = input.byte_offset(diff_cursor);
                     let descriptor = input
                         .peek(diff_cursor)
                         .map_or(Descriptor::EndOfInput, |item| input.describe(&item.token));
-                    vec![(diff_position, descriptor)]
+                    vec![(diff_position, diff_offset, descriptor)]
                 }),
             },
             kind => RichKind::try_from(kind)
@@ -270,6 +273,7 @@ impl ParseFailure for Rich {
         Self {
             kind,
             position: input.to_line_col(cursor),
+            byte_offset: input.byte_offset(cursor),
             supplemental: Vec::new(),
         }
     }
@@ -281,6 +285,7 @@ impl ParseFailure for Rich {
     ) -> Self {
         Self {
             position: input.to_line_col(cursor),
+            byte_offset: input.byte_offset(cursor),
             kind: RichKind::Custom(Arc::new(payload)),
             supplemental: Vec::new(),
         }
@@ -292,6 +297,7 @@ impl ParseFailure for Rich {
         branches: impl IntoIterator<Item = Self>,
     ) -> Self {
         let position = input.to_line_col(cursor);
+        let byte_offset = input.byte_offset(cursor);
         let supplemental: Vec<Self> = branches.into_iter().collect();
 
         // Unbounded recursion failure check.
@@ -310,6 +316,7 @@ impl ParseFailure for Rich {
         if let Ok(info) = try_fold {
             return Rich {
                 position,
+                byte_offset,
                 kind: RichKind::UnboundedRecursion { info },
                 supplemental,
             };
@@ -334,6 +341,7 @@ impl ParseFailure for Rich {
         if let Ok((hints, diverges_at, supplemental)) = all_expected_found {
             return Self {
                 position,
+                byte_offset,
                 kind: RichKind::ExpectedFound {
                     hint: ParseHint::choice(hints),
                     diverges_at,
@@ -359,6 +367,7 @@ impl ParseFailure for Rich {
         Self {
             kind: RichKind::CompositeFailure,
             position,
+            byte_offset,
             supplemental,
         }
     }
@@ -375,8 +384,10 @@ impl ParseFailure for Rich {
         info: UnboundedRecursion,
     ) -> Self {
         let line_col = input.to_line_col(cursor);
+        let byte_offset = input.byte_offset(cursor);
         Rich {
             position: line_col,
+            byte_offset,
             kind: RichKind::UnboundedRecursion {
                 info: vec![(line_col, info)],
             },

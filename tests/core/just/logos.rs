@@ -104,7 +104,7 @@ fn trivia_recovery() {
     let source = "(   )";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
 
-    let parser: Rc<dyn Parser<'_, LexerStream<Kind>, _, DefaultParseEnvironment>> =
+    let parser: Rc<dyn Parser<'_, LexerStream<Kind>, _, environment::Rich>> =
         just(Kind::LeftParen).then(just(Kind::RightParen)).shared();
 
     match parser.parse_all(&stream) {
@@ -138,7 +138,7 @@ fn leading_trivia_recovery() {
     let source = "   +   ";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
 
-    let parser: Rc<dyn Parser<'_, LexerStream<Kind>, _, DefaultParseEnvironment>> =
+    let parser: Rc<dyn Parser<'_, LexerStream<Kind>, _, environment::Rich>> =
         just(Kind::Plus).into_owned().shared();
 
     match parser.parse_all(&stream) {
@@ -172,7 +172,7 @@ fn leading_trivia_recovery() {
 fn token_plus() {
     let source = "+";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
-    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Operator, DefaultParseEnvironment>> =
+    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Operator, environment::Rich>> =
         just(Kind::Plus).map(|_| Operator::Add).boxed();
 
     let result = parser.parse_all(&stream);
@@ -185,7 +185,7 @@ fn token_plus() {
 fn token_asterisk() {
     let source = "*";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
-    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Operator, DefaultParseEnvironment>> =
+    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Operator, environment::Rich>> =
         just(Kind::Asterisk).map(|_| Operator::Mult).boxed();
 
     let result = parser.parse_all(&stream);
@@ -201,7 +201,7 @@ fn token_asterisk() {
 fn mismatched_token() {
     let source = "+";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
-    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Kind, DefaultParseEnvironment>> =
+    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Kind, environment::Rich>> =
         just(Kind::Root).into_owned().boxed();
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
@@ -215,7 +215,7 @@ fn mismatched_token() {
 fn unrecognized_token() {
     let source = "?";
     let stream: LexerStream<'_, Kind> = LexerStream::new(source, Kind::Trivia);
-    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Kind, DefaultParseEnvironment>> =
+    let parser: Box<dyn Parser<'_, LexerStream<'_, Kind>, Kind, environment::Rich>> =
         just(Kind::Root).into_owned().boxed();
     let result = parser.parse_all(&stream);
     assert!(result.is_err());
@@ -231,17 +231,17 @@ fn unrecognized_token() {
 /// - The parser constructor *must* be made *after* the stream is constructed due to drop order.
 /// - `'source : 'src` and that `LexerStream<'source>` must *not* be `LexerStream<'src, _>`.
 fn make_add_mult_parser<'src, 'source>()
--> impl Parser<'src, LexerStream<'source, Kind>, Box<Expression>, DefaultParseEnvironment>
+-> impl Parser<'src, LexerStream<'source, Kind>, Box<Expression>, environment::Rich>
 where
     'source: 'src,
 {
     let mut expr: Recursive<
-        Indirect<'_, '_, LexerStream<'_, Kind>, Box<Expression>, DefaultParseEnvironment>,
+        Indirect<'_, '_, LexerStream<'_, Kind>, Box<Expression>, environment::Rich>,
     > = Recursive::declare_as("addmult expression");
 
     // Assumed `BigUint::from_str` is infallible for input following regex pattern "[0-9]+".
     let num = just(WithText(Kind::Number))
-        .map(|(_, s)| Box::new(Expression::Number(BigUint::from_str(&s).unwrap())))
+        .map(|(_, s)| Box::new(Expression::Number(BigUint::from_str(s).unwrap())))
         .shared();
 
     let terminal = num

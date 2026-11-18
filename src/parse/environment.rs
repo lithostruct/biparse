@@ -1,29 +1,41 @@
+//! Module for [`ParseEnvironment`] implementors.
+//!
+//! Users are encouraged to define their own zero-sized structs implementing [`ParseEnvironment`]
+//! for different associated types.
+
 use crate::{
-    cst::IdSupply,
-    failure::{self, ParseFailure},
+    failure::{self},
+    parse::ParseEnvironment,
 };
 
-/// The trait describing additional information required by certain parsing constructs.
+/// The minimal implementation of [`ParseEnvironment`], corresponding to [`failure::types::Minimal`].
 ///
-/// This trait should be implemented by zero-sized types.
-pub trait ParseEnvironment: 'static {
-    /// The type of the failure payload.
-    type Failure: ParseFailure;
-    /// The type of the supply provided to [`Associate`](crate::combinator::Associate) combinators.
-    /// Used for associations.
-    type Supply: IdSupply;
-    /// The type of the supply provided to [`Recover`](crate::combinator::Recover) combinators.
-    /// Used for diagnostics.
-    type ErrorSupply: IdSupply;
+/// Lowest overhead, but with the least meaningful failure messages.
+#[derive(Debug, Clone, Copy)]
+pub struct Minimal;
+impl ParseEnvironment for Minimal {
+    type Failure = failure::types::Minimal;
+    type Supply = usize;
+    type ErrorSupply = usize;
 }
 
-/// The default implementation of [`ParseEnvironment`].
+/// The simple implementation of [`ParseEnvironment`], corresponding to [`failure::types::Simple`].
 ///
-/// Users are encouraged to define their own zero-typed structs implementing [`ParseEnvironment`]
-/// for different associated types.
+/// Moderate overhead, with meaningful positional and simplistic kind information.
 #[derive(Debug, Clone, Copy)]
-pub struct DefaultParseEnvironment;
-impl ParseEnvironment for DefaultParseEnvironment {
+pub struct Simple;
+impl ParseEnvironment for Simple {
+    type Failure = failure::types::Simple;
+    type Supply = usize;
+    type ErrorSupply = usize;
+}
+
+/// The rich implementation of [`ParseEnvironment`], corresponding to [`failure::types::Rich`].
+///
+/// High overhead, with most information retained from the site of failure.
+#[derive(Debug, Clone, Copy)]
+pub struct Rich;
+impl ParseEnvironment for Rich {
     type Failure = failure::types::Rich;
     type Supply = usize;
     type ErrorSupply = usize;

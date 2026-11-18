@@ -217,20 +217,18 @@ where
             ParseOutcome::Success(recovery_success) => {
                 // Recovery success!
                 let error_id = recovery_state.error_supply.next_id();
-                let recovered_cst = recovery_state.with_interner(|interner| {
-                    recovery_output.cst.diagnose_new_parent(
-                        self.kind,
-                        error_id.clone(),
-                        failure,
-                        interner,
-                    )
+                let overall_cst = recovery_state.with_interner(|interner| {
+                    output
+                        .cst
+                        .merge_with(recovery_output.cst)
+                        .diagnose_new_parent(self.kind, error_id.clone(), failure, interner)
                 });
                 let recovery_payload = (self.closure)(error_id, recovery_success);
                 (
                     recovery_state,
                     ParseOutput {
                         ast: ParseOutcome::Success(recovery_payload),
-                        cst: output.cst.merge_with(recovered_cst),
+                        cst: overall_cst,
                     },
                 )
             }

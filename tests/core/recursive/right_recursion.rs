@@ -7,7 +7,7 @@ use rowan::SyntaxKind;
 
 /// Matches string `s` on zero or more occurrences of 'a'.
 fn right_recursive_a(s: String) -> String {
-    let combinator: Recursive<Direct<'_, '_, str, String, DefaultParseEnvironment>> =
+    let combinator: Recursive<Direct<'_, '_, str, String, environment::Rich>> =
         Recursive::new(|this| {
             just((SyntaxKind(0), 'a'))
                 .then(this)
@@ -18,10 +18,8 @@ fn right_recursive_a(s: String) -> String {
                 .either_or(success())
                 .map(Either::left_or_default)
         });
-    let (state, output) = combinator.parse(
-        &s,
-        ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
-    );
+    let (state, output) =
+        combinator.parse(&s, ParseState::<str, environment::Rich>::new(s.as_str()));
     match output.ast {
         ParseOutcome::Success(header) => {
             if state.cursor.into_usize() == 0 {

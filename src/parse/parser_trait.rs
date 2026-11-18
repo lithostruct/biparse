@@ -10,11 +10,9 @@ use crate::{
         TryMap, end, success,
     },
     cst::IdSupply,
+    failure::ParseFailure,
     input::Input,
-    parse::{
-        DefaultParseEnvironment, ParseArtifact, ParseEnvironment, ParseOutput, ParseStateData,
-        TerminalFailure,
-    },
+    parse::{ParseArtifact, ParseOutput, ParseStateData, TerminalFailure, environment},
 };
 
 /// Type alias over [`ParseStateData`] which provides more straightforward type arguments for usage in [`Parser`] implementors.
@@ -23,7 +21,7 @@ use crate::{
 pub type ParseState<'src, I, E: ParseEnvironment> = ParseStateData<'src, <I as Input>::Cursor, E>;
 
 /// The central parsing trait, implemented by all combinators.
-/// Heavily based on that of [`chumsky`](https://docs.rs/chumsky/latest/chumsky/trait.Parser.html)
+/// Heavily based on that of [`chumsky`](https://docs.rs/chumsky/latest/chumsky/trait.Parser.html).
 ///
 /// Parsers take inputs of type `I`, which will implement [`Input`].
 /// Refer to the documentation on [`Input`] for examples of common input types.
@@ -37,13 +35,13 @@ pub type ParseState<'src, I, E: ParseEnvironment> = ParseStateData<'src, <I as I
 /// The final type parameter, E, is expected to be a [`ParseEnvironment`] implementor.
 /// [`ParseEnvironment`] is used to encapsulate the various types a parser uses that are not simply its input and output.
 /// Refer to the documentation on [`ParseEnvironment`] for more detail on the contained types.
-/// If not provided, it will default to [`DefaultParseEnvironment`],
+/// If not provided, it will default to [`environment::Rich`],
 /// which retains maximal failure information but may have significant overhead.
 ///
 /// The lifetime of the parser is used for zero-copy output. The input is bound by the lifetime,
 /// and returned values or parser state may take advantage of this to borrow tokens or slices of the input and hold on to them,
 /// if the input supports this.
-pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment> {
+pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = environment::Rich> {
     /// Parse the input from the given state, returning a result state and output.
     fn parse(
         &self,
@@ -78,6 +76,20 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
     }
 }
 
+/// The trait describing additional information required by certain parsing constructs.
+///
+/// This trait should be implemented by zero-sized types.
+pub trait ParseEnvironment: 'static {
+    /// The type of the failure payload.
+    type Failure: ParseFailure;
+    /// The type of the supply provided to [`Associate`](crate::combinator::Associate) combinators.
+    /// Used for associations.
+    type Supply: IdSupply;
+    /// The type of the supply provided to [`Recover`](crate::combinator::Recover) combinators.
+    /// Used for diagnostics.
+    type ErrorSupply: IdSupply;
+}
+
 /// Methods blanket implemented for all implementors of [`Parser<'src, I, A, E>`].
 ///
 /// Enables combinator method chaining,
@@ -90,7 +102,7 @@ pub trait Parser<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseE
 /// - Unlike [`Parser`], this trait is not intended to be implemented directly.
 /// - New methods may be added to this trait *without* following semantic versioning.
 /// - Existing methods will only be modified in accordance with semantic versioning.
-pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = DefaultParseEnvironment>:
+pub trait ParserExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = environment::Rich>:
     Parser<'src, I, A, E>
 {
     /// Parses from the start of input to the end, converting the output to a top-level result.
@@ -414,12 +426,9 @@ pub mod derived {
 }
 
 /// Convenience trait for [`.into_owned()`](Self::into_owned) method chaining.
-pub trait ParserIntoOwnedExt<
-    'src,
-    I: Input + ?Sized,
-    A,
-    E: ParseEnvironment = DefaultParseEnvironment,
->: Parser<'src, I, &'src A, E> where
+pub trait ParserIntoOwnedExt<'src, I: Input + ?Sized, A, E: ParseEnvironment = environment::Rich>:
+    Parser<'src, I, &'src A, E>
+where
     A: ToOwned + ?Sized + 'src,
 {
     /// Chains `self` by transforming an AST payload reference into owned data.

@@ -15,8 +15,8 @@ use rowan::SyntaxKind;
 proptest! {
     #[test]
     fn single_fail(s in any::<String>()) {
-        let (state, output): (_, ParseOutput<(), DefaultParseEnvironment>) = fail()
-            .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
+        let (state, output): (_, ParseOutput<(), environment::Rich>) = fail()
+            .parse(s.as_str(), ParseState::<str, environment::Rich>::new(s.as_str()));
 
         assert_eq!(state.cursor.into_usize(), 0);
         assert!(matches!(output.ast, ParseOutcome::Speculative(_)));
@@ -24,11 +24,11 @@ proptest! {
 
     #[test]
     fn fail_then_just(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (state, output): (_, ParseOutput<&str, DefaultParseEnvironment>)
+        let (state, output): (_, ParseOutput<&str, environment::Rich>)
             = fail()
                 .then(just((SyntaxKind(kind), pattern.clone())))
                 .map(|(_, s) : (!, &str)| s)
-                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, environment::Rich>::new(s.as_str()));
 
         // No input should be consumed.
         assert_eq!(state.cursor.into_usize(), 0);
@@ -37,10 +37,10 @@ proptest! {
 
     #[test]
     fn just_then_fail(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (_, output): (_, ParseOutput<&str, DefaultParseEnvironment>)
+        let (_, output): (_, ParseOutput<&str, environment::Rich>)
             = just((SyntaxKind(kind), pattern))
                 .then(fail()).map(|(s, ())| s)
-                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, environment::Rich>::new(s.as_str()));
 
         assert!(matches!(output.ast, ParseOutcome::Speculative(_)));
         // Regression: this assert doesn't make sense and hence removed
@@ -50,13 +50,13 @@ proptest! {
 
     #[test]
     fn fail_or_just(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (state1, output1): (_, ParseOutput<&str, DefaultParseEnvironment>)
+        let (state1, output1): (_, ParseOutput<&str, environment::Rich>)
             = just((SyntaxKind(kind), pattern.clone()))
-                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
-        let (state2, output2): (_, ParseOutput<&str, DefaultParseEnvironment>)
+                .parse(s.as_str(), ParseState::<str, environment::Rich>::new(s.as_str()));
+        let (state2, output2): (_, ParseOutput<&str, environment::Rich>)
             = fail()
                 .or(just((SyntaxKind(kind), pattern)))
-                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, environment::Rich>::new(s.as_str()));
 
         match (output1.ast, output2.ast) {
             (ParseOutcome::Success(val1), ParseOutcome::Success(val2))
@@ -73,14 +73,14 @@ proptest! {
 
     #[test]
     fn just_or_fail(kind in any::<u16>(), pattern in ".{0,20}", s in any::<String>()) {
-        let (state1, result1): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
+        let (state1, result1): (_, ParseOutput<Either<&str, ()>, environment::Rich>)
             = just((SyntaxKind(kind), pattern.clone()))
                 .map(Either::Left)
-                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
-        let (state2, result2): (_, ParseOutput<Either<&str, ()>, DefaultParseEnvironment>)
+                .parse(s.as_str(), ParseState::<str, environment::Rich>::new(s.as_str()));
+        let (state2, result2): (_, ParseOutput<Either<&str, ()>, environment::Rich>)
             = just((SyntaxKind(kind), pattern))
                 .either_or(fail())
-                .parse(s.as_str(), ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
+                .parse(s.as_str(), ParseState::<str, environment::Rich>::new(s.as_str()));
 
         match (result1.ast, result2.ast) {
             (ParseOutcome::Success(val1), ParseOutcome::Success(val2))

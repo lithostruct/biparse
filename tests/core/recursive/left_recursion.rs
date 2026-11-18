@@ -7,7 +7,7 @@ use rowan::SyntaxKind;
 
 /// Matches string `s` on zero or more occurrences of 'a'.
 fn left_recursive_a(s: String) -> String {
-    let combinator: Recursive<Direct<'_, '_, str, String, DefaultParseEnvironment>> =
+    let combinator: Recursive<Direct<'_, '_, str, String, environment::Rich>> =
         Recursive::new_as("left-recursive-a", |this| {
             this.then(just((SyntaxKind(0), 'a')))
                 .map(|(mut rest, last)| {
@@ -17,10 +17,8 @@ fn left_recursive_a(s: String) -> String {
                 .either_or(success())
                 .map(|either| either.left_or_default())
         });
-    let (state, output) = combinator.parse(
-        &s,
-        ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
-    );
+    let (state, output) =
+        combinator.parse(&s, ParseState::<str, environment::Rich>::new(s.as_str()));
     match output.ast {
         ParseOutcome::Success(header) => {
             if state.cursor.into_usize() == 0 {
@@ -76,7 +74,7 @@ proptest! {
 fn non_growing_termination() {
     #[derive(Clone, Copy)]
     struct OhNo;
-    let combinator: Recursive<dyn Parser<'_, str, Either<&str, OhNo>, DefaultParseEnvironment>> =
+    let combinator: Recursive<dyn Parser<'_, str, Either<&str, OhNo>, environment::Rich>> =
         Recursive::new(|this| just((SyntaxKind(0), "a")).either_or(this.map(|_| OhNo)));
 
     let artifact = combinator.parse_all("a").expect("Success!").into_ast_only();
@@ -91,7 +89,7 @@ fn non_growing_termination() {
 /// which is cached within the RecursiveState valid for the next iteration.
 #[test]
 fn left_recursion_with_association() {
-    let combinator: Recursive<dyn Parser<'_, str, Vec<(usize, char)>, DefaultParseEnvironment>> =
+    let combinator: Recursive<dyn Parser<'_, str, Vec<(usize, char)>, environment::Rich>> =
         Recursive::new(|this: Recursive<dyn Parser<'_, str, Vec<(usize, char)>>>| {
             this.then(just(Matches::always::<str>(SyntaxKind(0))))
                 .associate(SyntaxKind(0), |u, (mut acc, c)| {

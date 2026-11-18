@@ -23,7 +23,7 @@ use crate::failure::{Descriptor, ParseHint};
 /// - [`LexerStream`](super::logos::LexerStream), which wraps [`logos::Lexer`]
 ///   for any token type satisfying [`logos::Logos`] and [`Clone`]. Requires default feature `logos`.
 /// - [`SkippingStr`](super::skipping_str::SkippingStr), which implicitly skips trivia characters (such as whitespace),
-///   thus not requiring them to be explictly matched on the parser combinator level.
+///   thus not requiring them to be explicitly matched on the parser combinator level.
 pub trait Input {
     /// The type of the cursor, that allows for external users to refer into this input.
     type Cursor: Copy + Ord + Hash;
@@ -177,9 +177,7 @@ impl<T, C> InputItem<T, C> {
 pub struct LineColumn {
     /// 1-indexed line number.
     pub line: usize,
-    /// 1-indexed column number.
-    ///
-    /// For most [`Input`] implementors, this is determined via [`str::chars`] rather than using Unicode width.
+    /// 1-indexed column number, corresponding to the number of Unicode scalar values [`char`] in this line.
     pub column: usize,
 }
 impl Display for LineColumn {

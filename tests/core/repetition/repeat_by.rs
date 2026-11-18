@@ -6,12 +6,12 @@ use expect_test::expect;
 #[test]
 #[should_panic]
 fn invalid_construction() {
-    let _ = success::<str, DefaultParseEnvironment>().repeat_by(0..0);
+    let _ = success::<str, environment::Rich>().repeat_by(0..0);
 }
 
 #[test]
 fn bounded_repetition() {
-    fn a_parser_1to5<'src>() -> impl Parser<'src, str, Vec<&'src str>, DefaultParseEnvironment> {
+    fn a_parser_1to5<'src>() -> impl Parser<'src, str, Vec<&'src str>, environment::Rich> {
         just((SyntaxKind(0), 'a')).repeat_by(1..=5)
     }
 

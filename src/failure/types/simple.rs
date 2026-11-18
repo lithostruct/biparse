@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use thiserror::Error;
 
 use crate::{
@@ -13,15 +15,24 @@ pub enum SimpleKind {
     #[error("expected-found mismatch")]
     ExpectedFound,
     /// Failure caused by the [`Fail`](crate::combinator::Fail) primitive combinator.
-    #[error("primitive failure")]
-    FailPrimitive,
+    #[error("primitive failure{}", .message.as_ref().map_or_else(String::new, |inner| format!(": {inner}")))]
+    FailPrimitive {
+        /// Optional message to be transmitted.
+        message: Option<Cow<'static, str>>,
+    },
 
-    /// Undefined parser. This is always fatal.
-    #[error("undefined parser")]
-    UndefinedParser,
-    /// Dropped parser. This is always fatal.
-    #[error("dropped parser")]
-    DroppedParser,
+    /// Undefined recursive parser. This is always fatal.
+    #[error("undefined parser{}", .name.as_ref().map_or_else(String::new, |inner| format!(": {inner}")))]
+    UndefinedParser {
+        /// Optional name of the recursive parser.
+        name: Option<Cow<'static, str>>,
+    },
+    /// Dropped recursive parser. This is always fatal.
+    #[error("dropped parser{}", .name.as_ref().map_or_else(String::new, |inner| format!(": {inner}")))]
+    DroppedParser {
+        /// Optional name of the recursive parser.
+        name: Option<Cow<'static, str>>,
+    },
     /// Non-growing repetition in [`Repetition`](crate::combinator::Repetition). This is always fatal.
     #[error("non growing repetition")]
     NonGrowingRepetition,
@@ -48,9 +59,9 @@ impl<I: Input + ?Sized> From<FailureKind<I>> for SimpleKind {
     fn from(value: FailureKind<I>) -> Self {
         match value {
             FailureKind::ExpectedFound { .. } => SimpleKind::ExpectedFound,
-            FailureKind::FailPrimitive { .. } => SimpleKind::FailPrimitive,
-            FailureKind::UndefinedParser { .. } => SimpleKind::UndefinedParser,
-            FailureKind::DroppedParser { .. } => SimpleKind::DroppedParser,
+            FailureKind::FailPrimitive { message } => SimpleKind::FailPrimitive { message },
+            FailureKind::UndefinedParser { name } => SimpleKind::UndefinedParser { name },
+            FailureKind::DroppedParser { name } => SimpleKind::DroppedParser { name },
             FailureKind::NonGrowingRepetition { .. } => SimpleKind::NonGrowingRepetition,
             FailureKind::InsufficientRepetition { .. } => SimpleKind::InsufficientRepetition,
         }

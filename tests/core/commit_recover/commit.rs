@@ -11,19 +11,19 @@ use rowan::SyntaxKind;
 #[test]
 fn commit_semantics() {
     assert!(
-        success::<str, DefaultParseEnvironment>()
+        success::<str, environment::Rich>()
             .commit()
             .parse_all("")
             .is_ok()
     );
     assert!(
-        fail::<str, !, DefaultParseEnvironment>()
+        fail::<str, !, environment::Rich>()
             .commit()
             .parse_all("")
             .is_err()
     );
 
-    let combinator = fail::<str, !, DefaultParseEnvironment>().commit();
+    let combinator = fail::<str, !, environment::Rich>().commit();
     let (_, output) = combinator.parse("", ParseState::<str, _>::new(""));
     assert!(matches!(output.ast, ParseOutcome::Committed(_)));
 }
@@ -34,7 +34,7 @@ fn commit_semantics() {
 #[test]
 fn commit_within_then() {
     /// Expects "id" then "ent" (committed)
-    fn make_parser<'src>() -> impl Parser<'src, str, (), DefaultParseEnvironment> {
+    fn make_parser<'src>() -> impl Parser<'src, str, (), environment::Rich> {
         just((SyntaxKind(0), "id"))
             .then(just((SyntaxKind(0), "ent")).commit())
             .ignore()
@@ -75,7 +75,7 @@ fn commit_within_then() {
 #[test]
 fn commit_within_or() {
     // Expects "var_" then an alphabetic identifier + '_' (committed), or succeed unconditionally.
-    fn make_parser<'src>() -> impl Parser<'src, str, (), DefaultParseEnvironment> {
+    fn make_parser<'src>() -> impl Parser<'src, str, (), environment::Rich> {
         (just((SyntaxKind(0), "var_"))
             .then(just((SyntaxKind(0), regex::Regex::new(r"[a-zA-Z_]+").unwrap())).commit()))
         .either_or(success())
@@ -123,7 +123,7 @@ fn commit_within_many() {
     ///
     /// If '(' is first identified, ')' becomes a checkpoint, and is recovered until then.
     fn make_parser<'src>()
-    -> impl Parser<'src, str, Result<Vec<String>, FailReason>, DefaultParseEnvironment> {
+    -> impl Parser<'src, str, Result<Vec<String>, FailReason>, environment::Rich> {
         let whitespace = just((SyntaxKind(20), regex::Regex::new(r"[ \t\r\n]+").unwrap())).shared();
         let identifier: Rc<dyn Parser<'_, _, String, _>> = just((SyntaxKind(10), "FAIL:"))
             .then_ignore(fail::<_, !, _>().commit())
@@ -193,7 +193,7 @@ fn commit_within_many() {
 
     expect![[r#"
         [
-            Rich {
+            environment::Rich {
                 position: LineColumn {
                     line: 1,
                     column: 14,

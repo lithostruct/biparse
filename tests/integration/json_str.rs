@@ -238,7 +238,7 @@ fn json_parser<'src, E: ParseEnvironment>() -> impl Parser<'src, str, Json, E> {
 #[test]
 fn json_null() {
     let data = "null";
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(data).unwrap();
     expect![[r#"
         Null
@@ -259,7 +259,7 @@ fn json_null() {
 #[test]
 fn json_true() {
     let data = "true";
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(data).unwrap();
     expect![[r#"
         Boolean(
@@ -281,7 +281,7 @@ fn json_true() {
 #[test]
 fn json_false() {
     let data = "false";
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(data).unwrap();
     expect![[r#"
         Boolean(
@@ -304,7 +304,7 @@ fn json_false() {
 #[test]
 fn json_num() {
     let data = "12345";
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(data).unwrap();
     expect![[r#"
         Number(
@@ -327,7 +327,7 @@ fn json_num() {
 #[test]
 fn json_array() {
     let data = r#"[ "a", "b", "c", [1,2,3] ]"#;
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(data).unwrap();
     expect![[r#"
         Array(
@@ -413,7 +413,7 @@ fn package_data() {
             ]
         }
     "#};
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let (ast, cst) = parser.parse_all(data).expect("success!").into_parts();
 
     expect![[r#"

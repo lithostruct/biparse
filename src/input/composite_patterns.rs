@@ -16,7 +16,9 @@ use crate::{
 /// The [`Pattern`] implementation on [`AllOf`] is non-atomic; it defers to the inner patterns for matching,
 /// and chains the output of the previous element to the next.  
 /// This may have unintended interactions with [`SkippingStr`](crate::input::str::SkippingStr).
-/// Refer to [`SkippingStr`](crate::input::str::SkippingStr) "Notes on Trivia Matching and Pattern Atomicity" for more information.
+///
+/// Refer to [`SkippingStr`](crate::input::str::SkippingStr) documentation on
+/// "Notes on Trivia Matching and Pattern Atomicity" for more information.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Deref, DerefMut, AsRef, AsMut,
 )]

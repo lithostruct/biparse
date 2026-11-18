@@ -9,15 +9,15 @@ proptest! {
     #[test]
     fn arbitrary_char_pattern(pat in any::<char>(), s in any::<String>()) {
         let str_parser =
-            just::<'_, str, DefaultParseEnvironment, _>((SyntaxKind(0), pat))
+            just::<'_, str, environment::Rich, _>((SyntaxKind(0), pat))
                 .to_owned();
         let cachedstr_parser =
-            just::<'_, CachedStr<'_>, DefaultParseEnvironment, _>((SyntaxKind(0), pat))
+            just::<'_, CachedStr<'_>, environment::Rich, _>((SyntaxKind(0), pat))
                 .to_owned();
 
-        let str_output = str_parser.parse(&s, ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
+        let str_output = str_parser.parse(&s, ParseState::<str, environment::Rich>::new(s.as_str()));
         let cachedstr = CachedStr::new(&s);
-        let cachedstr_output = cachedstr_parser.parse(&cachedstr, ParseState::<str, DefaultParseEnvironment>::new(&cachedstr));
+        let cachedstr_output = cachedstr_parser.parse(&cachedstr, ParseState::<str, environment::Rich>::new(&cachedstr));
 
         assert_eq!(str_output.1, cachedstr_output.1);
         assert_eq!(str_output.0.cursor, cachedstr_output.0.cursor);
@@ -25,15 +25,15 @@ proptest! {
     #[test]
     fn arbitrary_string_pattern(pat in any::<String>(), s in any::<String>()) {
         let str_parser =
-            just::<'_, str, DefaultParseEnvironment, _>((SyntaxKind(0), pat.clone()))
+            just::<'_, str, environment::Rich, _>((SyntaxKind(0), pat.clone()))
                 .to_owned();
         let cachedstr_parser =
-            just::<'_, CachedStr<'_>, DefaultParseEnvironment, _>((SyntaxKind(0), pat))
+            just::<'_, CachedStr<'_>, environment::Rich, _>((SyntaxKind(0), pat))
                 .to_owned();
 
-        let str_output = str_parser.parse(&s, ParseState::<str, DefaultParseEnvironment>::new(s.as_str()));
+        let str_output = str_parser.parse(&s, ParseState::<str, environment::Rich>::new(s.as_str()));
         let cachedstr = CachedStr::new(&s);
-        let cachedstr_output = cachedstr_parser.parse(&cachedstr, ParseState::<str, DefaultParseEnvironment>::new(&cachedstr));
+        let cachedstr_output = cachedstr_parser.parse(&cachedstr, ParseState::<str, environment::Rich>::new(&cachedstr));
 
         assert_eq!(str_output.1, cachedstr_output.1);
         assert_eq!(str_output.0.cursor, cachedstr_output.0.cursor);

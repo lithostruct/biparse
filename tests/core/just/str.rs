@@ -12,11 +12,9 @@ fn some_amount_of_a() -> impl Strategy<Value = String> {
 }
 
 fn char_a(s: String) -> Option<String> {
-    let combinator: As<'_, str, &str, DefaultParseEnvironment, _> = just((SyntaxKind(0), 'a'));
-    let (state, result) = combinator.parse(
-        &s,
-        ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
-    );
+    let combinator: As<'_, str, &str, environment::Rich, _> = just((SyntaxKind(0), 'a'));
+    let (state, result) =
+        combinator.parse(&s, ParseState::<str, environment::Rich>::new(s.as_str()));
     match result.ast {
         ParseOutcome::Success(matched) => {
             assert_eq!(matched, "a");
@@ -38,11 +36,9 @@ proptest! {
 }
 
 fn str_a(s: String) -> Option<String> {
-    let combinator: As<'_, str, &str, DefaultParseEnvironment, _> = just((SyntaxKind(0), "a"));
-    let (state, result) = combinator.parse(
-        &s,
-        ParseState::<str, DefaultParseEnvironment>::new(s.as_str()),
-    );
+    let combinator: As<'_, str, &str, environment::Rich, _> = just((SyntaxKind(0), "a"));
+    let (state, result) =
+        combinator.parse(&s, ParseState::<str, environment::Rich>::new(s.as_str()));
     match result.ast {
         ParseOutcome::Success(matched) => {
             assert_eq!(matched, "a");
@@ -70,11 +66,11 @@ proptest! {
     #[test]
     fn arbitrary_char_pattern(pat in any::<char>(), s in any::<String>()) {
         let combinator =
-            just::<'_, str, DefaultParseEnvironment, _>((SyntaxKind(0), pat))
+            just::<'_, str, environment::Rich, _>((SyntaxKind(0), pat))
                 .to_owned();
         let (state, result) = combinator.parse(
             &s,
-            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
+            ParseState::<str, environment::Rich>::new(s.as_str())
         );
         match result.ast {
             ParseOutcome::Success(matched) => {
@@ -91,11 +87,11 @@ proptest! {
     #[test]
     fn arbitrary_string_pattern(pat in any::<String>(), s in any::<String>()) {
         let combinator =
-            just::<'_, str, DefaultParseEnvironment, _>((SyntaxKind(0), pat.clone()))
+            just::<'_, str, environment::Rich, _>((SyntaxKind(0), pat.clone()))
                 .to_owned();
         let (state, result) = combinator.parse(
             &s,
-            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
+            ParseState::<str, environment::Rich>::new(s.as_str())
         );
         match result.ast {
             ParseOutcome::Success(matched) => {

@@ -109,7 +109,7 @@ where
     ///
     /// This constructor assumes the caller has asserted that
     /// the Lexer created from this `Token` type produces gapless input coverage.
-    /// Biparse may panic during parsing if this invariant is not upheld.
+    /// [`Parser`] methods may panic if this invariant is not upheld.
     pub fn assume_contiguous<'root>(
         source: &'root Token::Source,
         descriptor: fn(&Token) -> String,
@@ -131,7 +131,7 @@ where
     Token: Logos<'src, Source = str>,
 {
     /// Returns the underlying source string.
-    pub fn source(&self) -> &str {
+    pub const fn source(&self) -> &str {
         self.source.source()
     }
 }

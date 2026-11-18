@@ -10,13 +10,13 @@ use proptest::{arbitrary::any, proptest};
 proptest! {
     #[test]
     fn this_or_empty(s in any::<String>()) {
-        let combinator: Recursive<dyn Parser<'_, str, (), DefaultParseEnvironment>> =
+        let combinator: Recursive<dyn Parser<'_, str, (), environment::Rich>> =
             Recursive::new(
                 |this| this.or(success()).map(|_| ())
             );
         let (state, output) = combinator.parse(
             &s,
-            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
+            ParseState::<str, environment::Rich>::new(s.as_str())
         );
         assert!(matches!(output.ast, ParseOutcome::Success(_)));
         assert_eq!(state.cursor.into_usize(), 0);
@@ -24,13 +24,13 @@ proptest! {
 
     #[test]
     fn empty_or_this(s in any::<String>()) {
-        let combinator: Recursive<dyn Parser<'_, str, (), DefaultParseEnvironment>> =
+        let combinator: Recursive<dyn Parser<'_, str, (), environment::Rich>> =
             Recursive::new(
                 |this| success().or(this).map(|_| ())
             );
         let (state, output) = combinator.parse(
             &s,
-            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
+            ParseState::<str, environment::Rich>::new(s.as_str())
         );
         assert!(matches!(output.ast, ParseOutcome::Success(_)));
         assert_eq!(state.cursor.into_usize(), 0);
@@ -38,14 +38,14 @@ proptest! {
 
     #[test]
     fn this_rec(s in any::<String>()) {
-        let combinator: Recursive<dyn Parser<'_, str, (), DefaultParseEnvironment>> =
+        let combinator: Recursive<dyn Parser<'_, str, (), environment::Rich>> =
             Recursive::new(
                 |this| this
             );
 
         let (state, output) = combinator.parse(
             &s,
-            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
+            ParseState::<str, environment::Rich>::new(s.as_str())
         );
         assert!(matches!(output.ast, ParseOutcome::Fatal(_)));
         assert_eq!(state.cursor.into_usize(), 0);
@@ -53,7 +53,7 @@ proptest! {
 
     #[test]
     fn mut_rec(s in any::<String>()) {
-        type Rec<'p, 'a> = Recursive::<Indirect<'p, 'a, str, (), DefaultParseEnvironment>>;
+        type Rec<'p, 'a> = Recursive::<Indirect<'p, 'a, str, (), environment::Rich>>;
         let mut rec_a : Rec<'_, '_> = Recursive::declare_as("rec_a");
         let mut rec_b : Rec<'_, '_> = Recursive::declare_as("rec_b");
         rec_a.define(rec_b.clone());
@@ -61,7 +61,7 @@ proptest! {
 
         let (state, output) = rec_a.parse(
             &s,
-            ParseState::<str, DefaultParseEnvironment>::new(s.as_str())
+            ParseState::<str, environment::Rich>::new(s.as_str())
         );
         assert!(matches!(output.ast, ParseOutcome::Fatal(_)));
         assert_eq!(state.cursor.into_usize(), 0);

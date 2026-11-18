@@ -69,8 +69,8 @@ impl SExp {
     /// Refer to [`Self::parse_with`] for expected format.
     pub fn parse(
         s: &str,
-    ) -> Result<Self, TerminalFailure<<DefaultParseEnvironment as ParseEnvironment>::Failure>> {
-        SExp::parse_with::<DefaultParseEnvironment>(s)
+    ) -> Result<Self, TerminalFailure<<environment::Rich as ParseEnvironment>::Failure>> {
+        SExp::parse_with::<environment::Rich>(s)
     }
 
     /// Attempts to construct [`Self`] via parsing of an S-expression,
@@ -138,9 +138,9 @@ impl SExp {
     }
 }
 impl FromStr for SExp {
-    type Err = TerminalFailure<<DefaultParseEnvironment as ParseEnvironment>::Failure>;
+    type Err = TerminalFailure<<environment::Rich as ParseEnvironment>::Failure>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        SExp::parse_with::<DefaultParseEnvironment>(s)
+        SExp::parse_with::<environment::Rich>(s)
     }
 }
 

@@ -7,18 +7,15 @@ use rowan::SyntaxKind;
 #[test]
 fn single_end() {
     const NO_TEXT: &str = "";
-    let no_input: ParseOutput<(), DefaultParseEnvironment> = end()
-        .parse(
-            NO_TEXT,
-            ParseState::<str, DefaultParseEnvironment>::new(NO_TEXT),
-        )
+    let no_input: ParseOutput<(), environment::Rich> = end()
+        .parse(NO_TEXT, ParseState::<str, environment::Rich>::new(NO_TEXT))
         .1;
     assert!(matches!(no_input.ast, ParseOutcome::Success(_)));
 
     const SOME_TEXT: &str = "lorem ipsum dolor sit amet";
-    let (state, some_input): (_, ParseOutput<(), DefaultParseEnvironment>) = end().parse(
+    let (state, some_input): (_, ParseOutput<(), environment::Rich>) = end().parse(
         SOME_TEXT,
-        ParseState::<str, DefaultParseEnvironment>::new(SOME_TEXT),
+        ParseState::<str, environment::Rich>::new(SOME_TEXT),
     );
     assert!(matches!(some_input.ast, ParseOutcome::Speculative(_)));
     assert_eq!(state.cursor.into_usize(), 0);
@@ -26,7 +23,7 @@ fn single_end() {
 
 #[test]
 fn just_then_end() {
-    let combinator = just::<_, DefaultParseEnvironment, _>((SyntaxKind(0), "a")).then(end());
+    let combinator = just::<_, environment::Rich, _>((SyntaxKind(0), "a")).then(end());
 
     let not_enough = combinator.parse_all("");
     let just_right = combinator.parse_all("a");
@@ -45,7 +42,7 @@ fn just_then_end() {
 fn all_trivia_end() {
     use biparse::input::str::SkippingStr;
 
-    let ends: As<'_, SkippingStr<'_>, (), DefaultParseEnvironment, _> = end();
+    let ends: As<'_, SkippingStr<'_>, (), environment::Rich, _> = end();
 
     const ALL_TRIVIA: &str = "     "; // length 5.
     let input = SkippingStr::whitespace(ALL_TRIVIA, SyntaxKind(0));
@@ -70,7 +67,7 @@ fn end_then_end() {
     const ALL_TRIVIA: &str = "     "; // length 5.
     let input = SkippingStr::whitespace(ALL_TRIVIA, SyntaxKind(0));
 
-    let ends: Box<dyn Parser<'_, SkippingStr<'_>, ((), ()), DefaultParseEnvironment>> =
+    let ends: Box<dyn Parser<'_, SkippingStr<'_>, ((), ()), environment::Rich>> =
         end().then(end()).boxed();
 
     // `parse_all` adds one more `end`, so the text is tripled if not handled correctly.

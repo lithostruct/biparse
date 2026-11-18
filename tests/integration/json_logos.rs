@@ -232,7 +232,7 @@ where
 #[test]
 fn json_null() {
     let data = LexerStream::new("null", Kind::Whitespace);
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(&data).unwrap();
     expect![[r#"
         Null
@@ -253,7 +253,7 @@ fn json_null() {
 #[test]
 fn json_true() {
     let data = LexerStream::new("true", Kind::Whitespace);
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(&data).unwrap();
     expect![[r#"
         Boolean(
@@ -275,7 +275,7 @@ fn json_true() {
 #[test]
 fn json_false() {
     let data = LexerStream::new("false", Kind::Whitespace);
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(&data).unwrap();
     expect![[r#"
         Boolean(
@@ -298,7 +298,7 @@ fn json_false() {
 #[test]
 fn json_num() {
     let data = LexerStream::new("12345", Kind::Whitespace);
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(&data).unwrap();
     expect![[r#"
         Number(
@@ -321,7 +321,7 @@ fn json_num() {
 #[test]
 fn json_array() {
     let data = LexerStream::new(r#"[ "a", "b", "c", [1,2,3] ]"#, Kind::Whitespace);
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let result = parser.parse_all(&data).unwrap();
     expect![[r#"
         Array(
@@ -402,7 +402,7 @@ fn package_data() {
         }
     "#};
     let data = LexerStream::new(source, Kind::Whitespace);
-    let parser = json_parser::<DefaultParseEnvironment>();
+    let parser = json_parser::<environment::Rich>();
     let (ast, cst) = parser.parse_all(&data).expect("success!").into_parts();
 
     expect![[r#"

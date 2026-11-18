@@ -1,4 +1,5 @@
 #![doc = include_str!("README.rustdoc.md")]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod green;
 

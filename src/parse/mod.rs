@@ -4,11 +4,10 @@
 
 mod parser_trait;
 
-mod environment;
+pub mod environment;
 mod io;
 
 pub use self::{
-    environment::*,
     io::*,
     parser_trait::{derived, *},
 };

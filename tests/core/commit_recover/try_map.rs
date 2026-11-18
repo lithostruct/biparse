@@ -12,27 +12,25 @@ fn parser_u16<'src, E: ParseEnvironment>() -> impl Parser<'src, str, u16, E> {
 
 #[test]
 fn try_map_u16() {
-    parser_u16::<DefaultParseEnvironment>()
+    parser_u16::<environment::Rich>()
         .parse_all("324")
         .expect("Successful parse!");
 
-    parser_u16::<DefaultParseEnvironment>()
+    parser_u16::<environment::Rich>()
         .parse_all("unexpected")
         .expect_err("No parse!");
-    parser_u16::<DefaultParseEnvironment>()
+    parser_u16::<environment::Rich>()
         .parse_all("123456789")
         .expect_err("Conversion fail!");
 }
 
 #[test]
 fn try_map_with_recovery() {
-    let parser = parser_u16::<DefaultParseEnvironment>()
-        .map(Option::Some)
-        .recover(
-            just(Matches::always::<str>(SyntaxKind(0))).many(),
-            |_, _| None,
-            SyntaxKind(999),
-        );
+    let parser = parser_u16::<environment::Rich>().map(Option::Some).recover(
+        just(Matches::always::<str>(SyntaxKind(0))).many(),
+        |_, _| None,
+        SyntaxKind(999),
+    );
     assert!(
         parser
             .parse_all("123456789") // exceeds u16::MAX!

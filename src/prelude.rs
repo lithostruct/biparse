@@ -7,8 +7,8 @@ pub use crate::{
     failure::{self, Descriptor, FailureKind, ParseFailure, ParseHint},
     input::{self, Input, LineColumn, Pattern},
     parse::{
-        DefaultParseEnvironment, ParseArtifact, ParseEnvironment, ParseOutcome, ParseOutput,
-        ParseState, Parser, ParserExt, ParserIntoOwnedExt, RecursiveState,
+        ParseArtifact, ParseEnvironment, ParseOutcome, ParseOutput, ParseState, Parser, ParserExt,
+        ParserIntoOwnedExt, RecursiveState, environment,
     },
 };
 pub use either::Either;
