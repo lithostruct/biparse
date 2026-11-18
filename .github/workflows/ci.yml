@@ -134,3 +134,24 @@ jobs:
 
       - name: Check dry run for all features
         run: cargo publish --dry-run
+  
+  guidebook-check:
+    name: Guidebook Check
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.99.0
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install mdBook and mdbook-rustdoc-links
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook,mdbook-rustdoc-links,mdbook-linkcheck2
+
+      - name: Build mdBook
+        run: mdbook build guide
