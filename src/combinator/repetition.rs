@@ -76,11 +76,11 @@ impl<P> Repetition<P> {
     ///
     /// Note that this range object is normalized, and may not be identical to that
     /// supplied to [`Repetition::new`] during construction of `self`.
-    /// 
+    ///
     /// The following invariant holds with respect to [`Repetition::new`]:
     /// ```rust,ignore
     /// collection[range] == collection[Repetition::new(_, range).unwrap().range()]
-    /// 
+    ///
     /// where:
     ///     Repetition::new(_, range) matches! Some(_);
     /// ```

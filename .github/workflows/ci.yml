@@ -48,7 +48,8 @@ jobs:
   
   fmt:
     name: Cargo Formatting
-    runs-on: ubuntu-latest
+    # There's a divergence between Windows and Linux here regarding treatment of 
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -62,7 +63,7 @@ jobs:
   semver:
     name: Semver Check
     if: ${{ vars.SEMVER_CHECKS_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -78,7 +79,7 @@ jobs:
 
   docs:
     name: Documentation
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -100,7 +101,7 @@ jobs:
 
   readme:
     name: README
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -112,7 +113,7 @@ jobs:
         run: cargo install cargo-readme
 
       - name: Generate README
-        run: cargo readme --input src/README.rustdoc.md --output README.generated.md --no-comment-extraction
+        run: cargo readme --input src/README.rustdoc.md --output README.md --no-comment-extraction
 
       - name: Check README
         run: git diff --exit-code -- README.md
@@ -120,7 +121,7 @@ jobs:
   publish-dry-run:
     name: Publish Dry Run
     if: ${{ vars.SEMVER_CHECKS_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6

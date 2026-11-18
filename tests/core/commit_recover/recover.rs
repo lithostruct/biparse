@@ -1,6 +1,5 @@
 //! Module testing [`Recover`](biparse::combinator::Recover).
 
-
 use biparse::{cst::NoLang, input::Matches, prelude::*};
 use expect_test::expect;
 use rowan::SyntaxKind;
