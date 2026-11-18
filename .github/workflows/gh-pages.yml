@@ -35,6 +35,13 @@ jobs:
 
       - name: Build mdBook
         run: mdbook build guide
+
+      - name: Inspect build output
+        run: |
+          Get-ChildItem guide/book -Recurse
+          if (!(Test-Path guide/book/index.html)) {
+            throw "mdBook did not generate index.html"
+          }
         
       - name: Setup Pages
         uses: actions/configure-pages@v4
