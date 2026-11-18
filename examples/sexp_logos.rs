@@ -1,8 +1,6 @@
 //! Simple symbolic expression parser using [`SkippingStr`].
 
-use biparse::{
-    prelude::*,
-};
+use biparse::prelude::*;
 use expect_test::expect;
 use logos::Logos;
 
@@ -37,16 +35,14 @@ impl rowan::Language for Kind {
         }
     }
     fn kind_to_raw(kind: Self::Kind) -> rowan::SyntaxKind {
-        rowan::SyntaxKind(
-            match kind {
-                Kind::Whitespace => 0,
-                Kind::LeftParen => 1,
-                Kind::RightParen => 2,
-                Kind::Atom => 3,
-                Kind::List => 4,
-                Kind::Root => 5,
-            }
-        )
+        rowan::SyntaxKind(match kind {
+            Kind::Whitespace => 0,
+            Kind::LeftParen => 1,
+            Kind::RightParen => 2,
+            Kind::Atom => 3,
+            Kind::List => 4,
+            Kind::Root => 5,
+        })
     }
 }
 #[allow(clippy::from_over_into)]
@@ -62,22 +58,20 @@ enum SExp {
     List(Vec<SExp>),
 }
 
-fn sexp_parser<'source, 'parse, E: ParseEnvironment>() -> impl Parser<'parse, LexerStream<'source, Kind>, SExp, E>
-where 'source : 'parse {
-    let atom =just::<'parse, LexerStream<'source, Kind>, E, _>(
-        WithText(Kind::Atom)
-    );
-    Recursive::new(|sexp|
+fn sexp_parser<'source, 'parse, E: ParseEnvironment>()
+-> impl Parser<'parse, LexerStream<'source, Kind>, SExp, E>
+where
+    'source: 'parse,
+{
+    let atom = just::<'parse, LexerStream<'source, Kind>, E, _>(WithText(Kind::Atom));
+    Recursive::new(|sexp| {
         atom.map(|(_kind, s)| SExp::Atom(s.to_owned()))
             .named("atom", Kind::Atom)
-        .or(
-            just(Kind::LeftParen)
-            .ignore_then(
-                sexp.many().map(SExp::List)
-            ).then_ignore(just(Kind::RightParen))
-            .named("list", Kind::List)
-        )
-    )
+            .or(just(Kind::LeftParen)
+                .ignore_then(sexp.many().map(SExp::List))
+                .then_ignore(just(Kind::RightParen))
+                .named("list", Kind::List))
+    })
 }
 
 fn main() {
@@ -85,11 +79,10 @@ fn main() {
     let result = sexp_parser::<environment::Rich>().parse_all(&input);
     let artifact = result.expect("parse success");
 
-    assert_eq!(*artifact.ast_only(),
+    assert_eq!(
+        *artifact.ast_only(),
         SExp::List(vec![
-            SExp::List(vec![
-                SExp::Atom("1".to_string()),
-            ]),
+            SExp::List(vec![SExp::Atom("1".to_string()),]),
             SExp::List(vec![
                 SExp::Atom("2".to_string()),
                 SExp::Atom("3".to_string()),
@@ -135,5 +128,6 @@ fn main() {
               RightParen@17..18 ")"
             RightParen@18..19 ")"
 
-    "#]].assert_debug_eq(red_tree.tree());
+    "#]]
+    .assert_debug_eq(red_tree.tree());
 }
